@@ -36,6 +36,7 @@ void readFTSensor(ThrdStruct &data_struct){
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0E_ = sensor_init;
     if (sensor_init) cout << "Sensor ATI F/T iniciado! \n";
+    else cout <<  "Falha ao iniciar Sensor ATI F/T !!! \n";
   }
 
   bool isready_imu(false);

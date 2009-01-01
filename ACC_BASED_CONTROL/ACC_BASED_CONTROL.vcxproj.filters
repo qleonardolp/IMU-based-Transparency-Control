@@ -83,6 +83,9 @@
     <ClCompile Include="readATISensor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="updateGains.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReleaseNotes.css" />

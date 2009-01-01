@@ -47,7 +47,7 @@ void updateGains(ThrdStruct &data_struct){
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL) {
       for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++)
-        fscanf(pFile, "%f\n", rawgains[i]);
+        fscanf(pFile, "%f\n", rawgains + i);
       fclose(pFile);
     }
 
@@ -71,7 +71,7 @@ void updateGains(ThrdStruct &data_struct){
 
 float constrain_float(float val, float min, float max)
 {
-	if (isnan(val)) return (min + max)/2;
+	if (_isnan(val)) return (min + max)/2;
 
 	if (val < min) return min;
 

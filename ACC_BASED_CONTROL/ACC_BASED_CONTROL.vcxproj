@@ -32,6 +32,7 @@
     <ClCompile Include="qASGD.cpp" />
     <ClCompile Include="readATISensor.cpp" />
     <ClCompile Include="readIMUs.cpp" />
+    <ClCompile Include="updateGains.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

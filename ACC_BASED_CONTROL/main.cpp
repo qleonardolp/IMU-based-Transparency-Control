@@ -98,6 +98,8 @@ int main()
   ftsensor_struct.sampletime_ = FT_SMPLTM;
   ftsensor_struct.param00_ = DEFAULT_PRIORITY;
   ftsensor_struct.param0E_ = &ftsensor_isready;
+  ftsensor_struct.param0A_ = &imu_isready;
+  *(ftsensor_struct.datavecB_) = states_data;
   *(ftsensor_struct.datavecF_) = ati_data;
   ftsensor_struct.mtx_ = &comm_mtx;
 
@@ -257,10 +259,11 @@ void Interface()
       cout << " [01]: Acc-based Transparency (PD) \n";
       cout << " [02]: Acc-based Transparency Z(0) \n";
       cout << " [03]: Acc-based Transparency (LS) \n";
-      cout << " [04]: Int-based Transparency (F/T)\n ";
-      cout << " [05]: Markoviano Impedância \n";
+      cout << " [04]: Int-based Transparency (F/T)\n";
+      cout << " [05]: Markoviano Impedancia \n";
       cout << " [06]: Markoviano Torque \n";
-      cout << " [07]: Markoviano Z(0) + RUÍDO \n";
+      cout << " [07]: Markoviano Z(0) + RUIDO \n";
+      cout << " ";
       cin >> option;
       control_struct.param01_ = option;
       logging_struct.param10_ = option; // to logging the control option

@@ -149,6 +149,8 @@ void Controle(ThrdStruct &data_struct){
 
         kneeRightMotor.PDOsetVelocitySetpoint(desiredVelRPM);
         kneeRightMotor.WritePDO02();
+        kneeLeftMotor.PDOsetVelocitySetpoint(desiredVelRPM);
+        kneeLeftMotor.WritePDO02();
 
         for (int i = 0; i < loggsize; i++){
           logging_data[i] = states_data[i];
