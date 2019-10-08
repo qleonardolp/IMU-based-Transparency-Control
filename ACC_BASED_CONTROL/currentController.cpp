@@ -14,26 +14,28 @@
 void accBasedControl::FiniteDiff(float velHum, float velExo)
 {
 	m_epos->sync();	//Sincroniza a CAN
-
+  
 	vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
-	for (size_t i = sizeof(velhumVec) - 1; i > 0; --i)
+
+	for (int i = 3; i > 0; --i)
 	{
 		velhumVec[i] = velhumVec[i - 1];
 	}
 	velhumVec[0] = vel_hum;
 	acc_hum = (-2*velhumVec[3] + 9*velhumVec[2] -18*velhumVec[1] + 11*velhumVec[0]) / (6)*RATE;
-
+  
 	//acc_hum = (vel_hum - vel_hum_ant)*RATE;
 	//vel_hum_ant = vel_hum;
 
 	vel_exo = vel_exo - LPF_SMF*(vel_exo - velExo);
-	for (size_t i = sizeof(velexoVec) - 1; i > 0; --i)
+  
+	for (int i = 3; i > 0; --i)
 	{
 		velexoVec[i] = velexoVec[i - 1];
 	}
 	velexoVec[0] = vel_exo;
 	acc_exo = (-2*velexoVec[3] + 9*velexoVec[2] - 18*velexoVec[1] + 11*velexoVec[0]) / (6)*RATE;
-
+  
 	//acc_exo = (vel_exo - vel_exo_ant)*RATE;
 	//vel_exo_ant = vel_exo;
 
@@ -44,13 +46,14 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
 	torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // smmooooooooooth operaaatoorr
-	for (size_t i = sizeof(torqueSeaVec) - 1; i > 0; --i)
+  
+	for (int i = 3; i > 0; --i)
 	{
 		torqueSeaVec[i] = torqueSeaVec[i - 1];
 	}
 	torqueSeaVec[0] = torque_sea;
 	d_torque_sea = (-2*torqueSeaVec[3] + 9*torqueSeaVec[2] - 18*torqueSeaVec[1] + 11*torqueSeaVec[0]) / (6)*RATE;
-
+  
 	//d_torque_sea = (torque_sea - torque_sea_ant)*RATE;
 	//torque_sea_ant = torque_sea;
 
@@ -65,8 +68,8 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
 	{
-		//if ((theta_l >= -0.5200) && (theta_l <= 1.4800)) // (sentado)
-	  if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
+		if ((theta_l >= -0.5200) && (theta_l <= 1.4800)) // (sentado)
+	  //if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
     //if ((theta_l >= - 1.39626) && (theta_l <= 0.17000)) //(em pe parado)
 		{
 			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento é em mA !!!

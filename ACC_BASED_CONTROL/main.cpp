@@ -419,7 +419,7 @@ int main(int argc, char** argv)
 
 		while (!_kbhit())
 		{
-			XsTime::msleep(5);
+			XsTime::msleep(7);
 			//QueryPerformanceCounter(&tick_before);
 			//final_time = tick_before.QuadPart + 1*ticksSampleTime;
 
@@ -461,7 +461,7 @@ int main(int argc, char** argv)
 				freq = (float)CLOCKS_PER_SEC / loop_duration;
 			}
 
-			if (printer == desiredUpdateRate / 5)   // 120
+      if (printer == RATE / 5)   // 
 			{
 				system("cls");
 				std::cout << xsens2Eposcan.ctrl_word;
@@ -469,7 +469,7 @@ int main(int argc, char** argv)
 				printer = 0;
 			}
 
-			if (scan_file == desiredUpdateRate * 5)  // every 5s reads the gains_values.txt 
+			if (scan_file == RATE * 5)  // every 5s reads the gains_values.txt 
 			{
 				xsens2Eposcan.Gains_Scan();
 				scan_file = 0;
