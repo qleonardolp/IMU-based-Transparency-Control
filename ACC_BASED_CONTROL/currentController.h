@@ -46,7 +46,7 @@
 #define     KD_F			0.0200      // [s]
 
 
-#define     RATE            142.86      // [Hz]		  ?? Ts = 0.005 -> 200 Hz ??
+#define     RATE            142.86      // [Hz]	Use the control loop rate running
 #define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
 #define		MY_PI			3.141592653	// Pi value
 #define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor
@@ -75,18 +75,15 @@ public:
 
 		vel_hum = 0;
 		vel_exo = 0;
-		vel_hum_ant = 0;
-		vel_exo_ant = 0;
 
-		for (size_t i = 0; i < 4; ++i)
+		for (size_t i = 0; i < 6; ++i)
 		{
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
-      torqueSeaVec[i] = 0;
+			torqueSeaVec[i] = 0;
 		}
 
 		torque_sea = 0;
-		torque_sea_ant = 0;
 		setpoint = 0;
 		setpoint_filt = 0;
 
@@ -157,15 +154,12 @@ private:
 
 	float acc_hum;			// [rad/s^2]
 	float acc_exo;			// [rad/s^2]
-
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
-	float vel_hum_ant;		// [rad/s]
-	float vel_exo_ant;		// [rad/s]
 
-	float velhumVec[4];		// [rad/s]
-	float velexoVec[4];		// [rad/s]
-	float torqueSeaVec[4];	// [N.m]
+	float velhumVec[6];		// [rad/s]
+	float velexoVec[6];		// [rad/s]
+	float torqueSeaVec[6];	// [N.m]
 
 	float setpoint;			// [mA]
 	float setpoint_filt;
@@ -174,7 +168,6 @@ private:
 	float theta_c;			// [rad]
 
 	float torque_sea;		// [N.m]
-	float torque_sea_ant;
 	float d_torque_sea;		// [N.m/s]
 	float accbased_comp;	// [N.m]
 	float grav_comp;		// [N.m]
