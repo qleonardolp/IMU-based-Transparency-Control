@@ -54,7 +54,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (accbased_comp + Kp_F*torque_sea + Kd_F*d_torque_sea);
 	setpoint = Amplifier * setpoint;
 
-	setpoint_filt = setpoint_filt - LPF_SMF*(setpoint_filt - setpoint); // does it really needs to be filtered again?  TEST IT!
+	setpoint_filt = setpoint_filt - LPF_SMF*(setpoint_filt - setpoint);
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
 	{
@@ -107,7 +107,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
   m_eixo_in->ReadPDO02();
   sprintf(numbers_str, "%+5d", m_eixo_in->PDOgetActualVelocity());
-	ctrl_word += " Velocity: " + (std::string) numbers_str + " [???]\n";
+	ctrl_word += " Velocity: " + (std::string) numbers_str + " [rpm]\n";
 
 	if (logging && (log_count != 0))
 	{
