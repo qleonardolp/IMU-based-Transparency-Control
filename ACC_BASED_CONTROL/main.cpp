@@ -408,6 +408,7 @@ int main(int argc, char** argv)
 		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, time_logging);
 
 		std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
+    //XsTime::msleep(1000);
 
 		float delay;
 		int printer = 0;
@@ -419,7 +420,7 @@ int main(int argc, char** argv)
 
 		while (!_kbhit())
 		{
-			XsTime::msleep(7);
+			XsTime::msleep(4);
 			//QueryPerformanceCounter(&tick_before);
 			//final_time = tick_before.QuadPart + 1*ticksSampleTime;
 
@@ -447,21 +448,16 @@ int main(int argc, char** argv)
 				xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
 				printer++;
 				scan_file++;
-				//xsens2Eposcan.Acc_Gravity((float) accData[0].value(0), (float) accData[0].value(1), (float) accData[1].value(0), (float) accData[1].value(1), (float) gyroData[0].value(2), (float) gyroData[1].value(2));
 
 				auto control_stamp = std::chrono::steady_clock::now();
 				delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
-
-				//clock_t end = clock();
-				//double delay = (double) (end - begin)/CLOCKS_PER_SEC;
-				//printf("%f s\n", delay);   // printing the delay
 
 				loop_duration = clock() - beginning;
 				beginning = clock();
 				freq = (float)CLOCKS_PER_SEC / loop_duration;
 			}
 
-      if (printer == RATE / 5)   // 
+      if (printer == (int) RATE / 5)   // 
 			{
 				system("cls");
 				std::cout << xsens2Eposcan.ctrl_word;
@@ -469,7 +465,7 @@ int main(int argc, char** argv)
 				printer = 0;
 			}
 
-			if (scan_file == RATE * 5)  // every 5s reads the gains_values.txt 
+			if (scan_file == (int) RATE * 5)  // every 5s reads the gains_values.txt 
 			{
 				xsens2Eposcan.Gains_Scan();
 				scan_file = 0;

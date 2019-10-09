@@ -46,7 +46,7 @@
 #define     KD_F			0.0200      // [s]
 
 
-#define     RATE            142.86      // [Hz]	Use the control loop rate running
+#define     RATE            125.0      // [Hz]	Use the control loop rate running
 #define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
 #define		MY_PI			3.141592653	// Pi value
 #define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor

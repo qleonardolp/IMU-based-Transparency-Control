@@ -15,21 +15,21 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 {
 	m_epos->sync();	//Sincroniza a CAN
   
-	//vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
+	vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
 	for (int i = 5; i > 0; --i)
 	{
 		velhumVec[i] = velhumVec[i - 1];
 	}
-	velhumVec[0] = velHum;
+	velhumVec[0] = vel_hum;
 	acc_hum = (-12*velhumVec[5] + 75*velhumVec[4] - 200*velhumVec[3] + 300*velhumVec[2] - 300*velhumVec[1] + 137*velhumVec[0]) / (60)*RATE;
 
 
-	//vel_exo = vel_exo - LPF_SMF*(vel_exo - velExo);
+	vel_exo = vel_exo - LPF_SMF*(vel_exo - velExo);
 	for (int i = 5; i > 0; --i)
 	{
 		velexoVec[i] = velexoVec[i - 1];
 	}
-	velexoVec[0] = velExo;
+	velexoVec[0] = vel_exo;
 	acc_exo = (-12*velexoVec[5] + 75*velexoVec[4] - 200*velexoVec[3] + 300*velexoVec[2] - 300*velexoVec[1] + 137*velexoVec[0]) / (60)*RATE;
 
 
@@ -39,13 +39,13 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	m_eixo_in->ReadPDO01();
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
-	//torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // smmooooooooooth operaaatoorr
+	torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // smmooooooooooth operaaatoorr
   
 	for (int i = 5; i > 0; --i)
 	{
 		torqueSeaVec[i] = torqueSeaVec[i - 1];
 	}
-	torqueSeaVec[0] = STIFFNESS*(theta_c - theta_l);
+  torqueSeaVec[0] = torque_sea;
 	d_torque_sea = (-12*torqueSeaVec[5] + 75*torqueSeaVec[4] - 200*torqueSeaVec[3] + 300*torqueSeaVec[2] - 300*torqueSeaVec[1] + 137*torqueSeaVec[0]) / (60)*RATE;
 
 	//grav_comp = (INERTIA_EXO + 0.038)*GRAVITY*(0.50)*sin(theta_l);
@@ -53,7 +53,6 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (accbased_comp + Kp_F*torque_sea + Kd_F*d_torque_sea);
 	setpoint = Amplifier * setpoint;
-	//setpoint = 300000 * setpoint;
 
 	setpoint_filt = setpoint_filt - LPF_SMF*(setpoint_filt - setpoint); // does it really needs to be filtered again?  TEST IT!
 
