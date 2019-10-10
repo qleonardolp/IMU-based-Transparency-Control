@@ -13,6 +13,7 @@
 #include "EPOS_NETWORK.h"
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 // CONSTANTES
 
@@ -27,7 +28,7 @@
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1000		// Max corrente nominal no motor Maxon RE40 [A]
-#define   VOLTAGE_MAX   21.000    // Max tensão de saída Vcc fornecida pela EPOS 24/5
+#define		VOLTAGE_MAX		21.400    // Max tensão de saída Vcc fornecida pela EPOS 24/5
 #define		TORQUE_CONST	60.300		// Constante de torque do motor RE40	[N.m/mA]
 #define		SPEED_CONST		158.00		// Constante de velocidade do motor RE40 [rpm/V]
 
@@ -36,6 +37,10 @@
 #define		MTW_DIST_LIMB	0.2500		// [m]
 #define		MTW_DIST_EXO	0.0700		// [m]
 #define		L_CG			0.3500		// [m]
+
+// According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851
+#define		J_EQ			0.4700		// [Kg.m^2]
+#define		B_EQ			60.000		// [N.m s/rad]
 
 // Feedforward-Feedback PI acc-based controller:
 #define		K_FF			1.0000		// [dimensionless]
@@ -46,7 +51,7 @@
 #define     KP_F			1.5310      // [dimensionless]
 #define     KD_F			0.0200      // [s]
 
-
+// Low Pass Filtering
 #define     RATE            125.0      // [Hz]	Use the control loop rate running
 #define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
 #define		MY_PI			3.141592653	// Pi value
@@ -125,9 +130,12 @@ public:
 	// acc-gravity
 	void Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X, float accExo_Y, float velHum_Z, float velExo_Z);
 
+	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
 	void GainsScan();
+
+	void* Recorder();
 
   void UpdateCtrlWord_Current();
 

@@ -326,7 +326,7 @@ int main(int argc, char** argv)
 		}
 
 		int time_logging;
-		printf("How long (sec) do you want to record this run? 0 to do not record.");
+		printf("How long (sec) do you want to record this run? 0 to do not record: ");
 		scanf("%d", &time_logging);
 
 		std::cout << "Starting measurement..." << std::endl;
@@ -381,7 +381,7 @@ int main(int argc, char** argv)
 			}
 		}
 
-		std::this_thread::sleep_for(std::chrono::seconds(6)); // Or use XsTime::msleep(6000) ???
+		std::this_thread::sleep_for(std::chrono::seconds(6));
 
 		std::vector<XsVector> accData(mtwCallbacks.size());
 		std::vector<XsVector> gyroData(mtwCallbacks.size());
@@ -408,13 +408,14 @@ int main(int argc, char** argv)
 		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, time_logging);
 
 		std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
-    //XsTime::msleep(1000);
+		XsTime::msleep(1600);
 
 		float delay;
 		int printer = 0;
 		int scan_file = 0;
+		int record_count = time_logging*RATE;
 
-    std::chrono::system_clock::time_point mtw_data_stamp;
+		std::chrono::system_clock::time_point mtw_data_stamp;
 
 		clock_t beginning = 0;
 		clock_t loop_duration;
@@ -446,35 +447,39 @@ int main(int argc, char** argv)
 			if (newDataAvailable)
 			{
 				//xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
-        xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+				xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
 				printer++;
 				scan_file++;
+				record_count--;
 
 				auto control_stamp = std::chrono::steady_clock::now();
 				delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
 
 				loop_duration = clock() - beginning;
 				beginning = clock();
-				freq = (float) CLOCKS_PER_SEC / loop_duration;
+				freq = (float)CLOCKS_PER_SEC / loop_duration;
 			}
 
-      if (printer == (int) RATE / 5)   // 
+			while (record_count > 0)
 			{
-				system("cls");
-        //xsens2Eposcan.UpdateCtrlWord_Current();
-        xsens2Eposcan.UpdateCtrlWord_Velocity();
-				std::cout << xsens2Eposcan.ctrl_word;
-				printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
-				printer = 0;
+				xsens2Eposcan.Recorder();
 			}
 
-      
-			if (scan_file == (int) RATE * 5)  // every 5s reads the gains_values.txt 
+			if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
 			{
 				xsens2Eposcan.GainsScan();
 				scan_file = 0;
 			}
-      
+
+			if (printer == (int)RATE / 5)   // 
+			{
+				system("cls");
+				//xsens2Eposcan.UpdateCtrlWord_Current();
+				xsens2Eposcan.UpdateCtrlWord_Velocity();
+				std::cout << xsens2Eposcan.ctrl_word;
+				printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
+				printer = 0;
+			}
 
 			//QueryPerformanceCounter(&tick_after);
 			//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
