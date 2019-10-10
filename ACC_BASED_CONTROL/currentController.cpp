@@ -14,25 +14,41 @@
 void accBasedControl::FiniteDiff(float velHum, float velExo)
 {
 	m_epos->sync();	//Sincroniza a CAN
-  
+  m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);
+
+
+  // Acc-Based Torque//
 	vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
-	for (int i = 5; i > 0; --i)
+	for (int i = 3; i > 0; --i)
 	{
 		velhumVec[i] = velhumVec[i - 1];
 	}
 	velhumVec[0] = vel_hum;
-	acc_hum = (-12*velhumVec[5] + 75*velhumVec[4] - 200*velhumVec[3] + 300*velhumVec[2] - 300*velhumVec[1] + 137*velhumVec[0]) / (60)*RATE;
+	acc_hum = (-2*velhumVec[3] + 9*velhumVec[2] - 18*velhumVec[1] + 11*velhumVec[0]) / (6)*RATE;
 
 
 	vel_exo = vel_exo - LPF_SMF*(vel_exo - velExo);
-	for (int i = 5; i > 0; --i)
+	for (int i = 3; i > 0; --i)
 	{
 		velexoVec[i] = velexoVec[i - 1];
 	}
 	velexoVec[0] = vel_exo;
-	acc_exo = (-12*velexoVec[5] + 75*velexoVec[4] - 200*velexoVec[3] + 300*velexoVec[2] - 300*velexoVec[1] + 137*velexoVec[0]) / (60)*RATE;
+	acc_exo = (-2*velexoVec[3] + 9*velexoVec[2] - 18*velexoVec[1] + 11*velexoVec[0]) / (6)*RATE;
 
 
+  for (int i = 3; i > 0; --i)
+	{
+		torqueAccVec[i] = torqueAccVec[i - 1];
+	}
+	torqueAccVec[0] = K_ff*(4 * INERTIA_EXO)*acc_hum + Kp_A*(acc_hum - acc_exo) + Ki_A*(vel_hum - vel_exo);
+  accbased_comp = torqueAccVec[0];
+
+	d_accbased_comp = (-2*torqueAccVec[3] + 9*torqueAccVec[2] - 18*torqueAccVec[1] + 11*torqueAccVec[0]) / (6)*RATE;
+  // Acc-Based Torque//
+
+
+
+  // SEA Torque //
 	m_eixo_out->ReadPDO01();
 	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 
@@ -41,19 +57,17 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // smmooooooooooth operaaatoorr
   
-	for (int i = 5; i > 0; --i)
+	for (int i = 3; i > 0; --i)
 	{
 		torqueSeaVec[i] = torqueSeaVec[i - 1];
 	}
   torqueSeaVec[0] = torque_sea;
-	d_torque_sea = (-12*torqueSeaVec[5] + 75*torqueSeaVec[4] - 200*torqueSeaVec[3] + 300*torqueSeaVec[2] - 300*torqueSeaVec[1] + 137*torqueSeaVec[0]) / (60)*RATE;
+	d_torque_sea = (-2*torqueSeaVec[3] + 9*torqueSeaVec[2] - 18*torqueSeaVec[1] + 11*torqueSeaVec[0]) / (6)*RATE;
+  // SEA Torque //
 
-	//grav_comp = (INERTIA_EXO + 0.038)*GRAVITY*(0.50)*sin(theta_l);
-	accbased_comp = K_ff*(4 * INERTIA_EXO)*acc_hum + Kp_A*(acc_hum - acc_exo) + Ki_A*(vel_hum - vel_exo);
+  //setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (-Kp_F*(accbased_comp - torque_sea) - Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
 
-	setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (accbased_comp + Kp_F*torque_sea + Kd_F*d_torque_sea);
-	setpoint = Amplifier * setpoint;
-
+  setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (accbased_comp + Kp_F*torque_sea + Kd_F*d_torque_sea) * Amplifier;
 	setpoint_filt = setpoint_filt - LPF_SMF*(setpoint_filt - setpoint);
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
@@ -76,38 +90,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	m_eixo_in->WritePDO01();
 
 	m_eixo_in->ReadPDO01();
-	int actualCurrent = m_eixo_in->PDOgetActualCurrent();
-
-	char numbers_str[20];
-
-	sprintf(numbers_str, "%+5.3f", setpoint_filt);
-	ctrl_word = " setpt: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%+5d", actualCurrent);
-	ctrl_word += " [" + (std::string) numbers_str + " mA]\n";
-	sprintf(numbers_str, "%+5.3f", theta_l * (180 / MY_PI));
-	ctrl_word += " theta_l: " + (std::string) numbers_str + " deg";
-	sprintf(numbers_str, "%+5.3f", theta_c * (180 / MY_PI));
-	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg\n";
-	sprintf(numbers_str, "%+5.3f", torque_sea);
-	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m";
-	sprintf(numbers_str, "%+5.3f", accbased_comp);
-	ctrl_word += " T_acc: " + (std::string) numbers_str + " N.m\n";
-	sprintf(numbers_str, "%6.4f", K_ff);
-	ctrl_word += " K_ff: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%6.4f", Kp_A);
-	ctrl_word += " Kp_A: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%6.4f", Ki_A);
-	ctrl_word += " Ki_A: " + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%6.4f", Kp_F);
-	ctrl_word += " Kp_F: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%6.4f", Kd_F);
-	ctrl_word += " Kd_F: " + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%5d", Amplifier);
-	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
-
-  m_eixo_in->ReadPDO02();
-  sprintf(numbers_str, "%+5d", m_eixo_in->PDOgetActualVelocity());
-	ctrl_word += " Velocity: " + (std::string) numbers_str + " [rpm]\n";
+	actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 	if (logging && (log_count != 0))
 	{
@@ -176,9 +159,36 @@ void accBasedControl::Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X
 
 void accBasedControl::OmegaControl(float velHum, float velExo)
 {
+  m_epos->sync();	//Sincroniza a CAN
+  m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);
+
+  vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
+
+  float offset = 26;    // [rpm]
+  vel_motor = 170 * GEAR_RATIO * (2*MY_PI/60) * vel_hum + offset;   // [rpm]
+  voltage = vel_motor / SPEED_CONST;
+  if (abs(voltage) <= VOLTAGE_MAX)
+  {
+    m_eixo_in->PDOsetVelocitySetpoint( (int)vel_motor );
+  }
+  else
+  {
+    if (vel_motor < 0)
+    {
+      m_eixo_in->PDOsetVelocitySetpoint( -(int)SPEED_CONST*VOLTAGE_MAX );
+    }
+    else
+    {
+      m_eixo_in->PDOsetVelocitySetpoint( (int)SPEED_CONST*VOLTAGE_MAX );
+    }
+  }
+  m_eixo_in->WritePDO02();
+
+  m_eixo_in->ReadPDO02();
+  actualVelocity = m_eixo_in->PDOgetActualVelocity();
 }
 
-void accBasedControl::Gains_Scan()
+void accBasedControl::GainsScan()
 {
 	gains_values = fopen("gains_values.txt", "rt");
 
@@ -187,4 +197,45 @@ void accBasedControl::Gains_Scan()
 		fscanf(gains_values, "K_FF %f\nKP_A %f\nKI_A %f\nKP_F %f\nKD_F %f\nAMP %d\n", &K_ff, &Kp_A, &Ki_A, &Kp_F, &Kd_F, &Amplifier);
 		fclose(gains_values);
 	}
+}
+
+void accBasedControl::UpdateCtrlWord_Current()
+{
+  char numbers_str[20];
+	sprintf(numbers_str, "%+5.3f", setpoint_filt);
+	ctrl_word = " setpt: " + (std::string) numbers_str;
+	sprintf(numbers_str, "%+5d", actualCurrent);
+	ctrl_word += " [" + (std::string) numbers_str + " mA]\n";
+	sprintf(numbers_str, "%+5.3f", theta_l * (180 / MY_PI));
+	ctrl_word += " theta_l: " + (std::string) numbers_str + " deg";
+	sprintf(numbers_str, "%+5.3f", theta_c * (180 / MY_PI));
+	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg\n";
+	sprintf(numbers_str, "%+5.3f", torque_sea);
+	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m";
+	sprintf(numbers_str, "%+5.3f", accbased_comp);
+	ctrl_word += " T_acc: " + (std::string) numbers_str + " N.m\n";
+	sprintf(numbers_str, "%5.3f", K_ff);
+	ctrl_word += " K_ff: " + (std::string) numbers_str;
+	sprintf(numbers_str, "%5.3f", Kp_A);
+	ctrl_word += " Kp_A: " + (std::string) numbers_str;
+	sprintf(numbers_str, "%5.3f", Ki_A);
+	ctrl_word += " Ki_A: " + (std::string) numbers_str + "\n";
+	sprintf(numbers_str, "%5.3f", Kp_F);
+	ctrl_word += " Kp_F: " + (std::string) numbers_str;
+	sprintf(numbers_str, "%5.3f", Kd_F);
+	ctrl_word += " Kd_F: " + (std::string) numbers_str + "\n";
+	sprintf(numbers_str, "%5d", Amplifier);
+	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
+}
+
+
+void accBasedControl::UpdateCtrlWord_Velocity()
+{
+  char numbers_str[20];
+  sprintf(numbers_str, "%+5.3f", vel_motor);
+  ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
+  sprintf(numbers_str, "%+5d", actualVelocity);
+  ctrl_word += " [" + (std::string) numbers_str + " rpm]\n";
+  sprintf(numbers_str, "%+5.3f", abs(actualVelocity / SPEED_CONST) );
+  ctrl_word += " Voltage: " + (std::string) numbers_str + " V\n";
 }

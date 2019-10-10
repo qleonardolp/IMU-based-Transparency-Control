@@ -27,6 +27,7 @@
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1000		// Max corrente nominal no motor Maxon RE40 [A]
+#define   VOLTAGE_MAX   21.000    // Max tensão de saída Vcc fornecida pela EPOS 24/5
 #define		TORQUE_CONST	60.300		// Constante de torque do motor RE40	[N.m/mA]
 #define		SPEED_CONST		158.00		// Constante de velocidade do motor RE40 [rpm/V]
 
@@ -63,6 +64,9 @@ public:
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
 
+    //m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function 
+    //m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
+
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
 
@@ -76,11 +80,12 @@ public:
 		vel_hum = 0;
 		vel_exo = 0;
 
-		for (size_t i = 0; i < 6; ++i)
+		for (size_t i = 0; i < 4; ++i)
 		{
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
 			torqueSeaVec[i] = 0;
+      torqueAccVec[i] = 0;
 		}
 
 		torque_sea = 0;
@@ -122,7 +127,11 @@ public:
 
 	void OmegaControl(float velHum, float velExo);
 
-	void Gains_Scan();
+	void GainsScan();
+
+  void UpdateCtrlWord_Current();
+
+  void UpdateCtrlWord_Velocity();
 
 	// destructor
 	~accBasedControl()
@@ -157,9 +166,10 @@ private:
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
 
-	float velhumVec[6];		// [rad/s]
-	float velexoVec[6];		// [rad/s]
-	float torqueSeaVec[6];	// [N.m]
+	float velhumVec[4];		// [rad/s]
+	float velexoVec[4];		// [rad/s]
+	float torqueSeaVec[4];	// [N.m]
+  float torqueAccVec[4];  // [N.m]
 
 	float setpoint;			// [mA]
 	float setpoint_filt;
@@ -167,10 +177,17 @@ private:
 	float theta_l;			// [rad]
 	float theta_c;			// [rad]
 
-	float torque_sea;		// [N.m]
+	float torque_sea;		  // [N.m]
 	float d_torque_sea;		// [N.m/s]
 	float accbased_comp;	// [N.m]
-	float grav_comp;		// [N.m]
+  float d_accbased_comp; // [N.m/s]
+	float grav_comp;		  // [N.m]
+
+  float vel_motor;      // [rpm]
+  float voltage;        // [V]
+
+  int actualCurrent;    // [mA]
+  int actualVelocity;   // [rpm]
 
 	int pos0_out;
 	int pos0_in;

@@ -394,7 +394,7 @@ int main(int argc, char** argv)
 
 
 		//Habilita o controle de corrente nos servomotores
-		eixo_in.VCS_SetOperationMode(CURRENT_MODE);
+		//eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
 
 		eixo_out.ReadPDO01();
 		eixo_in.ReadPDO01();
@@ -414,6 +414,8 @@ int main(int argc, char** argv)
 		int printer = 0;
 		int scan_file = 0;
 
+    std::chrono::system_clock::time_point mtw_data_stamp;
+
 		clock_t beginning = 0;
 		clock_t loop_duration;
 		float freq;
@@ -425,14 +427,12 @@ int main(int argc, char** argv)
 			//final_time = tick_before.QuadPart + 1*ticksSampleTime;
 
 			bool newDataAvailable = false;
-			std::chrono::system_clock::time_point mtw_data_stamp;
+			mtw_data_stamp = std::chrono::steady_clock::now();
 
 			for (size_t i = 0; i < mtwCallbacks.size(); ++i)
 			{
 				if (mtwCallbacks[i]->dataAvailable())
 				{
-					mtw_data_stamp = std::chrono::steady_clock::now();
-
 					newDataAvailable = true;
 					XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
 
@@ -445,7 +445,8 @@ int main(int argc, char** argv)
 
 			if (newDataAvailable)
 			{
-				xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+				//xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+        xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
 				printer++;
 				scan_file++;
 
@@ -454,22 +455,26 @@ int main(int argc, char** argv)
 
 				loop_duration = clock() - beginning;
 				beginning = clock();
-				freq = (float)CLOCKS_PER_SEC / loop_duration;
+				freq = (float) CLOCKS_PER_SEC / loop_duration;
 			}
 
       if (printer == (int) RATE / 5)   // 
 			{
 				system("cls");
+        //xsens2Eposcan.UpdateCtrlWord_Current();
+        xsens2Eposcan.UpdateCtrlWord_Velocity();
 				std::cout << xsens2Eposcan.ctrl_word;
 				printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
 				printer = 0;
 			}
 
+      
 			if (scan_file == (int) RATE * 5)  // every 5s reads the gains_values.txt 
 			{
-				xsens2Eposcan.Gains_Scan();
+				xsens2Eposcan.GainsScan();
 				scan_file = 0;
 			}
+      
 
 			//QueryPerformanceCounter(&tick_after);
 			//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
