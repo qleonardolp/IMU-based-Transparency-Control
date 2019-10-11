@@ -194,7 +194,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
 
   float offset = 26;    // [rpm]
-  vel_motor = 170 * GEAR_RATIO * (2*MY_PI/60) * vel_hum + offset;   // [rpm]
+  vel_motor = 110 * GEAR_RATIO * (2*MY_PI/60) * vel_hum + offset;   // [rpm]
   voltage = vel_motor / SPEED_CONST;
   if (abs(voltage) <= VOLTAGE_MAX)
   {
@@ -283,4 +283,5 @@ void* accBasedControl::Recorder()
 			fclose(logger);
 		}
 	}
+  return NULL;
 }

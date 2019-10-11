@@ -446,8 +446,8 @@ int main(int argc, char** argv)
 
 			if (newDataAvailable)
 			{
-				//xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
-				xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+				xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+				//xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
 				printer++;
 				scan_file++;
 				record_count--;
@@ -460,7 +460,7 @@ int main(int argc, char** argv)
 				freq = (float)CLOCKS_PER_SEC / loop_duration;
 			}
 
-			while (record_count > 0)
+			if (record_count >= 0)
 			{
 				xsens2Eposcan.Recorder();
 			}
@@ -474,8 +474,8 @@ int main(int argc, char** argv)
 			if (printer == (int)RATE / 5)   // 
 			{
 				system("cls");
-				//xsens2Eposcan.UpdateCtrlWord_Current();
-				xsens2Eposcan.UpdateCtrlWord_Velocity();
+				xsens2Eposcan.UpdateCtrlWord_Current();
+				//xsens2Eposcan.UpdateCtrlWord_Velocity();
 				std::cout << xsens2Eposcan.ctrl_word;
 				printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
 				printer = 0;
