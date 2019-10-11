@@ -28,7 +28,7 @@
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1000		// Max corrente nominal no motor Maxon RE40 [A]
-#define		VOLTAGE_MAX		21.400    // Max tensão de saída Vcc fornecida pela EPOS 24/5
+#define		VOLTAGE_MAX		21.600    // Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	60.300		// Constante de torque do motor RE40	[N.m/mA]
 #define		SPEED_CONST		158.00		// Constante de velocidade do motor RE40 [rpm/V]
 
@@ -38,7 +38,7 @@
 #define		MTW_DIST_EXO	0.0700		// [m]
 #define		L_CG			0.3500		// [m]
 
-// According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851
+// According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
 #define		J_EQ			0.4700		// [Kg.m^2]
 #define		B_EQ			60.000		// [N.m s/rad]
 
@@ -69,8 +69,8 @@ public:
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
 
-    //m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function 
-    //m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
+		//m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function 
+		//m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -85,12 +85,15 @@ public:
 		vel_hum = 0;
 		vel_exo = 0;
 
-		for (size_t i = 0; i < 4; ++i)
+		for (size_t i = 0; i < 11; ++i)
 		{
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
+		}
+		for (size_t i = 0; i < 4; ++i)
+		{
 			torqueSeaVec[i] = 0;
-      torqueAccVec[i] = 0;
+			torqueAccVec[i] = 0;
 		}
 
 		torque_sea = 0;
@@ -100,7 +103,7 @@ public:
 		if (seconds != 0)
 		{
 			logging = true;
-			log_count = seconds*RATE;
+			//log_count = seconds*RATE;
 
 			time_t rawtime;
 			struct tm* timeinfo;
@@ -137,9 +140,9 @@ public:
 
 	void* Recorder();
 
-  void UpdateCtrlWord_Current();
+	void UpdateCtrlWord_Current();
 
-  void UpdateCtrlWord_Velocity();
+	void UpdateCtrlWord_Velocity();
 
 	// destructor
 	~accBasedControl()
@@ -174,10 +177,10 @@ private:
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
 
-	float velhumVec[4];		// [rad/s]
-	float velexoVec[4];		// [rad/s]
+	float velhumVec[11];		// [rad/s]
+	float velexoVec[11];		// [rad/s]
 	float torqueSeaVec[4];	// [N.m]
-  float torqueAccVec[4];  // [N.m]
+	float torqueAccVec[4];  // [N.m]
 
 	float setpoint;			// [mA]
 	float setpoint_filt;
@@ -188,14 +191,15 @@ private:
 	float torque_sea;		  // [N.m]
 	float d_torque_sea;		// [N.m/s]
 	float accbased_comp;	// [N.m]
-  float d_accbased_comp; // [N.m/s]
+	float d_accbased_comp; // [N.m/s]
 	float grav_comp;		  // [N.m]
 
-  float vel_motor;      // [rpm]
-  float voltage;        // [V]
+	float vel_leg;		// [rpm]
+	float vel_motor;      // [rpm]
+	float voltage;        // [V]
 
-  int actualCurrent;    // [mA]
-  int actualVelocity;   // [rpm]
+	int actualCurrent;    // [mA]
+	int actualVelocity;   // [rpm]
 
 	int pos0_out;
 	int pos0_in;
