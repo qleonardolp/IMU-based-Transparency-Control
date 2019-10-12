@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <thread>
 
 // CONSTANTES
 
@@ -70,7 +71,7 @@ public:
 		m_eixo_out = eixo_out;
 
 		//m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function 
-		//m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
+		m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -96,6 +97,7 @@ public:
 			torqueAccVec[i] = 0;
 		}
 
+    accbased_comp = 0;
 		torque_sea = 0;
 		setpoint = 0;
 		setpoint_filt = 0;
@@ -103,7 +105,6 @@ public:
 		if (seconds != 0)
 		{
 			logging = true;
-			//log_count = seconds*RATE;
 
 			time_t rawtime;
 			struct tm* timeinfo;
@@ -115,7 +116,8 @@ public:
 			if (logger != NULL)
 			{
 				//printing the first line, the header:
-				fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_sea[N.m]  T_acc[N.m]  K_ff  Kp_A  Ki_A  Kp_F  Kd_F  Amp\n");
+				//fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_sea[N.m]  T_acc[N.m]  K_ff  Kp_A  Ki_A  Kp_F  Kd_F  Amp\n");
+        fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_sea[N.m]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]\n");
 				fclose(logger);
 			}
 		}
@@ -138,7 +140,7 @@ public:
 
 	void GainsScan();
 
-	void* Recorder();
+	void Recorder();
 
 	void UpdateCtrlWord_Current();
 

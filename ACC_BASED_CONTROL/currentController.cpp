@@ -12,16 +12,16 @@
 
 void accBasedControl::FiniteDiff(float velHum, float velExo)
 {
-	m_epos->sync();	//Sincroniza a CAN
-	m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);
+	m_epos->sync();	// CAN Synchronization 
+	//m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);
 
 
-	// Acc-Based Torque//
+	// -- Acc-Based Torque -- //
 
-	vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);		// LP Filtering
+  vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 15 Hz  0.429
 	for (int i = 10; i > 0; --i)
 	{
-		velhumVec[i] = velhumVec[i - 1];
+		velhumVec[i] = velhumVec[i - 1];  // shifting values in 1 position
 	}
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
@@ -31,14 +31,16 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 		- 5 * velhumVec[4] - 15 * velhumVec[3] - 10 * velhumVec[2]
 		+ 30 * velhumVec[1] + 131 * vel_hum) / 143;
 
-	// *Finite Difference Coefficients Calculator
-	acc_hum = (-2 * velhumVec[3] + 9 * velhumVec[2] - 18 * velhumVec[1] + 11 * velhumVec[0]) / (6)*RATE;
+  vel_hum = velhumVec[0];
 
+	// *Finite Difference Coefficients Calculator:
+	//acc_hum = (-2 * velhumVec[3] + 9 * velhumVec[2] - 18 * velhumVec[1] + 11 * velhumVec[0]) / (6)*RATE;  // Using the last 4 pts
+  acc_hum = (velhumVec[0] - velhumVec[1])*RATE;                                                       // Using the last 2 pts
 
-	vel_exo = vel_exo - LPF_SMF*(vel_exo - velExo);		// LP Filtering
+  vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 15 Hz  0.429
 	for (int i = 10; i > 0; --i)
 	{
-		velexoVec[i] = velexoVec[i - 1];
+		velexoVec[i] = velexoVec[i - 1];  // shifting values in 1 position
 	}
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
@@ -47,68 +49,65 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 		- 5 * velexoVec[4] - 15 * velexoVec[3] - 10 * velexoVec[2]
 		+ 30 * velexoVec[1] + 131 * vel_exo) / 143;
 
-	// *Finite Difference Coefficients Calculator
-	acc_exo = (-2 * velexoVec[3] + 9 * velexoVec[2] - 18 * velexoVec[1] + 11 * velexoVec[0]) / (6)*RATE;
+  vel_exo = velexoVec[0];
 
+	// *Finite Difference Coefficients Calculator:
+	//acc_exo = (-2 * velexoVec[3] + 9 * velexoVec[2] - 18 * velexoVec[1] + 11 * velexoVec[0]) / (6)*RATE;  // Using the last 4 pts
+  acc_exo = (velexoVec[0] - velexoVec[1])*RATE;                                                       // Using the last 2 pts
 
 	for (int i = 3; i > 0; --i)
 	{
-		torqueAccVec[i] = torqueAccVec[i - 1];
+		torqueAccVec[i] = torqueAccVec[i - 1];  // shifting values in 1 position
 	}
-	torqueAccVec[0] = K_ff*(4 * INERTIA_EXO)*acc_hum + Kp_A*(acc_hum - acc_exo) + Ki_A*(vel_hum - vel_exo);
-	accbased_comp = torqueAccVec[0]; // just for printing
+	accbased_comp = K_ff*(4 * INERTIA_EXO)*acc_hum + Kp_A*(acc_hum - acc_exo) + Ki_A*(vel_hum - vel_exo);
+  torqueAccVec[0] = torqueAccVec[0] - 0.334*(torqueAccVec[0] - accbased_comp);
 
+  // *Finite Difference Coefficients Calculator:
 	d_accbased_comp = (-2 * torqueAccVec[3] + 9 * torqueAccVec[2] - 18 * torqueAccVec[1] + 11 * torqueAccVec[0]) / (6)*RATE;
-
-	// Acc-Based Torque//
-
+  //d_accbased_comp = (torqueAccVec[0] - torqueAccVec[0])*RATE;
 
 
-	// SEA Torque //
+
+	// -- SEA Torque -- //
 
 	m_eixo_out->ReadPDO01();
 	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 
+  m_eixo_out->ReadPDO02();
 	vel_leg = -m_eixo_out->PDOgetActualVelocity();
 
 	m_eixo_in->ReadPDO01();
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
-	torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // ??? testar com maior LPF_FC somente aqui
+	torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS*(theta_c - theta_l));
+  //torque_sea = STIFFNESS*(theta_c - theta_l);
 
 	for (int i = 3; i > 0; --i)
 	{
-		torqueSeaVec[i] = torqueSeaVec[i - 1];
+		torqueSeaVec[i] = torqueSeaVec[i - 1];  // shifting values in 1 position
 	}
 	torqueSeaVec[0] = torque_sea;
 	d_torque_sea = (-2 * torqueSeaVec[3] + 9 * torqueSeaVec[2] - 18 * torqueSeaVec[1] + 11 * torqueSeaVec[0]) / (6)*RATE;
-	// SEA Torque //
+  //d_torque_sea = (torqueSeaVec[0] - torqueSeaVec[1])*RATE;
 
-	//setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (-Kp_F*(accbased_comp - torque_sea) - Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
 
-	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ*acc_exo + B_EQ*vel_exo + Kp_F*torque_sea + Kd_F*d_torque_sea) * Amplifier;
+
+	//setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (Kp_F*(accbased_comp - torque_sea) + Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
+
+	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ*acc_exo + B_EQ*vel_exo - Kp_F*torque_sea - Kd_F*d_torque_sea) * Amplifier;
 	setpoint_filt = setpoint_filt - LPF_SMF*(setpoint_filt - setpoint);
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
 	{
 		if ((theta_c >= -0.5200) && (theta_c <= 1.4800)) // (sentado)
-			//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
+		//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
 			//if ((theta_l >= - 1.39626) && (theta_l <= 0.17000)) //(em pe parado)
 		{
 			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento é em mA !!!
 		}
 		else
 		{
-			if (theta_c < -0.5200)
-			{
-				m_eixo_in->PDOsetPositionSetpoint((int)-0.5200 / (2 * MY_PI) * ENCODER_IN * GEAR_RATIO + pos0_in);
-				//m_eixo_in->WritePDO01();
-			}
-			if (theta_c > 1.4800)
-			{
-				m_eixo_in->PDOsetPositionSetpoint((int) 1.4800 / (2 * MY_PI) * ENCODER_IN * GEAR_RATIO + pos0_in);
-				//m_eixo_in->WritePDO01();
-			}
+      m_eixo_in->PDOsetCurrentSetpoint(0);
 		}
 	}
 	else
@@ -195,7 +194,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 
 	torque_sea = torque_sea - LPF_SMF*(torque_sea - STIFFNESS*(theta_c - theta_l)); // smmooooooooooth operaaatoorr
 
-	m_epos->sync();
+	//m_epos->sync();
 	m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);
 
 	vel_hum = vel_hum - LPF_SMF*(vel_hum - velHum);
@@ -282,17 +281,21 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word += " Voltage: " + (std::string) numbers_str + " V\n";
 }
 
-void* accBasedControl::Recorder()
+void accBasedControl::Recorder()
 {
 	if (logging)
 	{
 		logger = fopen(logger_filename, "a");
 		if (logger != NULL)
 		{
+      /*
 			fprintf(logger, "%5.3f  %5d   %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
 				setpoint_filt, actualCurrent, theta_l * (180 / MY_PI), theta_c * (180 / MY_PI), torque_sea, accbased_comp, K_ff, Kp_A, Ki_A, Kp_F, Kd_F, Amplifier);
+      */
+      fprintf(logger, "%5.3f  %5d   %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+        setpoint_filt, actualCurrent, theta_l * (180 / MY_PI), theta_c * (180 / MY_PI), torque_sea, accbased_comp, acc_hum, acc_exo, vel_hum, vel_exo);
 			fclose(logger);
 		}
 	}
-	return NULL;
+	//return NULL;
 }

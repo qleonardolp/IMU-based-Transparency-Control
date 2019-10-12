@@ -408,7 +408,7 @@ int main(int argc, char** argv)
 		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, time_logging);
 
 		std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
-		XsTime::msleep(1600);
+		//XsTime::msleep(1600);
 
 		float delay;
 		int printer = 0;
@@ -420,6 +420,8 @@ int main(int argc, char** argv)
 		clock_t beginning = 0;
 		clock_t loop_duration;
 		float freq;
+
+    //std::thread recorder_t( xsens2Eposcan.Recorder );
 
 		while (!_kbhit())
 		{
