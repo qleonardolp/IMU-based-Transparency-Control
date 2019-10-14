@@ -325,7 +325,11 @@ int main(int argc, char** argv)
 			throw std::runtime_error("quit by user request");
 		}
 
+		char control_mode;
 		int time_logging;
+
+		printf("Choose the control mode: [c] Current or [s] Speed: ");
+		scanf("%c", &control_mode);
 		printf("How long (sec) do you want to record this run? 0 to do not record: ");
 		scanf("%d", &time_logging);
 
@@ -405,15 +409,14 @@ int main(int argc, char** argv)
 		epos.sync();
 		eixo_out.ReadPDO01();
 		eixo_in.ReadPDO01();
-		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, time_logging);
+		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, time_logging);
 
 		std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
-		//XsTime::msleep(1600);
 
 		float delay;
 		int printer = 0;
 		int scan_file = 0;
-		int record_count = time_logging*RATE;
+		int record_count = time_logging * RATE;
 
 		std::chrono::system_clock::time_point mtw_data_stamp;
 
@@ -421,72 +424,138 @@ int main(int argc, char** argv)
 		clock_t loop_duration;
 		float freq;
 
-    //std::thread recorder_t( xsens2Eposcan.Recorder );
+		//std::thread recorder_t( xsens2Eposcan.Recorder );
 
-		while (!_kbhit())
+		if (control_mode == 'c')	// running current control
 		{
-			XsTime::msleep(4);
-			//QueryPerformanceCounter(&tick_before);
-			//final_time = tick_before.QuadPart + 1*ticksSampleTime;
-
-			bool newDataAvailable = false;
-			mtw_data_stamp = std::chrono::steady_clock::now();
-
-			for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+			while (!_kbhit())
 			{
-				if (mtwCallbacks[i]->dataAvailable())
+				XsTime::msleep(4);
+				//QueryPerformanceCounter(&tick_before);
+				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
+
+				bool newDataAvailable = false;
+				mtw_data_stamp = std::chrono::steady_clock::now();
+
+				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
 				{
-					newDataAvailable = true;
-					XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+					if (mtwCallbacks[i]->dataAvailable())
+					{
+						newDataAvailable = true;
+						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
 
-					accData[i] = packet->calibratedAcceleration();
-					gyroData[i] = packet->calibratedGyroscopeData();
+						accData[i] = packet->calibratedAcceleration();
+						gyroData[i] = packet->calibratedGyroscopeData();
 
-					mtwCallbacks[i]->deleteOldestPacket();
+						mtwCallbacks[i]->deleteOldestPacket();
+					}
 				}
+
+				if (newDataAvailable)
+				{
+					xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					printer++;
+					scan_file++;
+					record_count--;
+
+					auto control_stamp = std::chrono::steady_clock::now();
+					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+
+					loop_duration = clock() - beginning;
+					beginning = clock();
+					freq = (float)CLOCKS_PER_SEC / loop_duration;
+				}
+
+				if (record_count >= 0)
+				{
+					xsens2Eposcan.Recorder_Current();
+				}
+
+				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
+				{
+					xsens2Eposcan.GainsScan_Current();
+					scan_file = 0;
+				}
+
+				if (printer == (int)RATE / 5)   // 
+				{
+					system("cls");
+					xsens2Eposcan.UpdateCtrlWord_Current();
+					std::cout << xsens2Eposcan.ctrl_word;
+					printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
+					printer = 0;
+				}
+
+				//QueryPerformanceCounter(&tick_after);
+				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
 			}
-
-			if (newDataAvailable)
-			{
-				xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
-				//xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
-				printer++;
-				scan_file++;
-				record_count--;
-
-				auto control_stamp = std::chrono::steady_clock::now();
-				delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
-
-				loop_duration = clock() - beginning;
-				beginning = clock();
-				freq = (float)CLOCKS_PER_SEC / loop_duration;
-			}
-
-			if (record_count >= 0)
-			{
-				xsens2Eposcan.Recorder();
-			}
-
-			if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
-			{
-				xsens2Eposcan.GainsScan();
-				scan_file = 0;
-			}
-
-			if (printer == (int)RATE / 5)   // 
-			{
-				system("cls");
-				xsens2Eposcan.UpdateCtrlWord_Current();
-				//xsens2Eposcan.UpdateCtrlWord_Velocity();
-				std::cout << xsens2Eposcan.ctrl_word;
-				printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
-				printer = 0;
-			}
-
-			//QueryPerformanceCounter(&tick_after);
-			//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
+			(void)_getch();
 		}
-		(void)_getch();
+		if (control_mode == 's')	// running speed control
+		{
+			while (!_kbhit())
+			{
+				XsTime::msleep(4);
+				//QueryPerformanceCounter(&tick_before);
+				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
+
+				bool newDataAvailable = false;
+				mtw_data_stamp = std::chrono::steady_clock::now();
+
+				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+				{
+					if (mtwCallbacks[i]->dataAvailable())
+					{
+						newDataAvailable = true;
+						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+
+						accData[i] = packet->calibratedAcceleration();
+						gyroData[i] = packet->calibratedGyroscopeData();
+
+						mtwCallbacks[i]->deleteOldestPacket();
+					}
+				}
+
+				if (newDataAvailable)
+				{
+					xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					printer++;
+					scan_file++;
+					record_count--;
+
+					auto control_stamp = std::chrono::steady_clock::now();
+					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+
+					loop_duration = clock() - beginning;
+					beginning = clock();
+					freq = (float)CLOCKS_PER_SEC / loop_duration;
+				}
+
+				if (record_count >= 0)
+				{
+					xsens2Eposcan.Recorder_Velocity();
+				}
+
+				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
+				{
+					xsens2Eposcan.GainsScan_Velocity();
+					scan_file = 0;
+				}
+
+				if (printer == (int)RATE / 5)   // 
+				{
+					system("cls");
+					xsens2Eposcan.UpdateCtrlWord_Velocity();
+					std::cout << xsens2Eposcan.ctrl_word;
+					printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
+					printer = 0;
+				}
+
+				//QueryPerformanceCounter(&tick_after);
+				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
+			}
+			(void)_getch();
+		}
 
 		xsens2Eposcan.~accBasedControl(); //Zera o comando do motor
 

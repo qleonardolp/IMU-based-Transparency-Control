@@ -52,8 +52,11 @@
 #define     KP_F			1.5310      // [dimensionless]
 #define     KD_F			0.0200      // [s]
 
-// Low Pass Filtering
+
 #define     RATE            125.0      // [Hz]	Use the control loop rate running
+#define		DELTA_T			(1/RATE)   // [s]
+
+// Low Pass Filtering
 #define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
 #define		MY_PI			3.141592653	// Pi value
 #define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor
@@ -63,25 +66,39 @@ class accBasedControl
 {
 public:
 	// constructor
-	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, int seconds)
+	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds)
 	{
 
 		m_epos = epos;
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
 
-		//m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function 
-		m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
-
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
 
+		if (control_mode == 'c')
+		{
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
+		}
+		if (control_mode == 's')
+		{
+			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function
+		}
+
+		// Current Control
 		K_ff = K_FF;
 		Kp_A = KP_A;
 		Ki_A = KI_A;
 		Kp_F = KP_F;
 		Kd_F = KD_F;
 		Amplifier = 100000; // initialized with a safe value
+
+		// Speed Control
+		Kff_V = 1.000;
+		Kp_V = 1.000;
+		Ki_V = 1.000;
+		Kd_V = 1.000;
+		Amp_V = 50;			// initialized with a safe value
 
 		vel_hum = 0;
 		vel_exo = 0;
@@ -97,7 +114,7 @@ public:
 			torqueAccVec[i] = 0;
 		}
 
-    accbased_comp = 0;
+		accbased_comp = 0;
 		torque_sea = 0;
 		setpoint = 0;
 		setpoint_filt = 0;
@@ -115,9 +132,15 @@ public:
 			logger = fopen(logger_filename, "wt");
 			if (logger != NULL)
 			{
-				//printing the first line, the header:
-				//fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_sea[N.m]  T_acc[N.m]  K_ff  Kp_A  Ki_A  Kp_F  Kd_F  Amp\n");
-        fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_sea[N.m]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]\n");
+				// printing the header:
+				if (control_mode == 'c')
+				{
+					fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]\n");
+				}
+				if (control_mode == 's')
+				{
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rpm]  actual_Vel[rpm]  Voltage[V]\n");
+				}
 				fclose(logger);
 			}
 		}
@@ -129,7 +152,7 @@ public:
 
 	}
 
-	// numdiff
+	// numdiff, controlling through the EPOS current control
 	void FiniteDiff(float velHum, float velExo);
 
 	// acc-gravity
@@ -138,9 +161,13 @@ public:
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
-	void GainsScan();
+	void GainsScan_Current();
 
-	void Recorder();
+	void GainsScan_Velocity();
+
+	void Recorder_Current();
+
+	void Recorder_Velocity();
 
 	void UpdateCtrlWord_Current();
 
@@ -167,6 +194,8 @@ private:
 	bool logging;
 
 	FILE* gains_values;
+
+	// Current Control
 	int Amplifier;
 	float K_ff;
 	float Kp_A;
@@ -174,34 +203,42 @@ private:
 	float Kp_F;
 	float Kd_F;
 
+	// Speed Control
+	int Amp_V;
+	float Kff_V;
+	float Kp_V;
+	float Ki_V;
+	float Kd_V;
+
+
 	float acc_hum;			// [rad/s^2]
 	float acc_exo;			// [rad/s^2]
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
 
-	float velhumVec[11];		// [rad/s]
-	float velexoVec[11];		// [rad/s]
+	float velhumVec[11];	// [rad/s]
+	float velexoVec[11];	// [rad/s]
 	float torqueSeaVec[4];	// [N.m]
 	float torqueAccVec[4];  // [N.m]
 
 	float setpoint;			// [mA]
-	float setpoint_filt;
+	float setpoint_filt;	// [mA]
 
 	float theta_l;			// [rad]
 	float theta_c;			// [rad]
 
-	float torque_sea;		  // [N.m]
+	float torque_sea;		// [N.m]
 	float d_torque_sea;		// [N.m/s]
 	float accbased_comp;	// [N.m]
-	float d_accbased_comp; // [N.m/s]
-	float grav_comp;		  // [N.m]
+	float d_accbased_comp;	// [N.m/s]
+	float grav_comp;		// [N.m]
 
-	float vel_leg;		// [rpm]
-	float vel_motor;      // [rpm]
-	float voltage;        // [V]
+	float vel_leg;			// [rpm]
+	float vel_motor;		// [rpm]
+	float voltage;			// [V]
 
-	int actualCurrent;    // [mA]
-	int actualVelocity;   // [rpm]
+	int actualCurrent;		// [mA]
+	int actualVelocity;		// [rpm]
 
 	int pos0_out;
 	int pos0_in;
