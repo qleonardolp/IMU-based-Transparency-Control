@@ -20,7 +20,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	for (int i = 10; i > 0; --i)
 	{
-		velhumVec[i] = velhumVec[i - 1];  // shifting values in 1 position
+		velhumVec[i] = velhumVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
@@ -32,14 +32,17 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	vel_hum = velhumVec[0];
 
-	// *Finite Difference Coefficients Calculator:
-	//acc_hum = (-2 * velhumVec[3] + 9 * velhumVec[2] - 18 * velhumVec[1] + 11 * velhumVec[0]) / (6)*RATE;  // Using the last 4 pts
-	acc_hum = (velhumVec[0] - velhumVec[1])*RATE;                                                       // Using the last 2 pts
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	acc_hum = (5*velhumVec[0] + 4*velhumVec[1] + 3*velhumVec[2] + 2*velhumVec[3] + 
+			   1*velhumVec[4] + 0*velhumVec[5] - 1*velhumVec[6] - 2*velhumVec[7] - 
+			   3*velhumVec[8] - 4*velhumVec[9] - 5*velhumVec[10]) / (110) * RATE;
+
+
 
 	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	for (int i = 10; i > 0; --i)
 	{
-		velexoVec[i] = velexoVec[i - 1];  // shifting values in 1 position
+		velexoVec[i] = velexoVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
@@ -50,51 +53,55 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	vel_exo = velexoVec[0];
 
-	// *Finite Difference Coefficients Calculator:
-	//acc_exo = (-2 * velexoVec[3] + 9 * velexoVec[2] - 18 * velexoVec[1] + 11 * velexoVec[0]) / (6)*RATE;  // Using the last 4 pts
-	acc_exo = (velexoVec[0] - velexoVec[1])*RATE;                                                       // Using the last 2 pts
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	acc_exo = (5*velexoVec[0] + 4*velexoVec[1] + 3*velexoVec[2] + 2*velexoVec[3] +
+			   1*velexoVec[4] + 0*velexoVec[5] - 1*velexoVec[6] - 2*velexoVec[7] -
+			   3*velexoVec[8] - 4*velexoVec[9] - 5*velexoVec[10]) / (110) * RATE;
 
-	for (int i = 3; i > 0; --i)
+
+
+	for (int i = 10; i > 0; --i)
 	{
-		torqueAccVec[i] = torqueAccVec[i - 1];  // shifting values in 1 position
+		torqueAccVec[i] = torqueAccVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
 	accbased_comp = K_ff * (4 * INERTIA_EXO)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
-	torqueAccVec[0] = torqueAccVec[0] - 0.334*(torqueAccVec[0] - accbased_comp);	// LP Filtering, LPF_FC  = 10 Hz  0.334
+	torqueAccVec[0] = (torqueAccVec[2] + torqueAccVec[1] + accbased_comp) / (3);
+	accbased_comp = torqueAccVec[0];
 
-	// *Finite Difference Coefficients Calculator:
-	d_accbased_comp = (-2 * torqueAccVec[3] + 9 * torqueAccVec[2] - 18 * torqueAccVec[1] + 11 * torqueAccVec[0]) / (6)*RATE;
-	//d_accbased_comp = (torqueAccVec[0] - torqueAccVec[0])*RATE;
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	d_accbased_comp = (5*torqueAccVec[0] + 4*torqueAccVec[1] + 3*torqueAccVec[2] + 2*torqueAccVec[3] +
+					   1*torqueAccVec[4] + 0*torqueAccVec[5] - 1*torqueAccVec[6] - 2*torqueAccVec[7] -
+					   3*torqueAccVec[8] - 4*torqueAccVec[9] - 5*torqueAccVec[10]) / (110) * RATE;
 
 
 
-	  // -- SEA Torque -- //
+	// -- SEA Torque -- //
 
 	m_eixo_out->ReadPDO01();
 	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-
-	//m_eixo_out->ReadPDO02();
-	//vel_leg = -m_eixo_out->PDOgetActualVelocity();
-
 	m_eixo_in->ReadPDO01();
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
-	torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS * (theta_c - theta_l));
-	//torque_sea = STIFFNESS*(theta_c - theta_l);
+	torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS * (theta_c - theta_l)); // precisa?
 
-	for (int i = 3; i > 0; --i)
+	for (int i = 10; i > 0; --i)
 	{
-		torqueSeaVec[i] = torqueSeaVec[i - 1];  // shifting values in 1 position
+		torqueSeaVec[i] = torqueSeaVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
-	torqueSeaVec[0] = torque_sea;
-	d_torque_sea = (-2 * torqueSeaVec[3] + 9 * torqueSeaVec[2] - 18 * torqueSeaVec[1] + 11 * torqueSeaVec[0]) / (6)*RATE;
-	//d_torque_sea = (torqueSeaVec[0] - torqueSeaVec[1])*RATE;
+	torqueSeaVec[0] = (torqueSeaVec[3] + torqueSeaVec[2] + torqueSeaVec[1] + torque_sea) / (4);		// average of the last 4 pts
+	torque_sea = torqueSeaVec[0];
+
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	d_torque_sea = (5*torqueSeaVec[0] + 4*torqueSeaVec[1] + 3*torqueSeaVec[2] + 2*torqueSeaVec[3] +
+					1*torqueSeaVec[4] + 0*torqueSeaVec[5] - 1*torqueSeaVec[6] - 2*torqueSeaVec[7] -
+					3*torqueSeaVec[8] - 4*torqueSeaVec[9] - 5*torqueSeaVec[10]) / (110) * RATE;
 
 
 
 	//setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (Kp_F*(accbased_comp - torque_sea) + Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
 
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
-	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);
+	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);	// precisa?
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
 	{
@@ -113,11 +120,11 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	{
 		if (setpoint_filt < 0)
 		{
-			m_eixo_in->PDOsetCurrentSetpoint(-(int)CURRENT_MAX * 1000);
+			m_eixo_in->PDOsetCurrentSetpoint(-(int) (CURRENT_MAX * 1000));
 		}
 		else
 		{
-			m_eixo_in->PDOsetCurrentSetpoint((int)CURRENT_MAX * 1000);
+			m_eixo_in->PDOsetCurrentSetpoint((int) (CURRENT_MAX * 1000));
 		}
 	}
 	m_eixo_in->WritePDO01();
@@ -190,16 +197,18 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
 	// 143 |	6	-10	-5	5	10	6	-5	-15	-10	30	131
-	velhumVec[0] = (6 * velhumVec[10] - 10 * velhumVec[9] - 5 * velhumVec[8]
-		+ 5 * velhumVec[7] + 10 * velhumVec[6] + 6 * velhumVec[5]
-		- 5 * velhumVec[4] - 15 * velhumVec[3] - 10 * velhumVec[2]
-		+ 30 * velhumVec[1] + 131 * vel_hum) / 143;
+	velhumVec[0] = (6 * velhumVec[10] - 10 * velhumVec[9] - 5 * velhumVec[8] +
+					5 * velhumVec[7] + 10 * velhumVec[6] + 6 * velhumVec[5] -
+					5 * velhumVec[4] - 15 * velhumVec[3] - 10 * velhumVec[2] +
+					30 * velhumVec[1] + 131 * vel_hum) / 143;
 
 	vel_hum = velhumVec[0];
 
-	// *Finite Difference Coefficients Calculator:
-	//acc_hum = (-2 * velhumVec[3] + 9 * velhumVec[2] - 18 * velhumVec[1] + 11 * velhumVec[0]) / (6)*RATE;  // Using the last 4 pts
-	acc_hum = (velhumVec[0] - velhumVec[1])*RATE;                                                       // Using the last 2 pts
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	acc_hum = (5 * velhumVec[0] + 4 * velhumVec[1] + 3 * velhumVec[2] + 2 * velhumVec[3] +
+			   1 * velhumVec[4] + 0 * velhumVec[5] - 1 * velhumVec[6] - 2 * velhumVec[7] -
+			   3 * velhumVec[8] - 4 * velhumVec[9] - 5 * velhumVec[10]) / (110) * RATE;
+
 
 	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	for (int i = 10; i > 0; --i)
@@ -208,16 +217,18 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	}
 
 	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
-	velexoVec[0] = (6 * velexoVec[10] - 10 * velexoVec[9] - 5 * velexoVec[8]
-		+ 5 * velexoVec[7] + 10 * velexoVec[6] + 6 * velexoVec[5]
-		- 5 * velexoVec[4] - 15 * velexoVec[3] - 10 * velexoVec[2]
-		+ 30 * velexoVec[1] + 131 * vel_exo) / 143;
+	velexoVec[0] = (6 * velexoVec[10] - 10 * velexoVec[9] - 5 * velexoVec[8] +
+					5 * velexoVec[7] + 10 * velexoVec[6] + 6 * velexoVec[5] - 
+					5 * velexoVec[4] - 15 * velexoVec[3] - 10 * velexoVec[2] + 
+					30 * velexoVec[1] + 131 * vel_exo) / 143;
 
 	vel_exo = velexoVec[0];
 
-	// *Finite Difference Coefficients Calculator:
-	//acc_exo = (-2 * velexoVec[3] + 9 * velexoVec[2] - 18 * velexoVec[1] + 11 * velexoVec[0]) / (6)*RATE;  // Using the last 4 pts
-	acc_exo = (velexoVec[0] - velexoVec[1])*RATE;                                                       // Using the last 2 pts
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	acc_exo = (5 * velexoVec[0] + 4 * velexoVec[1] + 3 * velexoVec[2] + 2 * velexoVec[3] +
+			   1 * velexoVec[4] + 0 * velexoVec[5] - 1 * velexoVec[6] - 2 * velexoVec[7] -
+			   3 * velexoVec[8] - 4 * velexoVec[9] - 5 * velexoVec[10]) / (110) * RATE;
+
 
 	float offset = 26;    // [rpm]
 	vel_motor = Amp_V * GEAR_RATIO * (2 * MY_PI / 60) * vel_hum + offset;   // [rpm]
@@ -230,11 +241,11 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	{
 		if (vel_motor < 0)
 		{
-			m_eixo_in->PDOsetVelocitySetpoint(-(int)SPEED_CONST*VOLTAGE_MAX);
+			m_eixo_in->PDOsetVelocitySetpoint(-(int) SPEED_CONST * VOLTAGE_MAX);
 		}
 		else
 		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)SPEED_CONST*VOLTAGE_MAX);
+			m_eixo_in->PDOsetVelocitySetpoint((int) SPEED_CONST * VOLTAGE_MAX);
 		}
 	}
 	m_eixo_in->WritePDO02();

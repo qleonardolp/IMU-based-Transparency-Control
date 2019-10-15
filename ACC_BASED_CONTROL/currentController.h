@@ -108,7 +108,7 @@ public:
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
 		}
-		for (size_t i = 0; i < 4; ++i)
+		for (size_t i = 0; i < 11; ++i)
 		{
 			torqueSeaVec[i] = 0;
 			torqueAccVec[i] = 0;
@@ -218,8 +218,8 @@ private:
 
 	float velhumVec[11];	// [rad/s]
 	float velexoVec[11];	// [rad/s]
-	float torqueSeaVec[4];	// [N.m]
-	float torqueAccVec[4];  // [N.m]
+	float torqueSeaVec[11];	// [N.m]
+	float torqueAccVec[11];  // [N.m]
 
 	float setpoint;			// [mA]
 	float setpoint_filt;	// [mA]
