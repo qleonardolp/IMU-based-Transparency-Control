@@ -230,8 +230,8 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 			   3 * velexoVec[8] - 4 * velexoVec[9] - 5 * velexoVec[10]) / (110) * RATE;
 
 
-	float offset = 26;    // [rpm]
-	vel_motor = Amp_V * GEAR_RATIO * (2 * MY_PI / 60) * vel_hum + offset;   // [rpm]
+	float offset = -26;    // [rpm]
+	vel_motor = Amp_V * GEAR_RATIO * (2 * MY_PI / 60) * vel_hum;   // [rpm]
 	voltage = vel_motor / SPEED_CONST;
 	if (abs(voltage) <= VOLTAGE_MAX)
 	{
@@ -311,9 +311,9 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	char numbers_str[20];
 	sprintf(numbers_str, "%+5.3f", vel_motor);
 	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
-	sprintf(numbers_str, "%+5d", actualVelocity);
+	sprintf(numbers_str, "%+4d", actualVelocity);
 	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
-	sprintf(numbers_str, "%+5.3f", abs(actualVelocity / SPEED_CONST));
+	sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 	ctrl_word += (std::string) numbers_str + " V]\n";
 	sprintf(numbers_str, "%5.3f", Kff_V);
 	ctrl_word += " Kff_V: " + (std::string) numbers_str;
@@ -323,7 +323,7 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word += " Ki_V: " + (std::string) numbers_str;
 	sprintf(numbers_str, "%5.3f", Kd_V);
 	ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%5d", Amp_V);
+	sprintf(numbers_str, "%d", Amp_V);
 	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 }
 
