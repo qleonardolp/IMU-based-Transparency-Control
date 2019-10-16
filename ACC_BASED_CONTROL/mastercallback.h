@@ -12,6 +12,7 @@ class WirelessMasterCallback : public XsCallback
 {
 public:
 	XsDeviceSet getWirelessMTWs() const;
+  std::string mtw_event;
 
 protected:
 	virtual void onConnectivityChanged(XsDevice* dev, XsConnectivityState newState);

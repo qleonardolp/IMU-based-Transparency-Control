@@ -390,6 +390,8 @@ int main(int argc, char** argv)
 		std::vector<XsVector> accData(mtwCallbacks.size());
 		std::vector<XsVector> gyroData(mtwCallbacks.size());
 
+    wirelessMasterCallback.mtw_event.clear();
+
 		//Sincroniza as epos
 		epos.sync();
 
@@ -453,7 +455,7 @@ int main(int argc, char** argv)
 
 				if (newDataAvailable)
 				{
-					xsens2Eposcan.FiniteDiff((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					xsens2Eposcan.FiniteDiff(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
 					printer++;
 					scan_file++;
 					record_count--;
@@ -482,7 +484,8 @@ int main(int argc, char** argv)
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Current();
 					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
+					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+          std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 
@@ -518,7 +521,7 @@ int main(int argc, char** argv)
 
 				if (newDataAvailable)
 				{
-					xsens2Eposcan.OmegaControl((float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
 					printer++;
 					scan_file++;
 					record_count--;
@@ -547,7 +550,8 @@ int main(int argc, char** argv)
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Velocity();
 					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f us rate: %5.2f Hz\n", delay, freq);
+					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+          std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 
