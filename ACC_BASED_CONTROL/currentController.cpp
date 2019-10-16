@@ -230,7 +230,12 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 			   3 * velexoVec[8] - 4 * velexoVec[9] - 5 * velexoVec[10]) / (110) * RATE;
 
 
-	float offset = -26;    // [rpm]
+
+	vel_exo = vel_exo + 0.00295175;	// offset [rad/s]
+	vel_hum = vel_hum - 0.00657732;	// offset [rad/s]
+	acc_exo = acc_exo + 0.00075835;	// offset [rad/s2]
+	acc_hum = acc_hum + 0.00057484;	// offset [rad/s2]
+
 	vel_motor = Amp_V * GEAR_RATIO * (2 * MY_PI / 60) * vel_hum;   // [rpm]
 	voltage = vel_motor / SPEED_CONST;
 	if (abs(voltage) <= VOLTAGE_MAX)
