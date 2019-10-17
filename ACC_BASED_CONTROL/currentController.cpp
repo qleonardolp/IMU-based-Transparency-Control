@@ -82,7 +82,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	{
 		torqueAccVec[i] = torqueAccVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
-	accbased_comp = K_ff * (4 * INERTIA_EXO)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
+  accbased_comp = K_ff * (4 * INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
 	torqueAccVec[0] = (torqueAccVec[2] + torqueAccVec[1] + accbased_comp) / (3);
 	accbased_comp = torqueAccVec[0];
 
@@ -128,7 +128,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 		//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
 		//if ((theta_l >= - 1.39626) && (theta_l <= 0.17000)) //(em pe parado)
 		{
-			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento � em mA !!!
+			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento é em mA !!!
 		}
 		else
 		{
@@ -191,7 +191,7 @@ void accBasedControl::Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X
 	{
 		if ((theta_c >= -0.70000) && (theta_c <= 0.70000))
 		{
-			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento � em mA
+			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento é em mA
 		}
 		else
 		{
@@ -255,7 +255,20 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	acc_exo = acc_exo + 0.00075835;	// offset [rad/s2]
 	acc_hum = acc_hum + 0.00057484;	// offset [rad/s2]
 
-	vel_motor = Amp_V * GEAR_RATIO * (2 * MY_PI / 60) * vel_hum;   // [rpm]
+  //--- [rad/s] -> [rpm] ---//
+  vel_exo = (2*MY_PI/60) * vel_exo;
+  vel_hum = (2*MY_PI/60) * vel_hum;
+  acc_exo = (2*MY_PI/60) * acc_exo;   // [rpm/s]
+  acc_hum = (2*MY_PI/60) * acc_hum;   // [rpm/s]
+
+  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
+
+  // or:
+  m_eixo_in->ReadPDO02();
+  actualVelocity = m_eixo_in->PDOgetActualVelocity();
+  vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - actualVelocity) + Kd_V*(acc_hum - actualVelocity) );   // [rpm]
+
+
 	voltage = vel_motor / SPEED_CONST;
 	if (abs(voltage) <= VOLTAGE_MAX)
 	{

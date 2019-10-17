@@ -112,9 +112,9 @@ public:
 
 		// Speed Control
 		Kff_V = 1.000;
-		Kp_V = 1.000;
-		Ki_V = 1.000;
-		Kd_V = 1.000;
+		Kp_V = 0.100;
+		Ki_V = 0.100;
+		Kd_V = 0.100;
 		Amp_V = 50;			// initialized with a safe value
 
 		vel_hum = 0;
@@ -221,11 +221,11 @@ private:
 	float Kd_F;
 
 	// Speed Control
-	int Amp_V;
-	float Kff_V;
-	float Kp_V;
-	float Ki_V;
-	float Kd_V;
+	int Amp_V;          // [dimensionless]
+	float Kff_V;        // [dimensionless]
+	float Kp_V;         // [dimensionless]
+	float Ki_V;         // [1/s]
+	float Kd_V;         // [s]
 
 
 	float acc_hum;			// [rad/s^2]
