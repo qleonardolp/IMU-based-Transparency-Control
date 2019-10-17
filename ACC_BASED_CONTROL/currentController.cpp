@@ -82,7 +82,8 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	m_eixo_in->ReadPDO01();
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
-	torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS * (theta_c - theta_l)); // precisa?
+	//torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS * (theta_c - theta_l)); // precisa?
+  torque_sea = STIFFNESS * (theta_c - theta_l);
 
 	for (int i = 10; i > 0; --i)
 	{
@@ -101,7 +102,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	//setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (Kp_F*(accbased_comp - torque_sea) + Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
 
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
-	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);	// precisa?
+	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);	// precisa? SIM
 
 	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
 	{
