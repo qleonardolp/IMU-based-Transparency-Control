@@ -82,7 +82,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	{
 		torqueAccVec[i] = torqueAccVec[i - 1];  // shifting values in 1 position, in other words, updating the window with one sample
 	}
-  accbased_comp = K_ff * (4 * INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
+	accbased_comp = K_ff * (4 * INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
 	torqueAccVec[0] = (torqueAccVec[2] + torqueAccVec[1] + accbased_comp) / (3);
 	accbased_comp = torqueAccVec[0];
 
@@ -100,8 +100,19 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	m_eixo_in->ReadPDO01();
 	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 
+	for (int i = 10; i > 0; --i)
+		theta_c_vec[i] = theta_c_vec[i - 1];  // shifting values in 1 position
+
+	theta_c_vec[0] = GEAR_RATIO * theta_c;
+
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	vel_motor = (5*theta_c_vec[0] + 4*theta_c_vec[1] + 3*theta_c_vec[2] + 2*theta_c_vec[3] +
+				 1*theta_c_vec[4] + 0*theta_c_vec[5] - 1*theta_c_vec[6] - 2*theta_c_vec[7] -
+				 3*theta_c_vec[8] - 4*theta_c_vec[9] - 5*theta_c_vec[10]) / (110) * RATE;
+	// here, vel_motor is used as rad/s
+
 	//torque_sea = torque_sea - 0.334*(torque_sea - STIFFNESS * (theta_c - theta_l)); // precisa?
-  torque_sea = STIFFNESS * (theta_c - theta_l);
+	torque_sea = STIFFNESS * (theta_c - theta_l);
 
 	for (int i = 10; i > 0; --i)
 	{
@@ -119,10 +130,11 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	//setpoint = (1 / TORQUE_CONST) * (1 / GEAR_RATIO) * (Kp_F*(accbased_comp - torque_sea) + Kd_F*(d_accbased_comp - d_torque_sea)) * Amplifier;
 
+	// rever:
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
-	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);	// precisa? SIM
+	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);
 
-	if ((setpoint_filt >= -CURRENT_MAX * 1000) && (setpoint_filt <= CURRENT_MAX * 1000))
+	if (abs(setpoint_filt) <= CURRENT_MAX*1000)
 	{
 		if ((theta_c >= -0.5200) && (theta_c <= 1.4800)) // (sentado)
 		//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
@@ -268,27 +280,27 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   actualVelocity = m_eixo_in->PDOgetActualVelocity();
   vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - actualVelocity) + Kd_V*(acc_hum - actualVelocity) );   // [rpm]
 
+  voltage = abs(vel_motor / SPEED_CONST);
 
-	voltage = vel_motor / SPEED_CONST;
-	if (abs(voltage) <= VOLTAGE_MAX)
-	{
-		m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
-	}
-	else
-	{
-		if (vel_motor < 0)
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(-(int) SPEED_CONST * VOLTAGE_MAX);
-		}
-		else
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int) SPEED_CONST * VOLTAGE_MAX);
-		}
-	}
-	m_eixo_in->WritePDO02();
-
-	m_eixo_in->ReadPDO02();
-	actualVelocity = m_eixo_in->PDOgetActualVelocity();
+  if (voltage < 0.09)			// lower saturation
+  {
+	  m_eixo_in->PDOsetVelocitySetpoint(0);
+  }
+  if ((voltage > 0.09) && (voltage <= VOLTAGE_MAX))
+  {
+	  m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
+  }
+  if (voltage > VOLTAGE_MAX)	// upper saturation
+  {
+	  if (vel_motor < 0)
+		  m_eixo_in->PDOsetVelocitySetpoint(-(int)SPEED_CONST * VOLTAGE_MAX);
+	  else
+		  m_eixo_in->PDOsetVelocitySetpoint((int)SPEED_CONST * VOLTAGE_MAX);
+  }
+  m_eixo_in->WritePDO02();
+  
+  m_eixo_in->ReadPDO02();
+  actualVelocity = m_eixo_in->PDOgetActualVelocity();
 }
 
 void accBasedControl::GainsScan_Current()
@@ -340,6 +352,8 @@ void accBasedControl::UpdateCtrlWord_Current()
 	ctrl_word += " Kd_F: " + (std::string) numbers_str + "\n";
 	sprintf(numbers_str, "%5d", Amplifier);
 	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
+	sprintf(numbers_str, "%+5.3f", (2*MY_PI/60) * vel_motor);
+	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm\n";
 }
 
 

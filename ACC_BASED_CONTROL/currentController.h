@@ -119,22 +119,20 @@ public:
 
 		vel_hum = 0;
 		vel_exo = 0;
+		setpoint = 0;
+		setpoint_filt = 0;
+		accbased_comp = 0;
+		torque_sea = 0;
 
 		for (size_t i = 0; i < 11; ++i)
 		{
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
-		}
-		for (size_t i = 0; i < 11; ++i)
-		{
+			theta_l_vec[i] = 0;
+			theta_c_vec[i] = 0;
 			torqueSeaVec[i] = 0;
-			torqueAccVec[i] = 0;
+			torqueAccVec[i] = 0;	
 		}
-
-		accbased_comp = 0;
-		torque_sea = 0;
-		setpoint = 0;
-		setpoint_filt = 0;
 
 		if (seconds != 0)
 		{
@@ -243,6 +241,8 @@ private:
 
 	float theta_l;			// [rad]
 	float theta_c;			// [rad]
+	float theta_l_vec[11];
+	float theta_c_vec[11];
 
 	float torque_sea;		// [N.m]
 	float d_torque_sea;		// [N.m/s]
