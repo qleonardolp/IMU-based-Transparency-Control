@@ -328,7 +328,7 @@ int main(int argc, char** argv)
 		char control_mode;
 		int time_logging;
 
-		printf("Choose the control mode: [c] Current or [s] Speed: ");
+		printf("Choose the control mode: [c] Current, [s] Speed or [k] CurrentKF: ");
 		scanf("%c", &control_mode);
 		printf("How long (sec) do you want to record this run? 0 to do not record: ");
 		scanf("%d", &time_logging);
@@ -475,7 +475,7 @@ int main(int argc, char** argv)
 
 				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
 				{
-					xsens2Eposcan.GainsScan_Current();
+					xsens2Eposcan.GainScan_Current();
 					scan_file = 0;
 				}
 
@@ -485,7 +485,8 @@ int main(int argc, char** argv)
 					xsens2Eposcan.UpdateCtrlWord_Current();
 					std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-          std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					printf("%s\n", wirelessMasterCallback.mtw_event);
+					//std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 
@@ -494,6 +495,75 @@ int main(int argc, char** argv)
 			}
 			(void)_getch();
 		}
+
+		if (control_mode == 'k')	// running current control with Kalman Filter
+		{
+			while (!_kbhit())
+			{
+				XsTime::msleep(4);
+				//QueryPerformanceCounter(&tick_before);
+				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
+
+				bool newDataAvailable = false;
+				mtw_data_stamp = std::chrono::steady_clock::now();
+
+				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+				{
+					if (mtwCallbacks[i]->dataAvailable())
+					{
+						newDataAvailable = true;
+						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+
+						accData[i] = packet->calibratedAcceleration();
+						gyroData[i] = packet->calibratedGyroscopeData();
+
+						mtwCallbacks[i]->deleteOldestPacket();
+					}
+				}
+
+				if (newDataAvailable)
+				{
+					xsens2Eposcan.CurrentControlKF(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					printer++;
+					scan_file++;
+					record_count--;
+
+					auto control_stamp = std::chrono::steady_clock::now();
+					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+
+					loop_duration = clock() - beginning;
+					beginning = clock();
+					freq = (float)CLOCKS_PER_SEC / loop_duration;
+				}
+
+				if (record_count >= 0)
+				{
+					xsens2Eposcan.Recorder_Current();
+				}
+
+				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
+				{
+					xsens2Eposcan.GainScan_CurrentKF();
+					scan_file = 0;
+				}
+
+				if (printer == (int)RATE / 5)   // 
+				{
+					system("cls");
+					xsens2Eposcan.UpdateCtrlWord_CurrentKF();
+					std::cout << xsens2Eposcan.ctrl_word;
+					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+					printf("%s\n", wirelessMasterCallback.mtw_event);
+					//std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					printer = 0;
+				}
+
+				//QueryPerformanceCounter(&tick_after);
+				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
+			}
+			(void)_getch();
+		}
+
 		if (control_mode == 's')	// running speed control
 		{
 			while (!_kbhit())
@@ -539,9 +609,9 @@ int main(int argc, char** argv)
 					xsens2Eposcan.Recorder_Velocity();
 				}
 
-				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
+				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
 				{
-					xsens2Eposcan.GainsScan_Velocity();
+					xsens2Eposcan.GainScan_Velocity();
 					scan_file = 0;
 				}
 
@@ -551,7 +621,7 @@ int main(int argc, char** argv)
 					xsens2Eposcan.UpdateCtrlWord_Velocity();
 					std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-          std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 

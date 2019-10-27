@@ -33,7 +33,12 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <math.h>
 #include <thread>
 
-// CONSTANTES
+#include <Eigen/LU>
+#include <Eigen/Core>
+
+#define		SGVECT_SIZE		11				// Size of the window vector for Savitsky-Golay smoothing and derivative
+
+// CONSTANTS
 
 #define		GEAR_RATIO		150.0		    // Redução do Sistema
 #define		ENCODER_IN		4096		    // Resolução do encoder do motor
@@ -46,12 +51,12 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1000		// Max corrente nominal no motor Maxon RE40 [A]
-#define		VOLTAGE_MAX		21.600    // Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
+#define		VOLTAGE_MAX		21.600		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	60.300		// Constante de torque do motor RE40	[N.m/mA]
 #define		SPEED_CONST		158.00		// Constante de velocidade do motor RE40 [rpm/V]
 
 #define     GRAVITY         9.8066      // [m/s^2]
-#define     INERTIA_EXO     0.0655      // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
+#define     INERTIA_EXO     0.0655 * 4  // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
 #define		MTW_DIST_LIMB	0.2500		// [m]
 #define		MTW_DIST_EXO	0.0700		// [m]
 #define		L_CG			0.3500		// [m]
@@ -78,6 +83,9 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		MY_PI			3.141592653	// Pi value
 #define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor
 
+typedef Eigen::Matrix<float, 5, 1> Vector5f;
+typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+
 
 class accBasedControl
 {
@@ -93,9 +101,9 @@ public:
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
 
-		if (control_mode == 'c')
+		if (control_mode == 'c' || control_mode == 'k')
 		{
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff function
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff and CurrentControlKF functions
 		}
 		if (control_mode == 's')
 		{
@@ -117,6 +125,9 @@ public:
 		Kd_V = 0.100;
 		Amp_V = 50;			// initialized with a safe value
 
+		// Kalman Filter
+		Amp_kf = 1;
+
 		vel_hum = 0;
 		vel_exo = 0;
 		setpoint = 0;
@@ -124,7 +135,7 @@ public:
 		accbased_comp = 0;
 		torque_sea = 0;
 
-		for (size_t i = 0; i < 11; ++i)
+		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
 			velhumVec[i] = 0;
 			velexoVec[i] = 0;
@@ -147,10 +158,10 @@ public:
 			logger = fopen(logger_filename, "wt");
 			if (logger != NULL)
 			{
-				// printing the header:
-				if (control_mode == 'c')
+				// printing the header on the first line of the file
+				if (control_mode == 'c' || control_mode == 'k')
 				{
-					fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]\n");
+					fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]\n");
 				}
 				if (control_mode == 's')
 				{
@@ -162,29 +173,68 @@ public:
 		else
 		{
 			logging = false;
-			log_count = 0;
 		}
 
+
+		//		KALMAN FILTER SETUP		//
+
+		x_k = Eigen::MatrixXf::Zero();
+		z_k = Eigen::MatrixXf::Zero();
+
+		KG = Eigen::MatrixXf::Identity();
+
+		Fk = Eigen::MatrixXf::Zero(5, 5);	// filling Fx matrix with zeros, once there are many zeros on it
+		Fk(0, 0) = 1; Fk(0, 1) = DELTA_T;
+		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
+		Fk(2, 2) = 1; Fk(2, 3) = DELTA_T;
+		Fk(3, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
+		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
+		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
+
+		Bk = Eigen::MatrixXf::Zero(5, 1);
+		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
+		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
+
+		Pk = 0.1 * Eigen::MatrixXf::Identity();		// ???
+		Qk = 0.2 * Eigen::MatrixXf::Identity();		// ???
+
+		Hk = Eigen::MatrixXf::Identity();
+		Rk = 0.01 * Eigen::MatrixXf::Identity();
+		Rk(1, 0) = 2 * RATE * 0.01;		// error propagation from vel_hum to acc_hum
+		Rk(3, 2) = 2 * RATE * 0.01;		// error propagation from vel_exo to acc_exo
+
+
+
 	}
+
+	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
+	void savitskygolay(float window[], float newest_value, float* first_derivative);
 
 	// numdiff, controlling through the EPOS current control
 	void FiniteDiff(float velHum, float velExo);
 
 	// acc-gravity
-	void Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X, float accExo_Y, float velHum_Z, float velExo_Z);
+	//void Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X, float accExo_Y, float velHum_Z, float velExo_Z);
 
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
-	void GainsScan_Current();
+	// Controlling through the EPOS current control using Kalman Filter for state estimation
+	void CurrentControlKF(float velHum, float velExo);
 
-	void GainsScan_Velocity();
+	void GainScan_Current();
+
+	void GainScan_CurrentKF();
+
+	void GainScan_Velocity();
 
 	void Recorder_Current();
 
 	void Recorder_Velocity();
 
 	void UpdateCtrlWord_Current();
+
+	void UpdateCtrlWord_CurrentKF();
 
 	void UpdateCtrlWord_Velocity();
 
@@ -205,11 +255,14 @@ private:
 
 	FILE* logger;
 	char logger_filename[40];
-	int log_count;
 	bool logging;
 
 	FILE* gains_values;
 
+	int pos0_out;
+	int pos0_in;
+
+	//		GAINS		//
 	// Current Control
 	int Amplifier;
 	float K_ff;
@@ -225,24 +278,29 @@ private:
 	float Ki_V;         // [1/s]
 	float Kd_V;         // [s]
 
+	//	 STATE VARIABLES	//
 
 	float acc_hum;			// [rad/s^2]
 	float acc_exo;			// [rad/s^2]
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
 
-	float velhumVec[11];	// [rad/s]
-	float velexoVec[11];	// [rad/s]
-	float torqueSeaVec[11];	// [N.m]
-	float torqueAccVec[11];  // [N.m]
+	float theta_l;			// [rad]
+	float theta_c;			// [rad]
+
+	//		STATE VECTORS				//
+
+	float velhumVec[SGVECT_SIZE];		// [rad/s]
+	float velexoVec[SGVECT_SIZE];		// [rad/s]
+	float torqueSeaVec[SGVECT_SIZE];	// [N.m]
+	float torqueAccVec[SGVECT_SIZE];	// [N.m]
+	float theta_l_vec[SGVECT_SIZE];		// [rad]
+	float theta_c_vec[SGVECT_SIZE];		// [rad]
+
 
 	float setpoint;			// [mA]
 	float setpoint_filt;	// [mA]
 
-	float theta_l;			// [rad]
-	float theta_c;			// [rad]
-	float theta_l_vec[11];
-	float theta_c_vec[11];
 
 	float torque_sea;		// [N.m]
 	float d_torque_sea;		// [N.m/s]
@@ -257,8 +315,22 @@ private:
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]
 
-	int pos0_out;
-	int pos0_in;
+	//		KALMAN FILTER		//
+
+	Vector5f x_k;		// State Vector
+	Vector5f z_k;		// Sensor reading Vector
+	Matrix5f Pk;		// State Covariance Matrix
+	Matrix5f Fk;		// Prediction Matrix
+	Vector5f Bk;		// Control Matrix* (is a vector but called matrix)
+	Matrix5f Qk;		// Process noise Covariance
+	Matrix5f Hk;		// Sensor Expectations Matrix
+	Matrix5f Rk;		// Sensor noise Covariance
+	Matrix5f KG;		// Kalman Gain Matrix
+
+	float Amp_kf;
+
+	std::string kf_error;
+
 };
 
 #endif // !CURRENT_CONTROL_H
