@@ -178,12 +178,12 @@ public:
 
 		//		KALMAN FILTER SETUP		//
 
-		x_k = Eigen::MatrixXf::Zero();
-		z_k = Eigen::MatrixXf::Zero();
+		x_k = Vector5f::Zero();
+		z_k = Vector5f::Zero();
 
-		KG = Eigen::MatrixXf::Identity();
+		KG = Matrix5f::Identity();
 
-		Fk = Eigen::MatrixXf::Zero(5, 5);	// filling Fx matrix with zeros, once there are many zeros on it
+		Fk = Matrix5f::Zero(5, 5);	// filling Fx matrix with zeros, once there are many zeros on it
 		Fk(0, 0) = 1; Fk(0, 1) = DELTA_T;
 		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
 		Fk(2, 2) = 1; Fk(2, 3) = DELTA_T;
@@ -191,19 +191,17 @@ public:
 		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
 		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
 
-		Bk = Eigen::MatrixXf::Zero(5, 1);
+		Bk = Vector5f::Zero(5, 1);
 		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 
-		Pk = 0.1 * Eigen::MatrixXf::Identity();		// ???
-		Qk = 0.2 * Eigen::MatrixXf::Identity();		// ???
+		Pk = 0.1 * Matrix5f::Identity();		// ???
+		Qk = 0.2 * Matrix5f::Identity();		// ???
 
-		Hk = Eigen::MatrixXf::Identity();
-		Rk = 0.01 * Eigen::MatrixXf::Identity();
+		Hk = Matrix5f::Identity();
+		Rk = 0.01 * Matrix5f::Identity();
 		Rk(1, 0) = 2 * RATE * 0.01;		// error propagation from vel_hum to acc_hum
 		Rk(3, 2) = 2 * RATE * 0.01;		// error propagation from vel_exo to acc_exo
-
-
 
 	}
 
