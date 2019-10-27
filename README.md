@@ -6,11 +6,13 @@ wearable robot: the lower limbs exoskeleton designed by the Robotic Rehabilitati
 
 ## Setting up the Visual Studio solution
 
-This solution has been developed under VS Express 2012, but feel free to try under another version. Follow these steps to run the project after clone this repository:
+This solution has been developed under VS Express 2012, but feel free to try under another version. Follow the steps below to configure the VS solution before run the project:
 
-- Add the 'Win32/include' directory path of this repository in your computer to the include directories ...
-- Add the 'Win32/lib' to ...
-- Copy the '.lib' files on 'Win32/lib' to the Debug folder, or wherever is the executable, after build the solution in VS. It is necessary to run the program.
+- Add the 'Win32/include' directory path of this repository to "Additional Include Directories", under Configuration Properties > C/C++ > General;
+- Repeat the previous step for the path where [Eigen 3.3.7](http://eigen.tuxfamily.org/dox/GettingStarted.html) was extracted;
+- Add the 'Win32/lib' directory path of this repository to "Additional Library Directories", under Configuration Properties > Linker > General;
+- Repeat the previous step adding '$(NIEXTCCOMPILERSUPP)\lib32\msvc' to "Additional Library Directories";
+- Copy the '.lib' files on 'Win32/lib' to the Debug folder, or wherever the executable is after build the solution in VS. It is necessary to run the program.
 
 ## How to use the application
 
