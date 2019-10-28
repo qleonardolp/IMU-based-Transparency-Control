@@ -229,11 +229,12 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 	z_k << vel_hum, acc_hum, vel_exo, acc_exo, torque_sea;
 
 	// Predicting
+	// or x_k = Fk * x_k + Bk * 0; test
 	x_k = Fk * x_k + Bk * accbased_comp;
 	Pk = Fk * Pk * Fk.transpose() + Qk;
 
 	// Kalman Gain:
-	FullPivLU<Matrix5f> TotalCovariance(Hk * Pk * Hk.transpose() + Rk);
+	FullPivLU<Matrix3f> TotalCovariance(Hk * Pk * Hk.transpose() + Rk);
 	if (TotalCovariance.isInvertible())
 	{
 		KG = Pk * Hk.transpose() * TotalCovariance.inverse();

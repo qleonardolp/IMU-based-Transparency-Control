@@ -179,14 +179,14 @@ public:
 		//		KALMAN FILTER SETUP		//
 
 		x_k = Vector5f::Zero();
-		z_k = Vector5f::Zero();
+		z_k = Eigen::Vector3f::Zero();
 
-		KG = Matrix5f::Identity();
+		KG = Eigen::Matrix<float, 5, 3>::Zero();
 
 		Fk = Matrix5f::Zero(5, 5);	// filling Fx matrix with zeros, once there are many zeros on it
-		Fk(0, 0) = 1; Fk(0, 1) = DELTA_T;
+		Fk(0, 0) = 1;	Fk(0, 1) = DELTA_T;
 		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
-		Fk(2, 2) = 1; Fk(2, 3) = DELTA_T;
+		Fk(2, 2) = 1;	Fk(2, 3) = DELTA_T;
 		Fk(3, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
 		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
 		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
@@ -195,13 +195,14 @@ public:
 		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 
-		Pk = 0.1 * Matrix5f::Identity();		// ???
-		Qk = 0.2 * Matrix5f::Identity();		// ???
+		Pk = 0.05 * Matrix5f::Identity();		// ???
+		Qk = 0.1 * Matrix5f::Identity();		// ???
 
-		Hk = Matrix5f::Identity();
-		Rk = 0.01 * Matrix5f::Identity();
-		Rk(1, 0) = 2 * RATE * 0.01;		// error propagation from vel_hum to acc_hum
-		Rk(3, 2) = 2 * RATE * 0.01;		// error propagation from vel_exo to acc_exo
+		Hk = Eigen::Matrix<float, 3, 5>::Zero();
+		Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
+		Rk = 0.01 * Eigen::Matrix3f::Identity();
+		//Rk(1, 0) = 2 * RATE * 0.01;		// error propagation from vel_hum to acc_hum
+		//Rk(3, 2) = 2 * RATE * 0.01;		// error propagation from vel_exo to acc_exo
 
 	}
 
@@ -315,15 +316,16 @@ private:
 
 	//		KALMAN FILTER		//
 
-	Vector5f x_k;		// State Vector
-	Vector5f z_k;		// Sensor reading Vector
-	Matrix5f Pk;		// State Covariance Matrix
-	Matrix5f Fk;		// Prediction Matrix
-	Vector5f Bk;		// Control Matrix* (is a vector but called matrix)
-	Matrix5f Qk;		// Process noise Covariance
-	Matrix5f Hk;		// Sensor Expectations Matrix
-	Matrix5f Rk;		// Sensor noise Covariance
-	Matrix5f KG;		// Kalman Gain Matrix
+	Vector5f x_k;			// State Vector
+	Eigen::Vector3f z_k;	// Sensor reading Vector
+	Matrix5f Pk;			// State Covariance Matrix
+	Matrix5f Fk;			// Prediction Matrix
+	Vector5f Bk;			// Control Matrix* (is a vector but called matrix)
+	Matrix5f Qk;			// Process noise Covariance
+
+	Eigen::Matrix<float, 3, 5> Hk;			// Sensor Expectations Matrix
+	Eigen::Matrix3f Rk;						// Sensor noise Covariance
+	Eigen::Matrix<float, 5, 3> KG;			// Kalman Gain Matrix
 
 	float Amp_kf;
 
