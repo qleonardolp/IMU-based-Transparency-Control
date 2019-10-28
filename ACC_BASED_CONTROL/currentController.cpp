@@ -180,9 +180,9 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   else if (voltage > VOLTAGE_MAX)	// upper saturation
   {
 	  if (vel_motor < 0)
-		  m_eixo_in->PDOsetVelocitySetpoint(-(int)SPEED_CONST * VOLTAGE_MAX);
+		  m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
 	  else
-		  m_eixo_in->PDOsetVelocitySetpoint((int)SPEED_CONST * VOLTAGE_MAX);
+		  m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
   }
   m_eixo_in->WritePDO02();
   
