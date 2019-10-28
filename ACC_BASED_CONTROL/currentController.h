@@ -200,9 +200,7 @@ public:
 
 		Hk = Eigen::Matrix<float, 3, 5>::Zero();
 		Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
-		Rk = 0.01 * Eigen::Matrix3f::Identity();
-		//Rk(1, 0) = 2 * RATE * 0.01;		// error propagation from vel_hum to acc_hum
-		//Rk(3, 2) = 2 * RATE * 0.01;		// error propagation from vel_exo to acc_exo
+		Rk(0, 0) = 0.00002;	Rk(1, 1) = 0.00002;	Rk(2, 2) = 0.107;	// sensors noise covariances
 
 	}
 
