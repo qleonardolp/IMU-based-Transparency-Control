@@ -226,7 +226,7 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 
 
 	// Assigning the measured states to the Sensor reading Vector
-	z_k << vel_hum, acc_hum, vel_exo, acc_exo, torque_sea;
+	z_k << vel_hum, vel_exo, torque_sea;
 
 	// Predicting
 	// or x_k = Fk * x_k + Bk * 0; test
