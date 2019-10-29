@@ -479,14 +479,13 @@ int main(int argc, char** argv)
 					scan_file = 0;
 				}
 
-				if (printer == (int)RATE / 5)   // 
+				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
 				{
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Current();
 					std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-					printf("%s\n", wirelessMasterCallback.mtw_event);
-					//std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 
@@ -501,8 +500,6 @@ int main(int argc, char** argv)
 			while (!_kbhit())
 			{
 				XsTime::msleep(4);
-				//QueryPerformanceCounter(&tick_before);
-				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
 
 				bool newDataAvailable = false;
 				mtw_data_stamp = std::chrono::steady_clock::now();
@@ -547,19 +544,16 @@ int main(int argc, char** argv)
 					scan_file = 0;
 				}
 
-				if (printer == (int)RATE / 5)   // 
+				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
 				{
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_CurrentKF();
 					std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-					printf("%s\n", wirelessMasterCallback.mtw_event);
-					//std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
 
-				//QueryPerformanceCounter(&tick_after);
-				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
 			}
 			(void)_getch();
 		}
@@ -569,8 +563,6 @@ int main(int argc, char** argv)
 			while (!_kbhit())
 			{
 				XsTime::msleep(4);
-				//QueryPerformanceCounter(&tick_before);
-				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
 
 				bool newDataAvailable = false;
 				mtw_data_stamp = std::chrono::steady_clock::now();
@@ -615,7 +607,7 @@ int main(int argc, char** argv)
 					scan_file = 0;
 				}
 
-				if (printer == (int)RATE / 5)   // 
+				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
 				{
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Velocity();
@@ -625,8 +617,6 @@ int main(int argc, char** argv)
 					printer = 0;
 				}
 
-				//QueryPerformanceCounter(&tick_after);
-				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
 			}
 			(void)_getch();
 		}
