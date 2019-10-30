@@ -484,7 +484,7 @@ int main(int argc, char** argv)
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Current();
 					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
 					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
@@ -549,7 +549,7 @@ int main(int argc, char** argv)
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_CurrentKF();
 					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
 					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
@@ -612,7 +612,7 @@ int main(int argc, char** argv)
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Velocity();
 					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f us rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
 					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
