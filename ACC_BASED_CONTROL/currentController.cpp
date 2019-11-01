@@ -294,6 +294,41 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 	actualCurrent = m_eixo_in->PDOgetActualCurrent();
 }
 
+void accBasedControl::FFPosition(float velHum, float velExo)
+{
+	m_epos->sync();
+
+	//	LPF_FC = 10Hz >> 0.334
+	vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// [rad/s]
+	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// [rad/s]
+
+	velhumVec[0] = vel_hum;
+	acc_hum = (velhumVec[0] - velhumVec[1])*RATE;		// [rad/s^2]
+	velhumVec[1] = velhumVec[0];
+
+	velexoVec[0] = vel_exo;
+	acc_exo = (velexoVec[0] - velexoVec[1])*RATE;		// [rad/s^2]
+	velexoVec[1] = velexoVec[0];
+
+	m_eixo_out->ReadPDO01();
+	theta_l_vec[0] = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+	m_eixo_in->ReadPDO01();
+	theta_c_vec[0] = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+
+	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
+
+	theta_c = (INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];	
+	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
+
+	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
+	{
+		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
+		theta_c = (ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in;
+		m_eixo_in->PDOsetPositionSetpoint((int)theta_c);
+	}
+	m_eixo_in->WritePDO01();
+}
+
 void accBasedControl::GainScan_Current()
 {
 	gains_values = fopen("gainsCurrent.txt", "rt");

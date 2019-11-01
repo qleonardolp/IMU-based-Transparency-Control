@@ -101,13 +101,22 @@ public:
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
 
-		if (control_mode == 'c' || control_mode == 'k')
+		switch (control_mode)
 		{
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);    // For FiniteDiff and CurrentControlKF functions
-		}
-		if (control_mode == 's')
-		{
-			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);   // For OmegaControl function
+		case 'c':
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff
+			break;
+		case 'k':
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CurrentControlKF
+			break;
+		case 's':
+			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl
+			break;
+		case 'p':
+			m_eixo_in->VCS_SetOperationMode(POSITION_MODE); // For FFPosition 
+			break;
+		default:
+			break;
 		}
 
 		// Current Control
@@ -210,15 +219,15 @@ public:
 	// numdiff, controlling through the EPOS current control
 	void FiniteDiff(float velHum, float velExo);
 
-	// acc-gravity
-	//void Acc_Gravity(float accHum_X, float accHum_Y, float accExo_X, float accExo_Y, float velHum_Z, float velExo_Z);
-
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
-	// Controlling through the EPOS current control using Kalman Filter for state estimation
+	// Controlling through the EPOS current control using Kalman Filter
 	void CurrentControlKF(float velHum, float velExo);
 
+	// Controlling through the EPOS position control, assuming T_l = T_ff
+	void FFPosition(float velHum, float velExo);
+	
 	void GainScan_Current();
 
 	void GainScan_CurrentKF();
