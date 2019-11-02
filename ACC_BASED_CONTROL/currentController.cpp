@@ -195,16 +195,8 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 	m_epos->sync();
 
 	//	LPF_FC = 10Hz >> 0.334
-	vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// [rad/s]
-	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// [rad/s]
-
-	velhumVec[0] = vel_hum;
-	acc_hum = (velhumVec[0] - velhumVec[1])*RATE;		// [rad/s^2]
-	velhumVec[1] = velhumVec[0];
-
-	velexoVec[0] = vel_exo;
-	acc_exo = (velexoVec[0] - velexoVec[1])*RATE;		// [rad/s^2]
-	velexoVec[1] = velexoVec[0];
+	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// [rad/s]
+	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// [rad/s]
 
 	m_eixo_out->ReadPDO01();
 	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
@@ -226,11 +218,14 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 
 
 	// Assigning the measured states to the Sensor reading Vector
-	z_k << vel_hum, vel_exo, torque_sea;
+	z_k << velHum, velExo, torque_sea;
+
+	m_eixo_in->ReadPDO01();
+	actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 	// Predicting
 	// or x_k = Fk * x_k + Bk * 0; test
-	x_k = Fk * x_k + Bk * accbased_comp;
+	x_k = Fk * x_k + Bk * (actualCurrent * TORQUE_CONST / Amp_kf);
 	Pk = Fk * Pk * Fk.transpose() + Qk;
 
 	// Kalman Gain:
@@ -251,18 +246,17 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 	
 	// Controlling using the state estimations
 
-	vel_hum = x_k(0, 0);
-	acc_hum = x_k(1, 0);
-	vel_exo = x_k(2, 0);
-	acc_exo = x_k(3, 0);
-	torque_sea = x_k(4, 0);
+	acc_hum = x_k(1);
+	acc_exo = x_k(3);
+	vel_hum = x_k(0);
+	vel_exo = x_k(2);
+	torque_sea = x_k(4);
 	
-	accbased_comp = (1/GEAR_RATIO) * ( (J_EQ + INERTIA_EXO)*acc_hum + B_EQ*vel_exo );	// As considered for the Kalman Filter design, mainly on Fk
-	// or
-	//accbased_comp = (1 / GEAR_RATIO) * ((J_EQ + INERTIA_EXO)*acc_hum + B_EQ*vel_motor);
+	// As considered for the Kalman Filter designed in Fk
+	accbased_comp = (1 / GEAR_RATIO) * ((J_EQ + INERTIA_EXO)*acc_hum + (B_EQ / GEAR_RATIO)*vel_motor);
 
 	setpoint = (1/TORQUE_CONST) * (accbased_comp) * Amp_kf;
-	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);
+	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);		// test without it
 
 	if (abs(setpoint_filt) <= CURRENT_MAX * 1000)
 	{
@@ -298,17 +292,13 @@ void accBasedControl::FFPosition(float velHum, float velExo)
 {
 	m_epos->sync();
 
-	//	LPF_FC = 10Hz >> 0.334
-	vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// [rad/s]
-	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// [rad/s]
+	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
+	vel_hum = velhumVec[0];
 
-	velhumVec[0] = vel_hum;
-	acc_hum = (velhumVec[0] - velhumVec[1])*RATE;		// [rad/s^2]
-	velhumVec[1] = velhumVec[0];
-
-	velexoVec[0] = vel_exo;
-	acc_exo = (velexoVec[0] - velexoVec[1])*RATE;		// [rad/s^2]
-	velexoVec[1] = velexoVec[0];
+	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
+	vel_exo = velexoVec[0];
 
 	m_eixo_out->ReadPDO01();
 	theta_l_vec[0] = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
@@ -322,9 +312,10 @@ void accBasedControl::FFPosition(float velHum, float velExo)
 
 	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
 	{
+		float theta_m;
 		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
-		theta_c = (ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in;
-		m_eixo_in->PDOsetPositionSetpoint((int)theta_c);
+		theta_m = (ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in;
+		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
 	}
 	m_eixo_in->WritePDO01();
 }
@@ -358,6 +349,17 @@ void accBasedControl::GainScan_Velocity()
 	if (gains_values != NULL)
 	{
 		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\nAMP %d\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V, &Amp_V);
+		fclose(gains_values);
+	}
+}
+
+void accBasedControl::GainScan_Position()
+{
+	gains_values = fopen("gainsPosition.txt", "rt");
+
+	if (gains_values != NULL)
+	{
+		fscanf(gains_values, "KFF_P %f\nKP_P %f\nKI_P %f\nKD_P %f\nAMP %d\n", &Kff_P, &Kp_P, &Ki_P, &Kd_P, &Amp_P);
 		fclose(gains_values);
 	}
 }
@@ -437,6 +439,20 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 }
 
+void accBasedControl::UpdateCtrlWord_Position()
+{
+	char numbers_str[20];
+
+	sprintf(numbers_str, "%+5.3f", theta_l_vec[0] * (180 / MY_PI));
+	ctrl_word += " theta_l: " + (std::string) numbers_str + " deg";
+	sprintf(numbers_str, "%+5.3f", theta_c_vec[0] * (180 / MY_PI));
+	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg";
+	sprintf(numbers_str, "%+5.3f", torque_sea);
+	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m\n";
+	sprintf(numbers_str, "%+5.3f", theta_c * (180 / MY_PI));
+	ctrl_word += " theta_m: " + (std::string) numbers_str + " deg\n";
+}
+
 void accBasedControl::Recorder_Current()
 {
 	if (logging)
@@ -465,6 +481,21 @@ void accBasedControl::Recorder_Velocity()
 		}
 	}
 	
+}
+
+void accBasedControl::Recorder_Position()
+{
+	if (logging)
+	{
+		logger = fopen(logger_filename, "a");
+		if (logger != NULL)
+		{
+			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+				acc_hum, acc_exo, vel_hum, vel_exo, theta_c, theta_c_vec[0], theta_l_vec[0]);
+			fclose(logger);
+		}
+	}
+
 }
 
 void accBasedControl::savitskygolay(float window[], float newest_value, float* first_derivative)

@@ -328,7 +328,7 @@ int main(int argc, char** argv)
 		char control_mode;
 		int time_logging;
 
-		printf("Choose the control mode: [c] Current, [s] Speed or [k] CurrentKF: ");
+		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[p] FFPosition\n");
 		scanf("%c", &control_mode);
 		printf("How long (sec) do you want to record this run? 0 to do not record: ");
 		scanf("%d", &time_logging);
@@ -611,6 +611,69 @@ int main(int argc, char** argv)
 				{
 					system("cls");
 					xsens2Eposcan.UpdateCtrlWord_Velocity();
+					std::cout << xsens2Eposcan.ctrl_word;
+					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
+					printer = 0;
+				}
+
+			}
+			(void)_getch();
+		}
+
+		if (control_mode == 'p')	// running position control
+		{
+			while (!_kbhit())
+			{
+				XsTime::msleep(4);
+
+				bool newDataAvailable = false;
+				mtw_data_stamp = std::chrono::steady_clock::now();
+
+				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+				{
+					if (mtwCallbacks[i]->dataAvailable())
+					{
+						newDataAvailable = true;
+						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+
+						accData[i] = packet->calibratedAcceleration();
+						gyroData[i] = packet->calibratedGyroscopeData();
+
+						mtwCallbacks[i]->deleteOldestPacket();
+					}
+				}
+
+				if (newDataAvailable)
+				{
+					xsens2Eposcan.FFPosition(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					printer++;
+					scan_file++;
+					record_count--;
+
+					auto control_stamp = std::chrono::steady_clock::now();
+					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+
+					loop_duration = clock() - beginning;
+					beginning = clock();
+					freq = (float)CLOCKS_PER_SEC / loop_duration;
+				}
+
+				if (record_count >= 0)
+				{
+					xsens2Eposcan.Recorder_Position();
+				}
+
+				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
+				{
+					xsens2Eposcan.GainScan_Position();
+					scan_file = 0;
+				}
+
+				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
+				{
+					system("cls");
+					xsens2Eposcan.UpdateCtrlWord_Position();
 					std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
 					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected

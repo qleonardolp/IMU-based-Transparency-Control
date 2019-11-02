@@ -83,8 +83,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		MY_PI			3.141592653	// Pi value
 #define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor
 
-typedef Eigen::Matrix<float, 5, 1> Vector5f;
-typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+#define		STATE_DIM		5
+#define		SENSOR_DIM		3
 
 
 class accBasedControl
@@ -134,8 +134,12 @@ public:
 		Kd_V = 0.100;
 		Amp_V = 50;			// initialized with a safe value
 
-		// Kalman Filter
-		Amp_kf = 1;
+		// Position Control
+		Amp_P = 0;
+		Kff_P = 0;
+		Kp_P = 0;
+		Ki_P = 0;
+		Kd_P = 0;
 
 		vel_hum = 0;
 		vel_exo = 0;
@@ -176,6 +180,10 @@ public:
 				{
 					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rpm]  actual_Vel[rpm]  Voltage[V]\n");
 				}
+				if (control_mode == 'p')
+				{
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  theta_m[deg]  theta_c[deg]  theta_l[deg]\n");
+				}
 				fclose(logger);
 			}
 		}
@@ -187,12 +195,14 @@ public:
 
 		//		KALMAN FILTER SETUP		//
 
-		x_k = Vector5f::Zero();
-		z_k = Eigen::Vector3f::Zero();
+		Amp_kf = 1;
 
-		KG = Eigen::Matrix<float, 5, 3>::Zero();
+		x_k.setZero();
+		z_k.setZero();
 
-		Fk = Matrix5f::Zero(5, 5);	// filling Fx matrix with zeros, once there are many zeros on it
+		KG.setZero();
+
+		Fk.setZero();
 		Fk(0, 0) = 1;	Fk(0, 1) = DELTA_T;
 		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
 		Fk(2, 2) = 1;	Fk(2, 3) = DELTA_T;
@@ -200,15 +210,24 @@ public:
 		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
 		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
 
-		Bk = Vector5f::Zero(5, 1);
+		Bk.setZero();
 		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
 
-		Pk = 0.05 * Matrix5f::Identity();		// ???
-		Qk = 0.1 * Matrix5f::Identity();		// ???
+		// How to define my uncertainties ?	//
+		Pk.setZero();
+		Pk(0, 0) = 0.00002; Pk(1, 1) = 0.010; Pk(2, 2) = 0.00002; Pk(3, 3) = 0.010; Pk(4, 4) = 0.050;
 
-		Hk = Eigen::Matrix<float, 3, 5>::Zero();
+		Qk.setZero();
+		Qk(0, 0) = 0.01; Qk(1, 1) = 0.0001; Qk(2, 2) = 0.01; Qk(3, 3) = 0.0001; Qk(4, 4) = 0.01;
+
+		//Qk(4, 4) = 0.010; // mechanical slack in the knee joint
+
+		//	----------------------------	//
+
+		Hk.setZero();
 		Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
+		Rk.setZero();
 		Rk(0, 0) = 0.00002;	Rk(1, 1) = 0.00002;	Rk(2, 2) = 0.107;	// sensors noise covariances
 
 	}
@@ -234,15 +253,21 @@ public:
 
 	void GainScan_Velocity();
 
+	void GainScan_Position();
+
 	void Recorder_Current();
 
 	void Recorder_Velocity();
+
+	void Recorder_Position();
 
 	void UpdateCtrlWord_Current();
 
 	void UpdateCtrlWord_CurrentKF();
 
 	void UpdateCtrlWord_Velocity();
+
+	void UpdateCtrlWord_Position();
 
 	// destructor
 	~accBasedControl()
@@ -284,6 +309,14 @@ private:
 	float Ki_V;         // [1/s]
 	float Kd_V;         // [s]
 
+	// Position Control
+
+	int Amp_P;          // [dimensionless]
+	float Kff_P;        // [dimensionless]
+	float Kp_P;         // []
+	float Ki_P;         // []
+	float Kd_P;         // []
+
 	//	 STATE VARIABLES	//
 
 	float acc_hum;			// [rad/s^2]
@@ -323,16 +356,15 @@ private:
 
 	//		KALMAN FILTER		//
 
-	Vector5f x_k;			// State Vector
-	Eigen::Vector3f z_k;	// Sensor reading Vector
-	Matrix5f Pk;			// State Covariance Matrix
-	Matrix5f Fk;			// Prediction Matrix
-	Vector5f Bk;			// Control Matrix* (is a vector but called matrix)
-	Matrix5f Qk;			// Process noise Covariance
-
-	Eigen::Matrix<float, 3, 5> Hk;			// Sensor Expectations Matrix
-	Eigen::Matrix3f Rk;						// Sensor noise Covariance
-	Eigen::Matrix<float, 5, 3> KG;			// Kalman Gain Matrix
+	Eigen::Matrix<float, STATE_DIM, 1> x_k;			// State Vector
+	Eigen::Matrix<float, SENSOR_DIM, 1> z_k;		// Sensor reading Vector
+	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Pk;			// State Covariance Matrix
+	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Fk;			// Prediction Matrix
+	Eigen::Matrix<float, STATE_DIM, 1> Bk;					// Control Matrix* (is a vector but called matrix)
+	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Qk;			// Process noise Covariance
+	Eigen::Matrix<float, SENSOR_DIM, SENSOR_DIM> Rk;		// Sensor noise Covariance
+	Eigen::Matrix<float, SENSOR_DIM, STATE_DIM> Hk;			// Sensor Expectations Matrix
+	Eigen::Matrix<float, STATE_DIM, SENSOR_DIM> KG;			// Kalman Gain Matrix
 
 	float Amp_kf;
 
