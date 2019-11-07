@@ -120,33 +120,23 @@ public:
 		}
 
 		// Current Control
-		K_ff = K_FF;
-		Kp_A = KP_A;
-		Ki_A = KI_A;
-		Kp_F = KP_F;
-		Kd_F = KD_F;
+		K_ff = K_FF;	Kp_A = KP_A;	Ki_A = KI_A;	Kp_F = KP_F;	Kd_F = KD_F;
 		Amplifier = 100000; // initialized with a safe value
 
 		// Speed Control
-		Kff_V = 1.000;
-		Kp_V = 0.100;
-		Ki_V = 0.100;
-		Kd_V = 0.100;
+		Kff_V = 1.000;	Kp_V = 0.100;
+		Ki_V = 0.100;	Kd_V = 0.100;
 		Amp_V = 50;			// initialized with a safe value
 
 		// Position Control
-		Amp_P = 0;
-		Kff_P = 0;
-		Kp_P = 0;
-		Ki_P = 0;
-		Kd_P = 0;
+		Amp_P = 0;	Kff_P = 0;	Kp_P = 0;	Ki_P = 0;	Kd_P = 0;
 
-		vel_hum = 0;
-		vel_exo = 0;
-		setpoint = 0;
-		setpoint_filt = 0;
-		accbased_comp = 0;
-		torque_sea = 0;
+		vel_hum = 0;		vel_exo = 0;
+		setpoint = 0;		setpoint_filt = 0;
+		accbased_comp = 0;	torque_sea = 0;
+
+		accHum_R = 0;	accHum_T = 0;
+		accExo_R = 0;	accExo_T = 0;
 
 		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
@@ -246,6 +236,9 @@ public:
 
 	// Controlling through the EPOS position control, assuming T_l = T_ff
 	void FFPosition(float velHum, float velExo);
+
+	// Controlling through the EPOS position control, using the IMUs acceleration with gravity:
+	void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT, float accExoR, float velHum, float velExo);
 	
 	void GainScan_Current();
 
@@ -346,6 +339,11 @@ private:
 	float accbased_comp;	// [N.m]
 	float d_accbased_comp;	// [N.m/s]
 	float grav_comp;		// [N.m]
+
+	float accHum_R;			// [m/s²]
+	float accHum_T;			// [m/s²]
+	float accExo_R;			// [m/s²]
+	float accExo_T;			// [m/s²]
 
 	float vel_leg;			// [rpm]
 	float vel_motor;		// [rpm]

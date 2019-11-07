@@ -307,14 +307,58 @@ void accBasedControl::FFPosition(float velHum, float velExo)
 
 	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
 
-	theta_c = (INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];	
+	theta_c = Kff_P*(INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];	
 	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
 
 	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
 	{
 		float theta_m;
 		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
-		theta_m = (ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in;
+		theta_m = theta_m - LPF_SMF*( theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in) );		// LP Filtering
+		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
+	}
+	m_eixo_in->WritePDO01();
+}
+
+void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT, float accExoR, float velHum, float velExo)
+{
+	m_epos->sync();
+
+	// LP Filtering, LPF_FC = 10 Hz		(0.334)
+	vel_hum = vel_hum - 0.334*(vel_hum - velHum);
+	vel_exo = vel_exo - 0.334*(vel_exo - velExo);
+
+	accHum_R = accHum_R - 0.334*(accHum_R - accHumR);
+	accHum_T = accHum_T - 0.334*(accHum_T - accHumT);
+
+	accExo_R = accExo_R - 0.334*(accExo_R - accExoR);
+	accExo_T = accExo_T - 0.334*(accExo_T - accExoT);
+
+	/*
+	theta_l_vec[2] = acos((MTW_DIST_LIMB*vel_hum*vel_hum - accHum_R) / GRAVITY);
+	if ((theta_l_vec[2] >= -0.5200) && (theta_l_vec[2] <= 1.4800))
+	{
+		acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY*sin(theta_l_vec[2]));
+	}
+	*/
+
+	m_eixo_out->ReadPDO01();
+	theta_l_vec[0] = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+	m_eixo_in->ReadPDO01();
+	theta_c_vec[0] = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+
+	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
+
+	acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY * sin(theta_l_vec[0]));	// testar!
+
+	theta_c = Kff_P*(INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];
+	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
+
+	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
+	{
+		float theta_m;
+		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
+		theta_m = theta_m - LPF_SMF * (theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in));		// LP Filtering
 		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
 	}
 	m_eixo_in->WritePDO01();
