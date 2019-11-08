@@ -37,12 +37,12 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	// -- Acc-Based Torque -- //
 
-	vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velhumVec, vel_hum, &acc_hum);		// Updating window, smoothing and First Derivative
+	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
 	vel_hum = velhumVec[0];
 
-	vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velexoVec, vel_exo, &acc_exo);		// Updating window, smoothing and First Derivative
+	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
 	vel_exo = velexoVec[0];
 
 	accbased_comp = K_ff * (INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
@@ -138,21 +138,21 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 void accBasedControl::OmegaControl(float velHum, float velExo)
 {
-	m_epos->sync();	//Sincroniza a CAN
+	m_epos->sync();	// CAN Synchronization
 
-	vel_hum = vel_hum - 0.334*(vel_hum - velHum);	// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velhumVec, vel_hum, &acc_hum);	// Updating window, smoothing and First Derivative
+	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);	// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velhumVec, velHum, &acc_hum);	// Updating window, smoothing and First Derivative
 	vel_hum = velhumVec[0];
 
-	vel_exo = vel_exo - 0.334*(vel_exo - velExo);	// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velexoVec, vel_exo, &acc_exo);	// Updating window, smoothing and First Derivative
+	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);	// LP Filtering, LPF_FC  = 10 Hz  0.334
+	savitskygolay(velexoVec, velExo, &acc_exo);	// Updating window, smoothing and First Derivative
 	vel_exo = velexoVec[0];
 
 
-	vel_exo = vel_exo + 0.00295175;	// offset [rad/s]
-	vel_hum = vel_hum - 0.00657732;	// offset [rad/s]
-	acc_exo = acc_exo + 0.00075835;	// offset [rad/s2]
-	acc_hum = acc_hum + 0.00057484;	// offset [rad/s2]
+	//vel_exo = vel_exo + 0.00295175;	// offset [rad/s]
+	//vel_hum = vel_hum - 0.00657732;	// offset [rad/s]
+	//acc_exo = acc_exo + 0.00075835;	// offset [rad/s2]
+	//acc_hum = acc_hum + 0.00057484;	// offset [rad/s2]
 
   //--- [rad/s] -> [rpm] ---//
   vel_exo = (2*MY_PI/60) * vel_exo;
@@ -160,26 +160,29 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   acc_exo = (2*MY_PI/60) * acc_exo;   // [rpm/s]
   acc_hum = (2*MY_PI/60) * acc_hum;   // [rpm/s]
 
-  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
+  // KFF_V 200.00 KP_V 0.100  KI_V 0.000  KD_V 0.010  AMP 1
+  vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
 
   // or:
-  m_eixo_in->ReadPDO02();
-  actualVelocity = m_eixo_in->PDOgetActualVelocity();
-  vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - actualVelocity) + Kd_V*(acc_hum - actualVelocity) );   // [rpm]
+  //m_eixo_in->ReadPDO02();
+  //savitskygolay(velexoVec, m_eixo_in->PDOgetActualVelocity(), &acc_exo);	// Updating window, smoothing and First Derivative
+  //actualVelocity = velexoVec[0];
+  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - actualVelocity) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
+  vel_motor_filt = vel_motor_filt - LPF_SMF*(vel_motor_filt - vel_motor);
 
-  voltage = abs(vel_motor / SPEED_CONST);
+  voltage = abs(vel_motor_filt / SPEED_CONST);
 
-  if (voltage < 0.09)			// lower saturation
+  if (voltage < 0.100)			// lower saturation
   {
 	  m_eixo_in->PDOsetVelocitySetpoint(0);
   }
-  else if ((voltage > 0.09) && (voltage <= VOLTAGE_MAX))
+  else if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
   {
-	  m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
+	  m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor_filt);
   }
   else if (voltage > VOLTAGE_MAX)	// upper saturation
   {
-	  if (vel_motor < 0)
+	  if (vel_motor_filt < 0)
 		  m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
 	  else
 		  m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
@@ -312,7 +315,6 @@ void accBasedControl::FFPosition(float velHum, float velExo)
 
 	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
 	{
-		float theta_m;
 		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
 		theta_m = theta_m - LPF_SMF*( theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in) );		// LP Filtering
 		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
@@ -339,7 +341,7 @@ void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT
 	if ((theta_l_vec[2] >= -0.5200) && (theta_l_vec[2] <= 1.4800))
 	{
 		acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY*sin(theta_l_vec[2]));
-	}
+	} // deu ruim
 	*/
 
 	m_eixo_out->ReadPDO01();
@@ -349,14 +351,13 @@ void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT
 
 	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
 
-	acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY * sin(theta_l_vec[0]));	// testar!
+	acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY * sin(theta_l_vec[0]));	// testar! equivalente ao FFPosition
 
 	theta_c = Kff_P*(INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];
 	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
 
 	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
 	{
-		float theta_m;
 		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
 		theta_m = theta_m - LPF_SMF * (theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in));		// LP Filtering
 		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
@@ -392,7 +393,7 @@ void accBasedControl::GainScan_Velocity()
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\nAMP %d\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V, &Amp_V);
+		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\nAMP %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V, &Amp_V);
 		fclose(gains_values);
 	}
 }
@@ -403,7 +404,7 @@ void accBasedControl::GainScan_Position()
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "KFF_P %f\nKP_P %f\nKI_P %f\nKD_P %f\nAMP %d\n", &Kff_P, &Kp_P, &Ki_P, &Kd_P, &Amp_P);
+		fscanf(gains_values, "KFF_P %f\nKP_P %f\nKI_P %f\nKD_P %f\nAMP %f\n", &Kff_P, &Kp_P, &Ki_P, &Kd_P, &Amp_P);
 		fclose(gains_values);
 	}
 }
@@ -442,7 +443,7 @@ void accBasedControl::UpdateCtrlWord_Current()
 void accBasedControl::UpdateCtrlWord_CurrentKF()
 {
 	char numbers_str[20];
-	sprintf(numbers_str, "%+5.3f", setpoint_filt);
+	sprintf(numbers_str, "%+.3f", setpoint_filt);
 	ctrl_word = " setpt: " + (std::string) numbers_str;
 	sprintf(numbers_str, "%+5d", actualCurrent);
 	ctrl_word += " [" + (std::string) numbers_str + " mA]\n";
@@ -450,11 +451,11 @@ void accBasedControl::UpdateCtrlWord_CurrentKF()
 	ctrl_word += " theta_l: " + (std::string) numbers_str + " deg";
 	sprintf(numbers_str, "%+5.3f", theta_c * (180 / MY_PI));
 	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg\n";
-	sprintf(numbers_str, "%+5.3f", torque_sea);
+	sprintf(numbers_str, "%+.3f", torque_sea);
 	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m";
-	sprintf(numbers_str, "%+5.3f", accbased_comp);
+	sprintf(numbers_str, "%+.3f", accbased_comp);
 	ctrl_word += " T_acc: " + (std::string) numbers_str + " N.m\n";
-	sprintf(numbers_str, "%5d", Amp_kf);
+	sprintf(numbers_str, "%.3f", Amp_kf);
 	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 	sprintf(numbers_str, "%+5.3f", (2 * MY_PI / 60) * vel_motor);
 	ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm\n";
@@ -479,7 +480,7 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word += " Ki_V: " + (std::string) numbers_str;
 	sprintf(numbers_str, "%5.3f", Kd_V);
 	ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%d", Amp_V);
+	sprintf(numbers_str, "%5.3f", Amp_V);
 	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 }
 
@@ -488,7 +489,7 @@ void accBasedControl::UpdateCtrlWord_Position()
 	char numbers_str[20];
 
 	sprintf(numbers_str, "%+5.3f", theta_l_vec[0] * (180 / MY_PI));
-	ctrl_word += " theta_l: " + (std::string) numbers_str + " deg";
+	ctrl_word = " theta_l: " + (std::string) numbers_str + " deg";
 	sprintf(numbers_str, "%+5.3f", theta_c_vec[0] * (180 / MY_PI));
 	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg";
 	sprintf(numbers_str, "%+5.3f", torque_sea);
@@ -520,7 +521,7 @@ void accBasedControl::Recorder_Velocity()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d  %5.3f\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor, actualVelocity, abs(actualVelocity / SPEED_CONST));
+				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, actualVelocity, abs(actualVelocity / SPEED_CONST));
 			fclose(logger);
 		}
 	}
@@ -535,7 +536,7 @@ void accBasedControl::Recorder_Position()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, theta_c, theta_c_vec[0], theta_l_vec[0]);
+				acc_hum, acc_exo, vel_hum, vel_exo, theta_m, theta_c_vec[0], theta_l_vec[0]);
 			fclose(logger);
 		}
 	}

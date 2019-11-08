@@ -124,9 +124,12 @@ public:
 		Amplifier = 100000; // initialized with a safe value
 
 		// Speed Control
-		Kff_V = 1.000;	Kp_V = 0.100;
-		Ki_V = 0.100;	Kd_V = 0.100;
-		Amp_V = 50;			// initialized with a safe value
+		Kff_V = 225.000;	Kp_V = 0.018;
+		Ki_V = 0.000;	Kd_V = 0.000;
+		Amp_V = 1;			// initialized with a safe value
+
+    vel_motor = 0;
+    vel_motor_filt = 0;
 
 		// Position Control
 		Amp_P = 0;	Kff_P = 0;	Kp_P = 0;	Ki_P = 0;	Kd_P = 0;
@@ -137,6 +140,8 @@ public:
 
 		accHum_R = 0;	accHum_T = 0;
 		accExo_R = 0;	accExo_T = 0;
+
+    theta_m = 0;
 
 		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
@@ -296,7 +301,7 @@ private:
 	float Kd_F;
 
 	// Speed Control
-	int Amp_V;          // [dimensionless]
+	float Amp_V;          // [dimensionless]
 	float Kff_V;        // [dimensionless]
 	float Kp_V;         // [dimensionless]
 	float Ki_V;         // [1/s]
@@ -304,7 +309,7 @@ private:
 
 	// Position Control
 
-	int Amp_P;          // [dimensionless]
+	float Amp_P;          // [dimensionless]
 	float Kff_P;        // [dimensionless]
 	float Kp_P;         // []
 	float Ki_P;         // []
@@ -347,7 +352,10 @@ private:
 
 	float vel_leg;			// [rpm]
 	float vel_motor;		// [rpm]
+  float vel_motor_filt;
 	float voltage;			// [V]
+
+  float theta_m;       // [encoder pulses]
 
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]

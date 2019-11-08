@@ -646,7 +646,10 @@ int main(int argc, char** argv)
 
 				if (newDataAvailable)
 				{
-					xsens2Eposcan.FFPosition(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+					//xsens2Eposcan.FFPosition(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+          xsens2Eposcan.FFPositionGrav( (float)accData[0].value(1), (float)accData[0].value(0), 
+                                       -(float)accData[1].value(1), (float)accData[0].value(0), 
+                                       -(float)gyroData[0].value(2), (float)gyroData[1].value(2));
 					printer++;
 					scan_file++;
 					record_count--;
