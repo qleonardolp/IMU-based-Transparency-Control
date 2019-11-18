@@ -173,7 +173,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rpm]  actual_Vel[rpm]  Voltage[V]\n");
+					fprintf(logger, "acc_hum[rpm/s]  acc_exo[rpm/s]  vel_hum[rpm]  vel_exo[rpm]  vel_motor[rpm]  actual_Vel[rpm]  Voltage[V]\n");
 				}
 				if (control_mode == 'p')
 				{
