@@ -105,7 +105,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
 	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);
 
-	if (abs(setpoint_filt) <= CURRENT_MAX*1000)
+	if (abs(setpoint_filt) <= CURRENT_MAX * 1000)
 	{
 		if ((theta_c >= -0.5200) && (theta_c <= 1.4800)) // (sentado)
 		//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
@@ -118,7 +118,9 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 		}
 	}
-	else
+	//testar sem esse else
+	/*
+	else 
 	{
 		if (setpoint_filt < 0)
 		{
@@ -129,6 +131,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 			m_eixo_in->PDOsetCurrentSetpoint((int) (CURRENT_MAX * 1000));
 		}
 	}
+	*/
 	m_eixo_in->WritePDO01();
 
 	m_eixo_in->ReadPDO01();
@@ -536,7 +539,7 @@ void accBasedControl::Recorder_Position()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, theta_m, theta_c_vec[0], theta_l_vec[0]);
+				acc_hum, acc_exo, vel_hum, vel_exo, theta_c, theta_c_vec[0], theta_l_vec[0]);
 			fclose(logger);
 		}
 	}
