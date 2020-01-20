@@ -40,10 +40,23 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
 	vel_hum = velhumVec[0];
+	
+	/* velHum derivative using a Gain and a Discrete Integrator in loop
+	float diffCutoff = 8.5;	// Gain ** REMEMBER TO DECLARE IN .h
+	float discreteIntH = 0;	// Integrator state ** REMEMBER TO DECLARE IN .h
+	acc_hum = diffCutoff*( velHum - discreteIntH);
+	discreteIntH += acc_hum*(1/RATE);
+	*/
 
 	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
 	vel_exo = velexoVec[0];
+	
+	/* velExo derivative using a Gain and a Discrete Integrator in loop
+	float discreteIntE = 0;	// ** REMEMBER TO DECLARE IN .h
+	acc_exo = diffCutoff*( velExo - discreteIntE);
+	discreteIntE += acc_exo*(1/RATE);
+	*/
 
 	accbased_comp = K_ff * (INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
 	savitskygolay(torqueAccVec, accbased_comp, &d_accbased_comp);
