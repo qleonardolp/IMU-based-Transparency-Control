@@ -171,19 +171,23 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	//acc_hum = acc_hum + 0.00057484;	// offset [rad/s2]
 
   //--- [rad/s] -> [rpm] ---//
-  vel_exo = (2*MY_PI/60) * vel_exo;
-  vel_hum = (2*MY_PI/60) * vel_hum;
-  acc_exo = (2*MY_PI/60) * acc_exo;   // [rpm/s]
-  acc_hum = (2*MY_PI/60) * acc_hum;   // [rpm/s]
+  //vel_exo = (30/MY_PI) * vel_exo;
+  //vel_hum = (30/MY_PI) * vel_hum;
+  //acc_exo = (30/MY_PI) * acc_exo;   // [rpm/s]
+  //acc_hum = (30/MY_PI) * acc_hum;   // [rpm/s]
 
   // KFF_V 200.00 KP_V 0.100  KI_V 0.000  KD_V 0.010  AMP 1
-  vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
+  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
+  
+  // vel_motor using a inverted dependency of T_sea and feedforward command. Check my own ICAR2019 poster for further details...
+  torque_sea += torque_sea - 0.334*(torque_sea - STIFFNESS/RATE * (MY_PI/30*actualVelocity - vel_exo)); 
+  
+  //accbased_comp = J_EQ*acc_motor + INERTIA_EXO*acc_hum + Weight + B_EQ*actualVelocity*MY_PI/30;
+  accbased_comp = Kff_V*INERTIA_EXO*acc_hum + B_EQ*actualVelocity*MY_PI/30;
+  
+  vel_motor = Amp_V * GEAR_RATIO *( vel_hum + Kp_V*accbased_comp + Kd_V*(acc_hum - acc_exo) - Kp_V*torque_sea);   // [rpm]
+  vel_motor = 30/MY_PI*vel_motor;
 
-  // or:
-  //m_eixo_in->ReadPDO02();
-  //savitskygolay(velexoVec, m_eixo_in->PDOgetActualVelocity(), &acc_exo);	// Updating window, smoothing and First Derivative
-  //actualVelocity = velexoVec[0];
-  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - actualVelocity) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
   vel_motor_filt = vel_motor_filt - LPF_SMF*(vel_motor_filt - vel_motor);
 
   voltage = abs(vel_motor_filt / SPEED_CONST);
@@ -536,8 +540,9 @@ void accBasedControl::Recorder_Velocity()
 		logger = fopen(logger_filename, "a");
 		if (logger != NULL)
 		{
-			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d  %5.3f\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, actualVelocity, abs(actualVelocity / SPEED_CONST));
+			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
+				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, actualVelocity;
+				// just vel_motor_filt, actualVelocity are in RPM!
 			fclose(logger);
 		}
 	}
