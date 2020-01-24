@@ -81,10 +81,14 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 // Low Pass Filtering
 #define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
 #define		MY_PI			3.141592653	// Pi value
-#define		LPF_SMF         ( (2*MY_PI / RATE) / (2*MY_PI / RATE + 1 / LPF_FC) )    // Low Pass Filter Smoothing Factor
+#define		LPF_SMF         ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )    // Low Pass Filter Smoothing Factor
 
 #define		STATE_DIM		5
 #define		SENSOR_DIM		3
+
+// Filtered Derivative using Gain and Feedback Integrator
+#define		CUTOFF			8.0000
+
 
 
 class accBasedControl
@@ -128,8 +132,8 @@ public:
 		Ki_V = 0.000;	Kd_V = 0.000;
 		Amp_V = 1;			// initialized with a safe value
 
-    vel_motor = 0;
-    vel_motor_filt = 0;
+		vel_motor = 0;
+		vel_motor_filt = 0;
 
 		// Position Control
 		Amp_P = 0;	Kff_P = 0;	Kp_P = 0;	Ki_P = 0;	Kd_P = 0;
@@ -141,8 +145,15 @@ public:
 		accHum_R = 0;	accHum_T = 0;
 		accExo_R = 0;	accExo_T = 0;
 
-    theta_m = 0;
-
+		theta_m = 0;
+	
+		IntegratorHum = 0;
+		IntegratorExo = 0;
+		IntAccMotor = 0;
+		IntAccHum = 0;
+		IntAccExo = 0;
+		diffCutoff = CUTOFF;
+		
 		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
 			velhumVec[i] = 0;
@@ -173,7 +184,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rpm/s]  acc_exo[rpm/s]  vel_hum[rpm]  vel_exo[rpm]  vel_motor[rpm]  actual_Vel[rpm]  Voltage[V]\n");
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]  acc_motor[rad/s2]  actual_Vel[rad/s]\n");
 				}
 				if (control_mode == 'p')
 				{
@@ -321,11 +332,13 @@ private:
 	float acc_exo;			// [rad/s^2]
 	float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
+	float jerk_hum;			// [rad/s^3]
+	float jerk_exo;			// [rad/s^3]
 
 	float theta_l;			// [rad]
 	float theta_c;			// [rad]
 
-	//		STATE VECTORS				//
+	//		STATE MEMORY VECTORS        //
 
 	float velhumVec[SGVECT_SIZE];		// [rad/s]
 	float velexoVec[SGVECT_SIZE];		// [rad/s]
@@ -351,14 +364,22 @@ private:
 	float accExo_T;			// [m/s²]
 
 	float vel_leg;			// [rpm]
-	float vel_motor;		// [rpm]
-  float vel_motor_filt;
+	float acc_motor;		// [rad/s^2]
+	float vel_motor;		// [rad/s]
+	float vel_motor_filt;
 	float voltage;			// [V]
 
-  float theta_m;       // [encoder pulses]
+	float theta_m;       // [encoder pulses]
 
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]
+	
+	float diffCutoff;
+	float IntegratorHum;
+	float IntegratorExo;
+	float IntAccMotor;
+	float IntAccHum;
+	float IntAccExo;
 
 	//		KALMAN FILTER		//
 
