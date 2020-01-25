@@ -87,7 +87,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		SENSOR_DIM		3
 
 // Filtered Derivative using Gain and Feedback Integrator
-#define		CUTOFF			8.0000
+#define		CUTOFF			7.6000
 
 
 
@@ -177,7 +177,7 @@ public:
 			logger = fopen(logger_filename, "wt");
 			if (logger != NULL)
 			{
-				// printing the header on the first line of the file
+				// printing the header into the file first line
 				if (control_mode == 'c' || control_mode == 'k')
 				{
 					fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]\n");

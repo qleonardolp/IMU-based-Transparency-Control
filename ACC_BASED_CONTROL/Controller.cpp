@@ -76,13 +76,11 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	// rever:
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
-	setpoint_filt = setpoint_filt - LPF_SMF * (setpoint_filt - setpoint);
+	setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
 
 	if (abs(setpoint_filt) <= CURRENT_MAX * 1000)
 	{
-		if ((theta_c >= -0.5200) && (theta_c <= 1.4800)) // (sentado)
-		//if ((theta_l >= - 1.30899) && (theta_l <= 0.26179)) //(caminhando)
-		//if ((theta_l >= - 1.39626) && (theta_l <= 0.17000)) //(em pe parado)
+		if ((theta_l >= - 1.5708) && (theta_l <= 0.5236)) //(caminhando)
 		{
 			m_eixo_in->PDOsetCurrentSetpoint((int)setpoint_filt);	// esse argumento é em mA !!!
 		}
@@ -91,7 +89,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 		}
 	}
-	//testar sem esse else
+	//testar sem esse else ????
 	/*
 	else 
 	{
@@ -115,6 +113,8 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 void accBasedControl::OmegaControl(float velHum, float velExo)
 {
 	m_epos->sync();	// CAN Synchronization
+
+  // IMPLEMENT HIGH PASS FITLER FOR GYRO BIAS
 
 	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
 	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
@@ -161,9 +161,9 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   // Or, Jerk Feedforward:
   //m_eixo_out->ReadPDO02();
   //exoVelocity = m_eixo_out->PDOgetActualVelocity();
-  vel_motor = vel_exo + ( INERTIA_EXO*jerk_hum + KP_V*(jerk_hum - jerk_exo) + KI_V*(acc_hum - acc_exo) )/STIFFNESS;
+  //vel_motor = vel_exo + ( INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
   
-  vel_motor = 30/MY_PI * GEAR_RATIO * vel_motor;
+  vel_motor = 30/MY_PI*vel_motor;
   vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
   voltage = abs(vel_motor_filt / SPEED_CONST);
@@ -517,7 +517,7 @@ void accBasedControl::Recorder_Velocity()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, acc_motor, actualVelocity;
+				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, acc_motor, actualVelocity);
 				// everything logged in standard units (SI)
 			fclose(logger);
 		}

@@ -326,12 +326,26 @@ int main(int argc, char** argv)
 		}
 
 		char control_mode;
-		int time_logging;
+    bool proper_ctrl_mode = false;
+		int log_time;
 
 		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[p] FFPosition\n");
 		scanf("%c", &control_mode);
-		printf("How long (sec) do you want to record this run? 0 to do not record: ");
-		scanf("%d", &time_logging);
+    while(!proper_ctrl_mode)
+    {
+      if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'p')
+      {
+        proper_ctrl_mode = true;
+      }
+      else
+      {
+        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [p]\n");
+		    scanf("%c", &control_mode);
+      }
+    }
+
+		printf("How long (sec) do you want to record this run? Zero (0) to do not record: ");
+		scanf("%d", &log_time);
 
 		std::cout << "Starting measurement..." << std::endl;
 		if (!wirelessMasterDevice->gotoMeasurement())
@@ -411,14 +425,14 @@ int main(int argc, char** argv)
 		epos.sync();
 		eixo_out.ReadPDO01();
 		eixo_in.ReadPDO01();
-		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, time_logging);
+		accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, log_time);
 
 		std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
 
 		float delay;
 		int printer = 0;
 		int scan_file = 0;
-		int record_count = time_logging * RATE;
+		int record_count = log_time * RATE;
 
 		std::chrono::system_clock::time_point mtw_data_stamp;
 
@@ -428,13 +442,9 @@ int main(int argc, char** argv)
 
 		//std::thread recorder_t( xsens2Eposcan.Recorder );
 
-		if (control_mode == 'c')	// running current control
+  	while (!_kbhit())
 		{
-			while (!_kbhit())
-			{
-				XsTime::msleep(4);
-				//QueryPerformanceCounter(&tick_before);
-				//final_time = tick_before.QuadPart + 1*ticksSampleTime;
+			  XsTime::msleep(4);
 
 				bool newDataAvailable = false;
 				mtw_data_stamp = std::chrono::steady_clock::now();
@@ -455,7 +465,26 @@ int main(int argc, char** argv)
 
 				if (newDataAvailable)
 				{
-					xsens2Eposcan.FiniteDiff(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+
+          switch (control_mode)
+		      {
+		      case 'c':
+			      xsens2Eposcan.FiniteDiff(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));        // For FiniteDiff
+			      break;
+		      case 'k':
+			      xsens2Eposcan.CurrentControlKF(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));  // For CurrentControlKF
+			      break;
+		      case 's':
+			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // For OmegaControl
+			      break;
+		      case 'p':
+			      xsens2Eposcan.FFPositionGrav( (float)accData[0].value(1), (float)accData[0].value(0), 
+                                         -(float)accData[1].value(1), (float)accData[0].value(0), 
+                                         -(float)gyroData[0].value(2),(float)gyroData[1].value(2));     // For FFPosition 
+			      break;
+		      default:
+			      break;
+		      }
 					printer++;
 					scan_file++;
 					record_count--;
@@ -470,225 +499,77 @@ int main(int argc, char** argv)
 
 				if (record_count >= 0)
 				{
-					xsens2Eposcan.Recorder_Current();
+          switch (control_mode)
+          {
+          case 'c':
+            xsens2Eposcan.Recorder_Current();
+            break;
+          case 'k':
+            xsens2Eposcan.Recorder_Current();
+            break;
+          case 's':
+            xsens2Eposcan.Recorder_Velocity();
+            break;
+          case 'p':
+            xsens2Eposcan.Recorder_Position();
+            break;
+          default:
+            break;
+          }
 				}
 
 				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
 				{
-					xsens2Eposcan.GainScan_Current();
+          switch (control_mode)
+          {
+          case 'c':
+            xsens2Eposcan.GainScan_Current();
+            break;
+          case 'k':
+            xsens2Eposcan.GainScan_Current();
+            break;
+          case 's':
+            xsens2Eposcan.GainScan_Velocity();
+            break;
+          case 'p':
+            xsens2Eposcan.GainScan_Position();
+            break;
+          default:
+            break;
+          }
 					scan_file = 0;
 				}
 
-				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
+				if (printer == (int)RATE / 3)   // printing the status @ 3Hz
 				{
 					system("cls");
-					xsens2Eposcan.UpdateCtrlWord_Current();
-					std::cout << xsens2Eposcan.ctrl_word;
+          switch (control_mode)
+          {
+          case 'c':
+					  xsens2Eposcan.UpdateCtrlWord_Current();
+            break;
+          case 'k':
+            xsens2Eposcan.UpdateCtrlWord_CurrentKF();
+            break;
+          case 's':
+            xsens2Eposcan.UpdateCtrlWord_Velocity();
+            break;
+          case 'p':
+            xsens2Eposcan.UpdateCtrlWord_Position();
+            break;
+          default:
+            break;
+          }
+          std::cout << xsens2Eposcan.ctrl_word;
 					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
 					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
 					printer = 0;
 				}
-
-				//QueryPerformanceCounter(&tick_after);
-				//while (final_time > tick_after.QuadPart) QueryPerformanceCounter(&tick_after);
-			}
-			(void)_getch();
 		}
+		(void)_getch();
 
-		if (control_mode == 'k')	// running current control with Kalman Filter
-		{
-			while (!_kbhit())
-			{
-				XsTime::msleep(4);
-
-				bool newDataAvailable = false;
-				mtw_data_stamp = std::chrono::steady_clock::now();
-
-				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
-				{
-					if (mtwCallbacks[i]->dataAvailable())
-					{
-						newDataAvailable = true;
-						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
-
-						accData[i] = packet->calibratedAcceleration();
-						gyroData[i] = packet->calibratedGyroscopeData();
-
-						mtwCallbacks[i]->deleteOldestPacket();
-					}
-				}
-
-				if (newDataAvailable)
-				{
-					xsens2Eposcan.CurrentControlKF(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
-					printer++;
-					scan_file++;
-					record_count--;
-
-					auto control_stamp = std::chrono::steady_clock::now();
-					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
-
-					loop_duration = clock() - beginning;
-					beginning = clock();
-					freq = (float)CLOCKS_PER_SEC / loop_duration;
-				}
-
-				if (record_count >= 0)
-				{
-					xsens2Eposcan.Recorder_Current();
-				}
-
-				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
-				{
-					xsens2Eposcan.GainScan_CurrentKF();
-					scan_file = 0;
-				}
-
-				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
-				{
-					system("cls");
-					xsens2Eposcan.UpdateCtrlWord_CurrentKF();
-					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
-					printer = 0;
-				}
-
-			}
-			(void)_getch();
-		}
-
-		if (control_mode == 's')	// running speed control
-		{
-			while (!_kbhit())
-			{
-				XsTime::msleep(4);
-
-				bool newDataAvailable = false;
-				mtw_data_stamp = std::chrono::steady_clock::now();
-
-				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
-				{
-					if (mtwCallbacks[i]->dataAvailable())
-					{
-						newDataAvailable = true;
-						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
-
-						accData[i] = packet->calibratedAcceleration();
-						gyroData[i] = packet->calibratedGyroscopeData();
-
-						mtwCallbacks[i]->deleteOldestPacket();
-					}
-				}
-
-				if (newDataAvailable)
-				{
-					xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
-					printer++;
-					scan_file++;
-					record_count--;
-
-					auto control_stamp = std::chrono::steady_clock::now();
-					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
-
-					loop_duration = clock() - beginning;
-					beginning = clock();
-					freq = (float)CLOCKS_PER_SEC / loop_duration;
-				}
-
-				if (record_count >= 0)
-				{
-					xsens2Eposcan.Recorder_Velocity();
-				}
-
-				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
-				{
-					xsens2Eposcan.GainScan_Velocity();
-					scan_file = 0;
-				}
-
-				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
-				{
-					system("cls");
-					xsens2Eposcan.UpdateCtrlWord_Velocity();
-					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
-					printer = 0;
-				}
-
-			}
-			(void)_getch();
-		}
-
-		if (control_mode == 'p')	// running position control
-		{
-			while (!_kbhit())
-			{
-				XsTime::msleep(4);
-
-				bool newDataAvailable = false;
-				mtw_data_stamp = std::chrono::steady_clock::now();
-
-				for (size_t i = 0; i < mtwCallbacks.size(); ++i)
-				{
-					if (mtwCallbacks[i]->dataAvailable())
-					{
-						newDataAvailable = true;
-						XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
-
-						accData[i] = packet->calibratedAcceleration();
-						gyroData[i] = packet->calibratedGyroscopeData();
-
-						mtwCallbacks[i]->deleteOldestPacket();
-					}
-				}
-
-				if (newDataAvailable)
-				{
-					//xsens2Eposcan.FFPosition(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
-          xsens2Eposcan.FFPositionGrav( (float)accData[0].value(1), (float)accData[0].value(0), 
-                                       -(float)accData[1].value(1), (float)accData[0].value(0), 
-                                       -(float)gyroData[0].value(2), (float)gyroData[1].value(2));
-					printer++;
-					scan_file++;
-					record_count--;
-
-					auto control_stamp = std::chrono::steady_clock::now();
-					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
-
-					loop_duration = clock() - beginning;
-					beginning = clock();
-					freq = (float)CLOCKS_PER_SEC / loop_duration;
-				}
-
-				if (record_count >= 0)
-				{
-					xsens2Eposcan.Recorder_Position();
-				}
-
-				if (scan_file == (int)RATE * 5)  // every 5s reads the respective gains .txt file
-				{
-					xsens2Eposcan.GainScan_Position();
-					scan_file = 0;
-				}
-
-				if (printer == (int)RATE / 5)   // printing the status @ 5Hz
-				{
-					system("cls");
-					xsens2Eposcan.UpdateCtrlWord_Position();
-					std::cout << xsens2Eposcan.ctrl_word;
-					printf(" delay %4.2f ms rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
-					std::cout << wirelessMasterCallback.mtw_event << std::endl; // display MTW events, showing if one of the IMUs got disconnected
-					printer = 0;
-				}
-
-			}
-			(void)_getch();
-		}
-
-		xsens2Eposcan.~accBasedControl(); //Zera o comando do motor
-
+    //Zera o comando do motor
+		xsens2Eposcan.~accBasedControl();
 		//Desabilita o Eixo
 		Desabilita_Eixo(0);
 
