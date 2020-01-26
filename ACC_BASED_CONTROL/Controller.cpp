@@ -37,24 +37,17 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 
 	// -- Acc-Based Torque -- //
 
-	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	//savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
-	//vel_hum = velhumVec[0];
-	
+	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
+	vel_hum_last = velHum;
 	// velHum derivative using a Gain and a Discrete Integrator in loop
-	vel_hum = velHum;
 	acc_hum = diffCutoff*( vel_hum - IntegratorHum );
-	IntegratorHum += acc_hum*(1/RATE);
-	
-	
-	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	//savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
-	//vel_exo = velexoVec[0];
-	
+	IntegratorHum += acc_hum*DELTA_T;
+		
+	vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
+	vel_exo_last = velExo;
 	// velExo derivative using a Gain and a Discrete Integrator in loop
-	vel_exo = velExo;
 	acc_exo = diffCutoff*( vel_exo - IntegratorExo );
-	IntegratorExo += acc_exo*(1/RATE);
+	IntegratorExo += acc_exo*DELTA_T;
 
 	accbased_comp = K_ff * (INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
 	savitskygolay(torqueAccVec, accbased_comp, &d_accbased_comp);
@@ -113,56 +106,42 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 {
 	m_epos->sync();	// CAN Synchronization
 
-  // IMPLEMENT HIGH PASS FITLER FOR GYRO BIAS
+	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
+	vel_hum_last = velHum;
+	vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
+	vel_exo_last = velExo;
 
-	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
-	vel_hum = velhumVec[0];
+	// velocities derivative using a Gain and a Discrete Integrator in loop
+	acc_exo = diffCutoff*(vel_exo - IntegratorExo);
+	IntegratorExo += acc_exo*DELTA_T;
+	acc_hum = diffCutoff*(vel_hum - IntegratorHum);
+	IntegratorHum += acc_hum*DELTA_T;
 	
-	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
-	vel_exo = velexoVec[0];
-	
-	// velHum derivative using a Gain and a Discrete Integrator in loop
-	//vel_hum = velHum;
-	//acc_hum = diffCutoff*( vel_hum - IntegratorHum );
-	//IntegratorHum += acc_hum*(1/RATE);
-	
-	// velExo derivative using a Gain and a Discrete Integrator in loop
-	//vel_exo = velExo;
-	//acc_exo = diffCutoff*( vel_exo - IntegratorExo );
-	//IntegratorExo += acc_exo*(1/RATE);
-	
-	// acc_hum derivative using a Gain and a Discrete Integrator in loop
-	jerk_hum = 3.0f*( acc_hum - IntAccHum );	// diffCutoff == 3.0
-	IntAccHum += jerk_hum*(1/RATE);
-	
-	// acc_exo derivative using a Gain and a Discrete Integrator in loop
-	jerk_exo = 3.0f*( acc_exo - IntAccExo );
-	IntAccExo += jerk_exo*(1/RATE);
+	// accelerations derivative using a Gain and a Discrete Integrator in loop
+	jerk_hum = diffCutoff*( acc_hum - IntAccHum );
+	IntAccHum += jerk_hum*DELTA_T;
+	jerk_exo = diffCutoff*( acc_exo - IntAccExo );
+	IntAccExo += jerk_exo*DELTA_T;
 
-  // KFF_V 200.00 KP_V 0.100  KI_V 0.000  KD_V 0.010  AMP 1
-  //vel_motor = Amp_V * GEAR_RATIO * ( Kff_V*vel_hum + Kp_V*(vel_hum - vel_exo) + Kd_V*(acc_hum - acc_exo) );   // [rpm]
-  
   m_eixo_in->ReadPDO02();
-  actualVelocity = MY_PI/30*m_eixo_in->PDOgetActualVelocity();
+  actualVelocity = (MY_PI/30) * m_eixo_in->PDOgetActualVelocity();
   
   // vel_motor using a inverted dependency of T_sea and feedforward command. Check my own ICAR2019 poster for further details...
-  torque_sea += LPF_SMF*( STIFFNESS/RATE * (actualVelocity - vel_exo) - torque_sea); 
+  torque_sea += LPF_SMF*( STIFFNESS*DELTA_T*(actualVelocity - vel_exo) - torque_sea); 
   
   acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
-  IntAccMotor += acc_motor*(1/RATE);
+  IntAccMotor += acc_motor*DELTA_T;
   
   //accbased_comp = J_EQ*acc_motor + INERTIA_EXO*acc_hum + Weight + B_EQ*actualVelocity*MY_PI/30; // actual correct term
-  accbased_comp = Kff_V*INERTIA_EXO*acc_hum + B_EQ*actualVelocity + J_EQ*acc_motor;
-  vel_motor = Amp_V * GEAR_RATIO *( vel_hum + Kp_V*accbased_comp + Kd_V*(acc_hum - acc_exo) - Kp_V*torque_sea);   // [rad/s]
+  //accbased_comp = Kff_V*INERTIA_EXO*acc_hum + B_EQ*actualVelocity + J_EQ*acc_motor;
+  //vel_motor = Amp_V * GEAR_RATIO *( vel_hum + Kp_V*accbased_comp + Kd_V*(acc_hum - acc_exo) - Kp_V*torque_sea);   // [rad/s]
   
   // Or, Jerk Feedforward:
   //m_eixo_out->ReadPDO02();
-  //exoVelocity = m_eixo_out->PDOgetActualVelocity();
-  //vel_motor = vel_exo + ( INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
+  //exoVelocity = (MY_PI/30) * m_eixo_out->PDOgetActualVelocity();
+  vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
   
-  vel_motor = 30/MY_PI*vel_motor;
+  vel_motor = (30/MY_PI) * vel_motor;
   vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
   voltage = abs(vel_motor_filt / SPEED_CONST);

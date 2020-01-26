@@ -40,56 +40,61 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 // CONSTANTS
 
-#define		GEAR_RATIO		150.0		    // Redução do Sistema
+#define		GEAR_RATIO		150.0f		    // Redução do Sistema
 #define		ENCODER_IN		4096		    // Resolução do encoder do motor
 #define		ENCODER_OUT		2048		    // Resolução do encoder de saída
-#define		STIFFNESS		104.0			// Constante da mola SEA [N.m/rad]
+#define		STIFFNESS		104.0f			// Constante da mola SEA [N.m/rad]
+#define		MY_PI			3.141592653f	// Pi value
 
 //	Torque Constant: 0.0603 N.m/A = 60.3 N.m/mA
 //	Speed Constant: 158 rpm/V
 //	Max current (@ 48 V)  ~3.1 A
 //	Stall current (@ 48 V)  42.4 A
 
-#define		CURRENT_MAX		3.1000		// Max corrente nominal no motor Maxon RE40 [A]
-#define		VOLTAGE_MAX		21.600		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
-#define		TORQUE_CONST	60.300		// Constante de torque do motor RE40	[N.m/mA]
-#define		SPEED_CONST		158.00		// Constante de velocidade do motor RE40 [rpm/V]
+#define		CURRENT_MAX		3.1000f		// Max corrente nominal no motor Maxon RE40 [A]
+#define		VOLTAGE_MAX		21.600f		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
+#define		TORQUE_CONST	60.300f		// Constante de torque do motor RE40	[N.m/mA]
+#define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]
 
-#define     GRAVITY         9.8066      // [m/s^2]
-#define     INERTIA_EXO     0.0655 * 4  // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
-#define		MTW_DIST_LIMB	0.2500		// [m]
-#define		MTW_DIST_EXO	0.0700		// [m]
-#define		L_CG			0.3500		// [m]
+#define     GRAVITY         9.8066f		// [m/s^2]
+#define     INERTIA_EXO     (float) 0.0655*4 // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
+#define		MTW_DIST_LIMB	0.2500f		// [m]
+#define		MTW_DIST_EXO	0.0700f		// [m]
+#define		L_CG			0.3500f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
-#define		J_EQ			0.4700		// [Kg.m^2]
-#define		B_EQ			60.000		// [N.m s/rad]
+#define		J_EQ			0.4700f		// [Kg.m^2]
+#define		B_EQ			60.000f		// [N.m s/rad]
 
 // Feedforward-Feedback PI acc-based controller:
-#define		K_FF			1.0000		// [dimensionless]
-#define     KP_A			4.5600      // [Kg.m^2]
-#define     KI_A			5.7900      // [Kg.m^2/s]
+#define		K_FF			1.0000f		// [dimensionless]
+#define     KP_A			4.5600f     // [Kg.m^2]
+#define     KI_A			5.7900f     // [Kg.m^2/s]
 
 // Feedback PD force (SEA) controller:
-#define     KP_F			1.5310      // [dimensionless]
-#define     KD_F			0.0200      // [s]
+#define     KP_F			1.5310f     // [dimensionless]
+#define     KD_F			0.0200f     // [s]
 
 
-#define     RATE            125.0      // [Hz]	Use the control loop rate running
-#define		DELTA_T			(1/RATE)   // [s]
+#define     RATE            125.0f     // [Hz]	Use the control loop rate running
+#define		DELTA_T			(float) 1/RATE  // [s]
 
-// Low Pass Filtering
-#define     LPF_FC          5.000      // [Hz] Low Pass Filter Frequency Cutoff
-#define		MY_PI			3.141592653	// Pi value
-#define		LPF_SMF         ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )    // Low Pass Filter Smoothing Factor
-
-#define		STATE_DIM		5
-#define		SENSOR_DIM		3
+// Low Pass Filtering	//
+// [Hz] Low Pass Filter Frequency Cutoff
+#define     LPF_FC          5.000f
+// Low Pass Filter Smoothing Factor
+#define		LPF_SMF         (float) ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )
 
 // Filtered Derivative using Gain and Feedback Integrator
-#define		CUTOFF			1.6000
+#define		CUTOFF			1.6000f
 
+// High Pass Filter for Gyroscopes Bias
+#define		HPF_FC			0.7f	// [Hz]
+#define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
+// Kalman Filter Dimensions
+#define		STATE_DIM		5
+#define		SENSOR_DIM		3
 
 class accBasedControl
 {
@@ -139,6 +144,7 @@ public:
 		Amp_P = 0;	Kff_P = 0;	Kp_P = 0;	Ki_P = 0;	Kd_P = 0;
 
 		vel_hum = 0;		vel_exo = 0;
+		vel_hum_last = 0;		vel_exo_last = 0;
 		setpoint = 0;		setpoint_filt = 0;
 		accbased_comp = 0;	torque_sea = 0;
 
@@ -380,6 +386,9 @@ private:
 	float IntAccMotor;
 	float IntAccHum;
 	float IntAccExo;
+	
+	float vel_hum_last;
+	float vel_exo_last;
 
 	//		KALMAN FILTER		//
 
