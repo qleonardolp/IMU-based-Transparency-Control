@@ -42,7 +42,8 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	//vel_hum = velhumVec[0];
 	
 	// velHum derivative using a Gain and a Discrete Integrator in loop
-	acc_hum = diffCutoff*( velHum - IntegratorHum );
+	vel_hum = velHum;
+	acc_hum = diffCutoff*( vel_hum - IntegratorHum );
 	IntegratorHum += acc_hum*(1/RATE);
 	
 	
@@ -51,7 +52,8 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	//vel_exo = velexoVec[0];
 	
 	// velExo derivative using a Gain and a Discrete Integrator in loop
-	acc_exo = diffCutoff*( velExo - IntegratorExo );
+	vel_exo = velExo;
+	acc_exo = diffCutoff*( vel_exo - IntegratorExo );
 	IntegratorExo += acc_exo*(1/RATE);
 
 	accbased_comp = K_ff * (INERTIA_EXO + J_EQ)*acc_hum + Kp_A * (acc_hum - acc_exo) + Ki_A * (vel_hum - vel_exo);
@@ -78,7 +80,7 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 	setpoint = (1 / (TORQUE_CONST * GEAR_RATIO)) * (accbased_comp + J_EQ * acc_exo + B_EQ * vel_exo - Kp_F * torque_sea - Kd_F * d_torque_sea) * Amplifier;
 	setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
 
-	if (abs(setpoint_filt) <= CURRENT_MAX * 1000)
+	if (abs(setpoint_filt) < CURRENT_MAX * 1000)
 	{
 		if ((theta_l >= - 1.5708) && (theta_l <= 0.5236)) //(caminhando)
 		{
@@ -89,20 +91,17 @@ void accBasedControl::FiniteDiff(float velHum, float velExo)
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 		}
 	}
-	//testar sem esse else ????
-	/*
-	else 
+	else
 	{
 		if (setpoint_filt < 0)
 		{
-			m_eixo_in->PDOsetCurrentSetpoint(-(int) (CURRENT_MAX * 1000));
+			m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
 		}
 		else
 		{
-			m_eixo_in->PDOsetCurrentSetpoint((int) (CURRENT_MAX * 1000));
+			m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
 		}
 	}
-	*/
 	m_eixo_in->WritePDO01();
 
 	m_eixo_in->ReadPDO01();

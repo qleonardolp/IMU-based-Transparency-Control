@@ -87,7 +87,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		SENSOR_DIM		3
 
 // Filtered Derivative using Gain and Feedback Integrator
-#define		CUTOFF			7.6000
+#define		CUTOFF			1.6000
 
 
 
