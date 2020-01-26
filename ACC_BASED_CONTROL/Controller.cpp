@@ -24,11 +24,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 */
 
 
-#include "currentController.h"
+#include "Controller.h"
 
 using namespace Eigen;
 
-// Control Functions Descriptions //
+// Control Functions //
 
 void accBasedControl::FiniteDiff(float velHum, float velExo)
 {

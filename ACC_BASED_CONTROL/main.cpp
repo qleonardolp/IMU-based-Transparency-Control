@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
 #include "generalheader.h"
-#include "currentController.h"
+#include "Controller.h"
 
 
 #include "findClosestUpdateRate.h"
