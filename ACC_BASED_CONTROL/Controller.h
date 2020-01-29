@@ -190,7 +190,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]  acc_motor[rad/s2]  actual_Vel[rad/s]\n");
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  acc_motor[rad/s2]  actual_Vel[rad/s]\n");
 				}
 				if (control_mode == 'p')
 				{

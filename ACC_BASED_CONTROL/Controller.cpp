@@ -139,7 +139,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   // Or, Jerk Feedforward:
   //m_eixo_out->ReadPDO02();
   //exoVelocity = (MY_PI/30) * m_eixo_out->PDOgetActualVelocity();
-  vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
+  vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS; // FALTOU GEAR_RATIO
   
   vel_motor = (30/MY_PI) * vel_motor;
   vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
@@ -494,8 +494,8 @@ void accBasedControl::Recorder_Velocity()
 		logger = fopen(logger_filename, "a");
 		if (logger != NULL)
 		{
-			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, vel_motor_filt, acc_motor, actualVelocity);
+			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
+        acc_hum, acc_exo, vel_hum, vel_exo, jerk_hum, jerk_exo, vel_motor_filt, acc_motor, actualVelocity);
 				// everything logged in standard units (SI)
 			fclose(logger);
 		}
