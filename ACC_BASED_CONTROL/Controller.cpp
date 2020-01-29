@@ -129,19 +129,15 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   // vel_motor using a inverted dependency of T_sea and feedforward command. Check my own ICAR2019 poster for further details...
   torque_sea += LPF_SMF*( STIFFNESS*DELTA_T*(actualVelocity - vel_exo) - torque_sea); 
   
-  acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
-  IntAccMotor += acc_motor*DELTA_T;
+  //acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
+  //IntAccMotor += acc_motor*DELTA_T;
   
-  //accbased_comp = J_EQ*acc_motor + INERTIA_EXO*acc_hum + Weight + B_EQ*actualVelocity*MY_PI/30; // actual correct term
-  //accbased_comp = Kff_V*INERTIA_EXO*acc_hum + B_EQ*actualVelocity + J_EQ*acc_motor;
-  //vel_motor = Amp_V * GEAR_RATIO *( vel_hum + Kp_V*accbased_comp + Kd_V*(acc_hum - acc_exo) - Kp_V*torque_sea);   // [rad/s]
-  
-  // Or, Jerk Feedforward:
+  // Jerk Feedforward:
   //m_eixo_out->ReadPDO02();
   //exoVelocity = (MY_PI/30) * m_eixo_out->PDOgetActualVelocity();
-  vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS; // FALTOU GEAR_RATIO
+  vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
   
-  vel_motor = (30/MY_PI) * vel_motor;
+  vel_motor = (30/MY_PI) * GEAR_RATIO * vel_motor;
   vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
   voltage = abs(vel_motor_filt / SPEED_CONST);
