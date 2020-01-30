@@ -45,6 +45,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		ENCODER_OUT		2048		    // Resolução do encoder de saída
 #define		STIFFNESS		104.0f			// Constante da mola SEA [N.m/rad]
 #define		MY_PI			3.141592653f	// Pi value
+#define   RADS2RPM    (30/MY_PI)
+#define   RPM2RADS    (MY_PI/30)
 
 //	Torque Constant: 0.0603 N.m/A = 60.3 N.m/mA
 //	Speed Constant: 158 rpm/V
@@ -190,7 +192,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  acc_motor[rad/s2]  actual_Vel[rad/s]\n");
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]\n");
 				}
 				if (control_mode == 'p')
 				{
@@ -292,6 +294,7 @@ public:
 	}
 
 	std::string ctrl_word;
+  bool logging;
 
 private:
 
@@ -301,7 +304,7 @@ private:
 
 	FILE* logger;
 	char logger_filename[40];
-	bool logging;
+	
 
 	FILE* gains_values;
 
@@ -379,6 +382,7 @@ private:
 
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]
+  int exoVelocity;      // [rpm]
 	
 	float diffCutoff;
 	float IntegratorHum;

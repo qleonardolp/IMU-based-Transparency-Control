@@ -123,18 +123,15 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	jerk_exo = diffCutoff*( acc_exo - IntAccExo );
 	IntAccExo += jerk_exo*DELTA_T;
 
-  m_eixo_in->ReadPDO02();
-  actualVelocity = (MY_PI/30) * m_eixo_in->PDOgetActualVelocity();
-  
-  // vel_motor using a inverted dependency of T_sea and feedforward command. Check my own ICAR2019 poster for further details...
+
   torque_sea += LPF_SMF*( STIFFNESS*DELTA_T*(actualVelocity - vel_exo) - torque_sea); 
   
   //acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
   //IntAccMotor += acc_motor*DELTA_T;
   
   // Jerk Feedforward:
-  //m_eixo_out->ReadPDO02();
-  //exoVelocity = (MY_PI/30) * m_eixo_out->PDOgetActualVelocity();
+  m_eixo_out->ReadPDO02();
+  exoVelocity = m_eixo_out->PDOgetActualVelocity(); //  [rpm]
   vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
   
   vel_motor = (30/MY_PI) * GEAR_RATIO * vel_motor;
@@ -142,11 +139,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 
   voltage = abs(vel_motor_filt / SPEED_CONST);
 
-  if (voltage < 0.130)			// lower saturation
-  {
-	  m_eixo_in->PDOsetVelocitySetpoint(0);
-  }
-  else if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
+  if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
   {
 	  m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor_filt);
   }
@@ -157,10 +150,16 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	  else
 		  m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
   }
+  else                            // lower saturation
+  {
+    m_eixo_in->PDOsetVelocitySetpoint(0);
+  }
   m_eixo_in->WritePDO02();
   
   m_eixo_in->ReadPDO02();
-  actualVelocity = MY_PI/30*m_eixo_in->PDOgetActualVelocity();
+  actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
+
+  Recorder_Velocity();
 }
 
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
@@ -440,7 +439,7 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
 	sprintf(numbers_str, "%+4d", actualVelocity);
 	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
-	sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
+  sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST) );
 	ctrl_word += (std::string) numbers_str + " V]\n";
 	sprintf(numbers_str, "%5.3f", Kff_V);
 	ctrl_word += " Kff_V: " + (std::string) numbers_str;
@@ -491,7 +490,7 @@ void accBasedControl::Recorder_Velocity()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
-        acc_hum, acc_exo, vel_hum, vel_exo, jerk_hum, jerk_exo, vel_motor_filt, acc_motor, actualVelocity);
+        acc_hum, acc_exo, vel_hum, vel_exo, jerk_hum, jerk_exo, RPM2RADS*vel_motor_filt, RPM2RADS*exoVelocity, RPM2RADS*actualVelocity);
 				// everything logged in standard units (SI)
 			fclose(logger);
 		}
