@@ -488,6 +488,10 @@ int main(int argc, char** argv)
 
 					printer++;
 					scan_file++;
+					if (record_count >= 0)
+					{
+						record_count--;
+					}
 
 					auto control_stamp = std::chrono::steady_clock::now();
 					delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
@@ -497,15 +501,11 @@ int main(int argc, char** argv)
 					freq = (float)CLOCKS_PER_SEC / loop_duration;
 				}
 
-        while (record_count >= 0)
-        {
-          record_count--;
-          if (record_count < 0)
-				  {
-            xsens2Eposcan.logging = false;
-            break;
-				  }
-        }
+				if (record_count == -1)
+				{
+					xsens2Eposcan.StopLogging();
+					record_count--;	// let record_count == -2 just to avoid this IF from now on
+				}
 
 				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
 				{

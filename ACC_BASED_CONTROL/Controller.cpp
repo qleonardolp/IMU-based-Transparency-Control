@@ -123,8 +123,8 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	jerk_exo = diffCutoff*( acc_exo - IntAccExo );
 	IntAccExo += jerk_exo*DELTA_T;
 
-
-  torque_sea += LPF_SMF*( STIFFNESS*DELTA_T*(actualVelocity - vel_exo) - torque_sea); 
+	m_eixo_in->ReadPDO02();
+	torque_sea += LPF_SMF*(STIFFNESS*DELTA_T*(RPM2RADS*m_eixo_in->PDOgetActualVelocity() - vel_exo) - torque_sea);
   
   //acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
   //IntAccMotor += acc_motor*DELTA_T;
@@ -159,7 +159,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   m_eixo_in->ReadPDO02();
   actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
-  Recorder_Velocity();
+  if (logging){ Recorder_Velocity(); }
 }
 
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
@@ -484,18 +484,14 @@ void accBasedControl::Recorder_Current()
 
 void accBasedControl::Recorder_Velocity()
 {
-	if (logging)
+	logger = fopen(logger_filename, "a");
+	if (logger != NULL)
 	{
-		logger = fopen(logger_filename, "a");
-		if (logger != NULL)
-		{
-			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5d\n",
-        acc_hum, acc_exo, vel_hum, vel_exo, jerk_hum, jerk_exo, RPM2RADS*vel_motor_filt, RPM2RADS*exoVelocity, RPM2RADS*actualVelocity);
-				// everything logged in standard units (SI)
-			fclose(logger);
-		}
+		fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+        acc_hum, acc_exo, vel_hum, vel_exo, jerk_hum, jerk_exo, RPM2RADS*vel_motor_filt, RPM2RADS*exoVelocity, RPM2RADS*actualVelocity, torque_sea);
+		// everything logged in standard units (SI)
+		fclose(logger);
 	}
-	
 }
 
 void accBasedControl::Recorder_Position()

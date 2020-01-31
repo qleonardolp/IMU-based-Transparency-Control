@@ -192,7 +192,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]\n");
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
 				}
 				if (control_mode == 'p')
 				{
@@ -286,6 +286,8 @@ public:
 
 	void UpdateCtrlWord_Position();
 
+	void StopLogging(){ logging = false; }
+
 	// destructor
 	~accBasedControl()
 	{
@@ -294,7 +296,6 @@ public:
 	}
 
 	std::string ctrl_word;
-  bool logging;
 
 private:
 
@@ -304,7 +305,7 @@ private:
 
 	FILE* logger;
 	char logger_filename[40];
-	
+	bool logging;
 
 	FILE* gains_values;
 
