@@ -454,6 +454,9 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	ctrl_word += " Kp	Ki	STF	DAM\n" + (std::string) numbers_str + "\n";
 	sprintf(numbers_str, "%5.3f", torque_sea);
 	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+	ctrl_word += " -> Passivity Constraints <-\n kd lower limit: ";
+	ctrl_word += std::to_string(damping_A*(Ki_A / Kp_A - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_A / J_EQ));
+	ctrl_word += "\n kd upper limit: " + std::to_string(STIFFNESS) + "\n";
 }
 
 void accBasedControl::Recorder_Current()
