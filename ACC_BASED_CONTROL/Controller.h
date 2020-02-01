@@ -115,16 +115,12 @@ public:
 		switch (control_mode)
 		{
 		case 'c':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff
-			break;
 		case 'k':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CurrentControlKF
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff or CurrentControlKF
 			break;
 		case 's':
-			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl
-			break;
-		case 'p':
-			m_eixo_in->VCS_SetOperationMode(POSITION_MODE); // For FFPosition 
+		case 'a':
+			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl or CAdmittanceControl
 			break;
 		default:
 			break;
@@ -135,23 +131,22 @@ public:
 		Amplifier = 100000; // initialized with a safe value
 
 		// Speed Control
-		Kff_V = 225.000;	Kp_V = 0.018;
-		Ki_V = 0.000;	Kd_V = 0.000;
-		Amp_V = 1;			// initialized with a safe value
+		Kff_V = 53.000;	Kp_V = 24.80;
+		Ki_V = 0.450;	Kd_V = 0.000;
 
 		vel_motor = 0;
 		vel_motor_filt = 0;
 
-		// Position Control
-		Amp_P = 0;	Kff_P = 0;	Kp_P = 0;	Ki_P = 0;	Kd_P = 0;
+		// Admittance Control
+		Ki_A = 0;	Kp_A = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
+		vel_adm = 0;	vel_adm_last = 0;
+		IntAdm = 0;	IntTorqueM = 0;
 
 		vel_hum = 0;		vel_exo = 0;
-		vel_hum_last = 0;		vel_exo_last = 0;
+		vel_hum_last = 0;	vel_exo_last = 0;
 		setpoint = 0;		setpoint_filt = 0;
 		accbased_comp = 0;	torque_sea = 0;
-
-		accHum_R = 0;	accHum_T = 0;
-		accExo_R = 0;	accExo_T = 0;
+		d_accbased_comp = 0; d_torque_sea = 0;
 
 		theta_m = 0;
 	
@@ -194,9 +189,9 @@ public:
 				{
 					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
 				}
-				if (control_mode == 'p')
+				if (control_mode == 'a')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  theta_m[deg]  theta_c[deg]  theta_l[deg]\n");
+					fprintf(logger, "vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
 				}
 				fclose(logger);
 			}
@@ -255,14 +250,13 @@ public:
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
+	void OmegaControl(float velHum){};	// overload using only the vel from Hum and considering the exo velocity from EPOS
+
+	// Collocated Admittance Controller using q' and tau, according to A. Calanca, R. Muradore and P. Fiorini
+	void CAdmittanceControl(float velHum, float velExo);
+
 	// Controlling through the EPOS current control using Kalman Filter
 	void CurrentControlKF(float velHum, float velExo);
-
-	// Controlling through the EPOS position control, assuming T_l = T_ff
-	void FFPosition(float velHum, float velExo);
-
-	// Controlling through the EPOS position control, using the IMUs acceleration with gravity:
-	void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT, float accExoR, float velHum, float velExo);
 	
 	void GainScan_Current();
 
@@ -270,13 +264,13 @@ public:
 
 	void GainScan_Velocity();
 
-	void GainScan_Position();
+	void GainScan_Admittance();
 
 	void Recorder_Current();
 
 	void Recorder_Velocity();
 
-	void Recorder_Position();
+	void Recorder_Admittance();
 
 	void UpdateCtrlWord_Current();
 
@@ -284,7 +278,7 @@ public:
 
 	void UpdateCtrlWord_Velocity();
 
-	void UpdateCtrlWord_Position();
+	void UpdateCtrlWord_Admittance();
 
 	void StopLogging(){ logging = false; }
 
@@ -322,19 +316,26 @@ private:
 	float Kd_F;
 
 	// Speed Control
-	float Amp_V;          // [dimensionless]
 	float Kff_V;        // [dimensionless]
 	float Kp_V;         // [dimensionless]
 	float Ki_V;         // [1/s]
 	float Kd_V;         // [s]
 
-	// Position Control
+	// | Admittance Control ---
+	// |
+	// |- Inner Control:
+	float Ki_A;			// in the reference is the P []
+	float Kp_A;         // in the reference is the D []
+	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
+	float IntAdm;		// Integrator of the input in Cv(s)
+	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
+	// |- Admittance Control:
+	float stiffness_d;  // k_d	  []
+	float damping_A;    // d_{dm} []
+	float vel_adm;		// output from A(s), the velocity required to guarantee the desired Admittance
+	float vel_adm_last;
+	// |-----------------------
 
-	float Amp_P;          // [dimensionless]
-	float Kff_P;        // [dimensionless]
-	float Kp_P;         // []
-	float Ki_P;         // []
-	float Kd_P;         // []
 
 	//	 STATE VARIABLES	//
 
@@ -368,11 +369,6 @@ private:
 	float d_accbased_comp;	// [N.m/s]
 	float grav_comp;		// [N.m]
 
-	float accHum_R;			// [m/s²]
-	float accHum_T;			// [m/s²]
-	float accExo_R;			// [m/s²]
-	float accExo_T;			// [m/s²]
-
 	float vel_leg;			// [rpm]
 	float acc_motor;		// [rad/s^2]
 	float vel_motor;		// [rad/s]
@@ -383,7 +379,7 @@ private:
 
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]
-  int exoVelocity;      // [rpm]
+	int exoVelocity;      // [rpm]
 	
 	float diffCutoff;
 	float IntegratorHum;

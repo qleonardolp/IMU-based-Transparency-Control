@@ -124,7 +124,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 	IntAccExo += jerk_exo*DELTA_T;
 
 	m_eixo_in->ReadPDO02();
-	torque_sea += LPF_SMF*(STIFFNESS*DELTA_T*(RPM2RADS*m_eixo_in->PDOgetActualVelocity() - vel_exo) - torque_sea);
+	torque_sea += LPF_SMF*(STIFFNESS*DELTA_T*(RPM2RADS/GEAR_RATIO*m_eixo_in->PDOgetActualVelocity() - vel_exo) - torque_sea);
   
   //acc_motor = diffCutoff*( actualVelocity - IntAccMotor );
   //IntAccMotor += acc_motor*DELTA_T;
@@ -134,7 +134,7 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   exoVelocity = m_eixo_out->PDOgetActualVelocity(); //  [rpm]
   vel_motor = vel_exo + ( Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo) )/STIFFNESS;
   
-  vel_motor = (30/MY_PI) * GEAR_RATIO * vel_motor;
+  vel_motor = RADS2RPM * GEAR_RATIO * vel_motor;
   vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
   voltage = abs(vel_motor_filt / SPEED_CONST);
@@ -159,7 +159,69 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
   m_eixo_in->ReadPDO02();
   actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
-  if (logging){ Recorder_Velocity(); }
+  if (logging)
+	Recorder_Velocity();
+}
+
+void accBasedControl::CAdmittanceControl(float velHum, float velExo)
+{
+	m_epos->sync();	// CAN Synchronization
+
+	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
+	vel_hum_last = velHum;
+	vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
+	vel_exo_last = velExo;
+
+	m_eixo_in->ReadPDO02();
+	vel_motor = RPM2RADS/GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+	d_torque_sea += LPF_SMF*(STIFFNESS*(vel_motor - vel_exo) - d_torque_sea);
+	torque_sea   += LPF_SMF*(STIFFNESS*DELTA_T*(vel_motor - vel_exo) - torque_sea);
+
+	// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
+	// Here, the reference torque is zero!
+	
+	vel_adm = damping_A/(damping_A + stiffness_d*DELTA_T) * vel_adm -
+			  (1 - stiffness_d/STIFFNESS)/(stiffness_d + damping_A/DELTA_T) * d_torque_sea;
+	vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
+	vel_adm_last = vel_adm;
+
+	// Integration for the Inner Control (PI)
+	IntAdm += (vel_hum + vel_adm - vel_motor)*DELTA_T;
+	// Inner Control Loop (PI):
+	torque_m = Kp_A*(vel_hum + vel_adm - vel_motor) + Ki_A*IntAdm;
+	
+	// Dynamics:
+	torque_m = torque_m - torque_sea;
+	// torque_m -> 1/(J_EQ*s) -> vel_motor:
+	IntTorqueM += (torque_m/J_EQ)*DELTA_T;
+
+	vel_motor = RADS2RPM * GEAR_RATIO * IntTorqueM;
+	vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
+
+	voltage = abs(vel_motor_filt / SPEED_CONST);
+
+	if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
+	{
+		m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor_filt);
+	}
+	else if (voltage > VOLTAGE_MAX)	// upper saturation
+	{
+		if (vel_motor_filt < 0)
+			m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
+		else
+			m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
+	}
+	else                            // lower saturation
+	{
+		m_eixo_in->PDOsetVelocitySetpoint(0);
+	}
+	m_eixo_in->WritePDO02();
+
+	m_eixo_in->ReadPDO02();
+	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
+
+	if (logging)
+		Recorder_Admittance();
 }
 
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
@@ -260,79 +322,6 @@ void accBasedControl::CurrentControlKF(float velHum, float velExo)
 	actualCurrent = m_eixo_in->PDOgetActualCurrent();
 }
 
-void accBasedControl::FFPosition(float velHum, float velExo)
-{
-	m_epos->sync();
-
-	//vel_hum = vel_hum - 0.334*(vel_hum - velHum);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velhumVec, velHum, &acc_hum);		// Updating window, smoothing and First Derivative
-	vel_hum = velhumVec[0];
-
-	//vel_exo = vel_exo - 0.334*(vel_exo - velExo);		// LP Filtering, LPF_FC  = 10 Hz  0.334
-	savitskygolay(velexoVec, velExo, &acc_exo);		// Updating window, smoothing and First Derivative
-	vel_exo = velexoVec[0];
-
-	m_eixo_out->ReadPDO01();
-	theta_l_vec[0] = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-	m_eixo_in->ReadPDO01();
-	theta_c_vec[0] = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-
-	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
-
-	theta_c = Kff_P*(INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];	
-	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
-
-	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
-	{
-		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
-		theta_m = theta_m - LPF_SMF*( theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in) );		// LP Filtering
-		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
-	}
-	m_eixo_in->WritePDO01();
-}
-
-void accBasedControl::FFPositionGrav(float accHumT, float accHumR, float accExoT, float accExoR, float velHum, float velExo)
-{
-	m_epos->sync();
-
-	// LP Filtering, LPF_FC = 10 Hz		(0.334)
-	vel_hum = vel_hum - 0.334*(vel_hum - velHum);
-	vel_exo = vel_exo - 0.334*(vel_exo - velExo);
-
-	accHum_R = accHum_R - 0.334*(accHum_R - accHumR);
-	accHum_T = accHum_T - 0.334*(accHum_T - accHumT);
-
-	accExo_R = accExo_R - 0.334*(accExo_R - accExoR);
-	accExo_T = accExo_T - 0.334*(accExo_T - accExoT);
-
-	/*
-	theta_l_vec[2] = acos((MTW_DIST_LIMB*vel_hum*vel_hum - accHum_R) / GRAVITY);
-	if ((theta_l_vec[2] >= -0.5200) && (theta_l_vec[2] <= 1.4800))
-	{
-		acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY*sin(theta_l_vec[2]));
-	} // deu ruim
-	*/
-
-	m_eixo_out->ReadPDO01();
-	theta_l_vec[0] = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-	m_eixo_in->ReadPDO01();
-	theta_c_vec[0] = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-
-	torque_sea = STIFFNESS * (theta_c_vec[0] - theta_l_vec[0]);
-
-	acc_hum = (1 / MTW_DIST_LIMB)*(accHum_T - GRAVITY * sin(theta_l_vec[0]));	// testar! equivalente ao FFPosition
-
-	theta_c = Kff_P*(INERTIA_EXO / STIFFNESS)*acc_hum + theta_l_vec[0];
-	//[kg m² . rad/ Nm . rad / s²] = [Kg m / N . rad²/s² ] = [Kg m s²/ (Kg m) rad²/s²] = [s² rad²/s²] = rad² ???
-
-	if ((theta_c >= -0.5200) && (theta_c <= 1.4800))
-	{
-		// theta_c from RAD to encoder counts, considering the initial offset pos0_in
-		theta_m = theta_m - LPF_SMF * (theta_m - ((ENCODER_IN * GEAR_RATIO / (2 * MY_PI)) * theta_c + pos0_in));		// LP Filtering
-		m_eixo_in->PDOsetPositionSetpoint((int)theta_m);
-	}
-	m_eixo_in->WritePDO01();
-}
 
 void accBasedControl::GainScan_Current()
 {
@@ -362,18 +351,18 @@ void accBasedControl::GainScan_Velocity()
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\nAMP %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V, &Amp_V);
+		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
 		fclose(gains_values);
 	}
 }
 
-void accBasedControl::GainScan_Position()
+void accBasedControl::GainScan_Admittance()
 {
-	gains_values = fopen("gainsPosition.txt", "rt");
+	gains_values = fopen("gainsAdmittance.txt", "rt");
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "KFF_P %f\nKP_P %f\nKI_P %f\nKD_P %f\nAMP %f\n", &Kff_P, &Kp_P, &Ki_P, &Kd_P, &Amp_P);
+		fscanf(gains_values, "KP_A %f\nKI_A %f\nSTF %f\nDAM %f\n", &Kp_A, &Ki_A, &stiffness_d, &damping_A);
 		fclose(gains_values);
 	}
 }
@@ -435,7 +424,7 @@ void accBasedControl::UpdateCtrlWord_CurrentKF()
 void accBasedControl::UpdateCtrlWord_Velocity()
 {
 	char numbers_str[20];
-	sprintf(numbers_str, "%+5.3f", vel_motor);
+	sprintf(numbers_str, "%+5.3f", vel_motor_filt);
 	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
 	sprintf(numbers_str, "%+4d", actualVelocity);
 	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
@@ -449,22 +438,22 @@ void accBasedControl::UpdateCtrlWord_Velocity()
 	ctrl_word += " Ki_V: " + (std::string) numbers_str;
 	sprintf(numbers_str, "%5.3f", Kd_V);
 	ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%5.3f", Amp_V);
-	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 }
 
-void accBasedControl::UpdateCtrlWord_Position()
+void accBasedControl::UpdateCtrlWord_Admittance()
 {
 	char numbers_str[20];
-
-	sprintf(numbers_str, "%+5.3f", theta_l_vec[0] * (180 / MY_PI));
-	ctrl_word = " theta_l: " + (std::string) numbers_str + " deg";
-	sprintf(numbers_str, "%+5.3f", theta_c_vec[0] * (180 / MY_PI));
-	ctrl_word += " theta_c: " + (std::string) numbers_str + " deg";
-	sprintf(numbers_str, "%+5.3f", torque_sea);
-	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m\n";
-	sprintf(numbers_str, "%+5.3f", theta_c * (180 / MY_PI));
-	ctrl_word += " theta_m: " + (std::string) numbers_str + " deg\n";
+	ctrl_word = " COLLOCATED ADMITTANCE CONTROLLER\n";
+	sprintf(numbers_str, "%+5.3f", vel_motor_filt);
+	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
+	sprintf(numbers_str, "%+4d", actualVelocity);
+	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
+	sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
+	ctrl_word += (std::string) numbers_str + " V]\n";
+	sprintf(numbers_str, "%5.3f	%5.3f	%5.3f	%5.3f", Kp_A, Ki_A, stiffness_d, damping_A);
+	ctrl_word += " Kp	Ki	STF	DAM\n" + (std::string) numbers_str + "\n";
+	sprintf(numbers_str, "%5.3f", torque_sea);
+	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
 }
 
 void accBasedControl::Recorder_Current()
@@ -475,7 +464,7 @@ void accBasedControl::Recorder_Current()
 		if (logger != NULL)
 		{
 			fprintf(logger, "%5.3f  %5d   %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-				setpoint_filt, actualCurrent, theta_l * (180 / MY_PI), theta_c * (180 / MY_PI), accbased_comp, acc_hum, acc_exo, vel_hum, vel_exo, vel_motor);
+			setpoint_filt, actualCurrent, theta_l * (180 / MY_PI), theta_c * (180 / MY_PI), accbased_comp, acc_hum, acc_exo, vel_hum, vel_exo, vel_motor);
 			fclose(logger);
 		}
 	}
@@ -494,19 +483,16 @@ void accBasedControl::Recorder_Velocity()
 	}
 }
 
-void accBasedControl::Recorder_Position()
+void accBasedControl::Recorder_Admittance()
 {
-	if (logging)
+	logger = fopen(logger_filename, "a");
+	if (logger != NULL)
 	{
-		logger = fopen(logger_filename, "a");
-		if (logger != NULL)
-		{
-			fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-				acc_hum, acc_exo, vel_hum, vel_exo, theta_c, theta_c_vec[0], theta_l_vec[0]);
-			fclose(logger);
-		}
+		fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+		vel_hum, vel_exo, vel_adm, RPM2RADS*vel_motor_filt, RPM2RADS*actualVelocity, torque_sea);
+		// everything logged in standard units (SI)
+		fclose(logger);
 	}
-
 }
 
 void accBasedControl::savitskygolay(float window[], float newest_value, float* first_derivative)

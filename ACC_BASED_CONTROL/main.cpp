@@ -329,17 +329,17 @@ int main(int argc, char** argv)
     bool proper_ctrl_mode = false;
 		int log_time;
 
-		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[p] FFPosition\n");
+		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] Adimittance\n");
 		scanf("%c", &control_mode);
     while(!proper_ctrl_mode)
     {
-      if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'p')
+      if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'a')
       {
         proper_ctrl_mode = true;
       }
       else
       {
-        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [p]\n");
+        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]\n");
 		    scanf("%c", &control_mode);
       }
     }
@@ -476,11 +476,9 @@ int main(int argc, char** argv)
 			      break;
 		      case 's':
 			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // For OmegaControl
-			      break;
-		      case 'p':
-			      xsens2Eposcan.FFPositionGrav( (float)accData[0].value(1), (float)accData[0].value(0), 
-                                         -(float)accData[1].value(1), (float)accData[0].value(0), 
-                                         -(float)gyroData[0].value(2),(float)gyroData[1].value(2));     // For FFPosition 
+				  break;
+			  case 'a':
+				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
 			      break;
 		      default:
 			      break;
@@ -519,9 +517,9 @@ int main(int argc, char** argv)
             break;
           case 's':
             xsens2Eposcan.GainScan_Velocity();
-            break;
-          case 'p':
-            xsens2Eposcan.GainScan_Position();
+			break;
+		  case 'a':
+			  xsens2Eposcan.GainScan_Admittance();
             break;
           default:
             break;
@@ -535,7 +533,7 @@ int main(int argc, char** argv)
           switch (control_mode)
           {
           case 'c':
-					  xsens2Eposcan.UpdateCtrlWord_Current();
+			xsens2Eposcan.UpdateCtrlWord_Current();
             break;
           case 'k':
             xsens2Eposcan.UpdateCtrlWord_CurrentKF();
@@ -543,9 +541,9 @@ int main(int argc, char** argv)
           case 's':
             xsens2Eposcan.UpdateCtrlWord_Velocity();
             break;
-          case 'p':
-            xsens2Eposcan.UpdateCtrlWord_Position();
-            break;
+		  case 'a':
+			  xsens2Eposcan.UpdateCtrlWord_Admittance();
+			  break;
           default:
             break;
           }
@@ -557,7 +555,7 @@ int main(int argc, char** argv)
 		}
 		(void)_getch();
 
-    //Zera o comando do motor
+		//Zera o comando do motor
 		xsens2Eposcan.~accBasedControl();
 		//Desabilita o Eixo
 		Desabilita_Eixo(0);
