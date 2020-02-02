@@ -48,22 +48,22 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		RADS2RPM		(30/MY_PI)		// rad/s to rpm 
 #define		RPM2RADS		(MY_PI/30)		// rpm to rad/s
 
-//	Torque Constant: 0.0603 N.m/A = 60.3 N.m/mA
+//	Torque Constant: 0.0603 N.m/A
 //	Speed Constant: 158 rpm/V
 //	Max current (@ 48 V)  ~3.1 A
 //	Stall current (@ 48 V)  42.4 A
 
-#define		CURRENT_MAX		3.1000f		// Max corrente nominal no motor Maxon RE40 [A]
+#define		CURRENT_MAX		3.1600f		// Max corrente nominal no motor Maxon RE40 [A]
 #define		VOLTAGE_MAX		21.600f		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
-#define		TORQUE_CONST	60.300f		// Constante de torque do motor RE40	[N.m/mA]
+#define		TORQUE_CONST	0.0603f		// Constante de torque do motor RE40	[N.m/A]
 #define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]
 
 #define     GRAVITY         9.8066f		// [m/s^2]
 #define     INERTIA_EXO     (float) 0.0655*4 // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
-#define		LOWERLEGMASS	3.1820f		// [Kg] Pesar no labDim para saber valor real!
+#define		LOWERLEGMASS	3.6480f		// [Kg] Pesar no labDim para saber valor real!
 #define		MTW_DIST_LIMB	0.2500f		// [m]
 #define		MTW_DIST_EXO	0.0700f		// [m]
-#define		L_CG			0.3500f		// [m]
+#define		L_CG			0.4500f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
 #define		J_EQ			0.4700f		// [Kg.m^2]
@@ -84,12 +84,12 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 // Low Pass Filtering	//
 // [Hz] Low Pass Filter Frequency Cutoff
-#define     LPF_FC          5.000f
+#define     LPF_FC          3.000f
 // Low Pass Filter Smoothing Factor
 #define		LPF_SMF         (float) ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )
 
 // Filtered Derivative using Gain and Feedback Integrator
-#define		CUTOFF			1.6000f
+#define		CUTOFF			20.000f
 
 // High Pass Filter for Gyroscopes Bias
 #define		HPF_FC			0.7f	// [Hz]
@@ -192,7 +192,7 @@ public:
 				}
 				if (control_mode == 's')
 				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
+					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
 				}
 				if (control_mode == 'a')
 				{
@@ -254,8 +254,6 @@ public:
 
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
-
-	void OmegaControl(float velHum);	// overload using only the vel from Hum and considering the exo velocity from EPOS
 
 	// Collocated Admittance Controller using q' and tau, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(float velHum, float velExo){};
