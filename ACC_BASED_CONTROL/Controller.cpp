@@ -175,7 +175,7 @@ void accBasedControl::CAdmittanceControl(float velHum, float velExo)
 	m_eixo_in->ReadPDO02();
 	vel_motor = RPM2RADS/GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 	d_torque_sea += LPF_SMF*(STIFFNESS*(vel_motor - vel_exo) - d_torque_sea);
-	torque_sea   += LPF_SMF*(STIFFNESS*DELTA_T*(vel_motor - vel_exo) - torque_sea);
+  //torque_sea += LPF_SMF*(STIFFNESS*DELTA_T*(vel_motor - vel_exo) - torque_sea);
 
 	// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
 	// Here, the reference torque is zero!
@@ -188,8 +188,18 @@ void accBasedControl::CAdmittanceControl(float velHum, float velExo)
 	// Integration for the Inner Control (PI)
 	IntAdm += (vel_hum + vel_adm - vel_motor)*DELTA_T;
 	// Inner Control Loop (PI):
-	torque_m = Kp_A*(vel_hum + vel_adm - vel_motor) + Ki_A*IntAdm;
+	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntAdm;
 	
+  // SEA Torque:
+  
+  m_eixo_out->ReadPDO01();
+	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+	m_eixo_in->ReadPDO01();
+	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+
+  torque_sea +=LPF_SMF*( STIFFNESS*(theta_c - theta_l) - torque_sea);
+  
+
 	// Dynamics:
 	torque_m = torque_m - torque_sea;
 	// torque_m -> 1/(J_EQ*s) -> vel_motor:
@@ -362,7 +372,7 @@ void accBasedControl::GainScan_Admittance()
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "KP_A %f\nKI_A %f\nSTF %f\nDAM %f\n", &Kp_A, &Ki_A, &stiffness_d, &damping_A);
+		fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
 		fclose(gains_values);
 	}
 }
@@ -450,13 +460,19 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
 	sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 	ctrl_word += (std::string) numbers_str + " V]\n";
-	sprintf(numbers_str, "%5.3f	%5.3f	%5.3f	%5.3f", Kp_A, Ki_A, stiffness_d, damping_A);
-	ctrl_word += " Kp	Ki	STF	DAM\n" + (std::string) numbers_str + "\n";
-	sprintf(numbers_str, "%5.3f", torque_sea);
-	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+	sprintf(numbers_str, "%5.3f", Kp_adm);
+	ctrl_word += " Kp: " + (std::string) numbers_str;
+  sprintf(numbers_str, "%5.3f", Ki_adm);
+	ctrl_word += " Ki: " + (std::string) numbers_str;
+  sprintf(numbers_str, "%5.3f", stiffness_d);
+	ctrl_word += " STF: " + (std::string) numbers_str;
+  sprintf(numbers_str, "%5.3f", damping_A);
+	ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
+  ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
 	ctrl_word += " -> Passivity Constraints <-\n kd lower limit: ";
-	ctrl_word += std::to_string(damping_A*(Ki_A / Kp_A - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_A / J_EQ));
-	ctrl_word += "\n kd upper limit: " + std::to_string(STIFFNESS) + "\n";
+  kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
+  ctrl_word += std::to_string(kd_min);
+  ctrl_word += "\n kd upper limit: " + std::to_string(kd_max) + "\n";
 }
 
 void accBasedControl::Recorder_Current()

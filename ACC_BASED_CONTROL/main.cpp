@@ -533,7 +533,7 @@ int main(int argc, char** argv)
           switch (control_mode)
           {
           case 'c':
-			xsens2Eposcan.UpdateCtrlWord_Current();
+			      xsens2Eposcan.UpdateCtrlWord_Current();
             break;
           case 'k':
             xsens2Eposcan.UpdateCtrlWord_CurrentKF();
@@ -541,9 +541,9 @@ int main(int argc, char** argv)
           case 's':
             xsens2Eposcan.UpdateCtrlWord_Velocity();
             break;
-		  case 'a':
-			  xsens2Eposcan.UpdateCtrlWord_Admittance();
-			  break;
+		      case 'a':
+			      xsens2Eposcan.UpdateCtrlWord_Admittance();
+			      break;
           default:
             break;
           }

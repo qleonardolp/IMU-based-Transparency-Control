@@ -108,6 +108,7 @@ public:
 		m_epos = epos;
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
+    ctrl_mode  = control_mode;
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -138,9 +139,12 @@ public:
 		vel_motor_filt = 0;
 
 		// Admittance Control
-		Ki_A = 0;	Kp_A = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
+		Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
 		vel_adm = 0;	vel_adm_last = 0;
 		IntAdm = 0;	IntTorqueM = 0;
+    kd_max = STIFFNESS;
+    kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
+
 
 		vel_hum = 0;		vel_exo = 0;
 		vel_hum_last = 0;	vel_exo_last = 0;
@@ -285,8 +289,21 @@ public:
 	// destructor
 	~accBasedControl()
 	{
-		m_eixo_in->PDOsetCurrentSetpoint(0);
-		m_eixo_in->WritePDO01();
+    switch (ctrl_mode)
+		{
+		case 'c':
+		case 'k':
+      m_eixo_in->PDOsetCurrentSetpoint(0);
+      m_eixo_in->WritePDO01();
+			break;
+		case 's':
+		case 'a':
+      m_eixo_in->PDOsetVelocitySetpoint(0);
+      m_eixo_in->WritePDO02();
+			break;
+		default:
+			break;
+		}
 	}
 
 	std::string ctrl_word;
@@ -296,6 +313,7 @@ private:
 	EPOS_NETWORK* m_epos;
 	AXIS* m_eixo_in;
 	AXIS* m_eixo_out;
+  char ctrl_mode;
 
 	FILE* logger;
 	char logger_filename[40];
@@ -324,8 +342,8 @@ private:
 	// | Admittance Control ---
 	// |
 	// |- Inner Control:
-	float Ki_A;			// in the reference is the P []
-	float Kp_A;         // in the reference is the D []
+	float Ki_adm;			// in the reference is the P []
+	float Kp_adm;         // in the reference is the D []
 	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
 	float IntAdm;		// Integrator of the input in Cv(s)
 	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
@@ -334,6 +352,7 @@ private:
 	float damping_A;    // d_{dm} []
 	float vel_adm;		// output from A(s), the velocity required to guarantee the desired Admittance
 	float vel_adm_last;
+  float kd_min; float kd_max;
 	// |-----------------------
 
 
