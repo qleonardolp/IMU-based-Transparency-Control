@@ -17,9 +17,9 @@ Redistribution and use in source and binary forms, with or without modification,
 
 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
-FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
@@ -45,8 +45,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		ENCODER_OUT		2048		    // Resolução do encoder de saída
 #define		STIFFNESS		104.0f			// Constante da mola SEA [N.m/rad]
 #define		MY_PI			3.141592653f	// Pi value
-#define   RADS2RPM    (30/MY_PI)
-#define   RPM2RADS    (MY_PI/30)
+#define		RADS2RPM		(30/MY_PI)		// rad/s to rpm 
+#define		RPM2RADS		(MY_PI/30)		// rpm to rad/s
 
 //	Torque Constant: 0.0603 N.m/A = 60.3 N.m/mA
 //	Speed Constant: 158 rpm/V
@@ -60,6 +60,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #define     GRAVITY         9.8066f		// [m/s^2]
 #define     INERTIA_EXO     (float) 0.0655*4 // [Kg.m^2], +- 0.0006, estimado em 2019-08-21
+#define		LOWERLEGMASS	3.1820f		// [Kg] Pesar no labDim para saber valor real!
 #define		MTW_DIST_LIMB	0.2500f		// [m]
 #define		MTW_DIST_EXO	0.0700f		// [m]
 #define		L_CG			0.3500f		// [m]
@@ -108,7 +109,7 @@ public:
 		m_epos = epos;
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
-    ctrl_mode  = control_mode;
+		ctrl_mode = control_mode;
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -140,10 +141,10 @@ public:
 
 		// Admittance Control
 		Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
-		vel_adm = 0;	vel_adm_last = 0;
-		IntAdm = 0;	IntTorqueM = 0;
-    kd_max = STIFFNESS;
-    kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
+		vel_adm = 0;	vel_adm_last = 0;	torque_ref = 0;
+		IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0;
+		kd_max = STIFFNESS;
+		kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 
 
 		vel_hum = 0;		vel_exo = 0;
@@ -153,14 +154,14 @@ public:
 		d_accbased_comp = 0; d_torque_sea = 0;
 
 		theta_m = 0;
-	
+
 		IntegratorHum = 0;
 		IntegratorExo = 0;
 		IntAccMotor = 0;
 		IntAccHum = 0;
 		IntAccExo = 0;
 		diffCutoff = CUTOFF;
-		
+
 		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
 			velhumVec[i] = 0;
@@ -168,7 +169,7 @@ public:
 			theta_l_vec[i] = 0;
 			theta_c_vec[i] = 0;
 			torqueSeaVec[i] = 0;
-			torqueAccVec[i] = 0;	
+			torqueAccVec[i] = 0;
 		}
 
 		if (seconds != 0)
@@ -254,14 +255,15 @@ public:
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
-	void OmegaControl(float velHum){};	// overload using only the vel from Hum and considering the exo velocity from EPOS
+	void OmegaControl(float velHum);	// overload using only the vel from Hum and considering the exo velocity from EPOS
 
 	// Collocated Admittance Controller using q' and tau, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControl(float velHum, float velExo);
+	void CAdmittanceControl(float velHum, float velExo){};
+	void CAdmittanceControl(float velHum);
 
 	// Controlling through the EPOS current control using Kalman Filter
 	void CurrentControlKF(float velHum, float velExo);
-	
+
 	void GainScan_Current();
 
 	void GainScan_CurrentKF();
@@ -289,17 +291,17 @@ public:
 	// destructor
 	~accBasedControl()
 	{
-    switch (ctrl_mode)
+		switch (ctrl_mode)
 		{
 		case 'c':
 		case 'k':
-      m_eixo_in->PDOsetCurrentSetpoint(0);
-      m_eixo_in->WritePDO01();
+			m_eixo_in->PDOsetCurrentSetpoint(0);
+			m_eixo_in->WritePDO01();
 			break;
 		case 's':
 		case 'a':
-      m_eixo_in->PDOsetVelocitySetpoint(0);
-      m_eixo_in->WritePDO02();
+			m_eixo_in->PDOsetVelocitySetpoint(0);
+			m_eixo_in->WritePDO02();
 			break;
 		default:
 			break;
@@ -313,7 +315,7 @@ private:
 	EPOS_NETWORK* m_epos;
 	AXIS* m_eixo_in;
 	AXIS* m_eixo_out;
-  char ctrl_mode;
+	char ctrl_mode;
 
 	FILE* logger;
 	char logger_filename[40];
@@ -339,21 +341,24 @@ private:
 	float Ki_V;         // [1/s]
 	float Kd_V;         // [s]
 
-	// | Admittance Control ---
+	// |-> Admittance Control <--
 	// |
 	// |- Inner Control:
-	float Ki_adm;			// in the reference is the P []
-	float Kp_adm;         // in the reference is the D []
+	float Ki_adm;		// in the reference is the P [N.m s/rad]
+	float Kp_adm;       // in the reference is the D [N.m/rad]
 	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
-	float IntAdm;		// Integrator of the input in Cv(s)
+	float IntInnerC;	// Integrator of the input in Cv(s)
 	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
 	// |- Admittance Control:
-	float stiffness_d;  // k_d	  []
-	float damping_A;    // d_{dm} []
-	float vel_adm;		// output from A(s), the velocity required to guarantee the desired Admittance
-	float vel_adm_last;
-  float kd_min; float kd_max;
-	// |-----------------------
+	float torque_ref;	// Reference Torque for A(s). Compensate the lower leg exo mass and dynamics
+	float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)
+	float IntAdm_In;	// A(s) Input integrator
+	float stiffness_d;  // k_d	  [N.m/rad]
+	float damping_A;    // d_{dm} [N.m s/rad]
+	float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
+	float vel_adm_last;	// [rad/s]
+	float kd_min; float kd_max;
+	// |-------------------------
 
 
 	//	 STATE VARIABLES	//
@@ -394,26 +399,26 @@ private:
 	float vel_motor_filt;
 	float voltage;			// [V]
 
-	float theta_m;       // [encoder pulses]
+	float theta_m;			// [encoder pulses]
 
 	int actualCurrent;		// [mA]
 	int actualVelocity;		// [rpm]
-	int exoVelocity;      // [rpm]
-	
+	int exoVelocity;		// [rpm]
+
 	float diffCutoff;
 	float IntegratorHum;
 	float IntegratorExo;
 	float IntAccMotor;
 	float IntAccHum;
 	float IntAccExo;
-	
+
 	float vel_hum_last;
 	float vel_exo_last;
 
 	//		KALMAN FILTER		//
 
-	Eigen::Matrix<float, STATE_DIM, 1> x_k;			// State Vector
-	Eigen::Matrix<float, SENSOR_DIM, 1> z_k;		// Sensor reading Vector
+	Eigen::Matrix<float, STATE_DIM, 1> x_k;					// State Vector
+	Eigen::Matrix<float, SENSOR_DIM, 1> z_k;				// Sensor reading Vector
 	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Pk;			// State Covariance Matrix
 	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Fk;			// Prediction Matrix
 	Eigen::Matrix<float, STATE_DIM, 1> Bk;					// Control Matrix* (is a vector but called matrix)

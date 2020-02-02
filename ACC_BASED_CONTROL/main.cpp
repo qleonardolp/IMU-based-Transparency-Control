@@ -478,7 +478,7 @@ int main(int argc, char** argv)
 			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // For OmegaControl
 				  break;
 			  case 'a':
-				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));
+				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2));
 			      break;
 		      default:
 			      break;
@@ -486,7 +486,7 @@ int main(int argc, char** argv)
 
 					printer++;
 					scan_file++;
-					if (record_count >= 0)
+					if (record_count > 0)
 					{
 						record_count--;
 					}
@@ -499,10 +499,10 @@ int main(int argc, char** argv)
 					freq = (float)CLOCKS_PER_SEC / loop_duration;
 				}
 
-				if (record_count == -1)
+				if (record_count == 0)
 				{
 					xsens2Eposcan.StopLogging();
-					record_count--;	// let record_count == -2 just to avoid this IF from now on
+					record_count--;	// let record_count == -1 just to avoid this IF from now on
 				}
 
 				if (scan_file == (int)RATE * 5)  // every 5s reads the gains_values.txt 
