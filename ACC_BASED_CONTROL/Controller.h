@@ -53,7 +53,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //	Max current (@ 48 V)  ~3.1 A
 //	Stall current (@ 48 V)  42.4 A
 
-#define		CURRENT_MAX		3.1600f		// Max corrente nominal no motor Maxon RE40 [A]
+#define		CURRENT_MAX		3.1400f		// Max corrente nominal no motor Maxon RE40 [A]
 #define		VOLTAGE_MAX		21.600f		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	0.0603f		// Constante de torque do motor RE40	[N.m/A]
 #define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]

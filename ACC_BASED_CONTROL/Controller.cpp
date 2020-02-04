@@ -206,12 +206,12 @@ void accBasedControl::CAdmittanceControl(float velHum)
 	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
 
 	// Motor Dynamics:
-	torque_m = torque_m - torque_sea;
+	torque_m = torque_m - torque_sea + L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l);
 	// torque_m -> 1/(J_EQ*s) -> vel_motor:
 	IntTorqueM += (torque_m / J_EQ)*DELTA_T;
 	// IntTorqueM Saturation:
   
-	if (RADS2RPM*abs(IntTorqueM) >= SPEED_CONST*VOLTAGE_MAX)
+	if (abs(IntTorqueM) >= RPM2RADS*SPEED_CONST*VOLTAGE_MAX)
 	{
 		if (IntTorqueM < 0)
 			IntTorqueM = -RPM2RADS*SPEED_CONST*VOLTAGE_MAX;
