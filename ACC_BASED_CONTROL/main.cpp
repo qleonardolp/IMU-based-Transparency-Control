@@ -412,10 +412,6 @@ int main(int argc, char** argv)
 		endwait = clock() + 1 * CLOCKS_PER_SEC;
 		while (clock() < endwait) {}
 
-
-		//Habilita o controle de corrente nos servomotores
-		//eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
-
 		eixo_out.ReadPDO01();
 		eixo_in.ReadPDO01();
 
@@ -440,7 +436,11 @@ int main(int argc, char** argv)
 		clock_t loop_duration;
 		float freq;
 
-		//std::thread recorder_t( xsens2Eposcan.Recorder );
+    std::thread controller_t(&accBasedControl::CACurrent, &xsens2Eposcan);
+    std::thread recorder_t(&accBasedControl::Recorder_Admittance, &xsens2Eposcan);
+    std::thread gainscan_t(&accBasedControl::GainScan_Admittance, &xsens2Eposcan);
+    std::thread update_t(&accBasedControl::UpdateCtrlWord_Admittance, &xsens2Eposcan);
+
 
   	while (!_kbhit())
 		{
@@ -477,11 +477,11 @@ int main(int argc, char** argv)
 		      case 's':
 			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // OmegaControl
 				  break;
-			  case 'a':
+			    case 'a':
 				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2));							  // CAC (q')
 			      break;
-			  case 'u':
-				  xsens2Eposcan.CACurrent(-(float)gyroData[0].value(2));									  // CAC (tau_m)
+			    case 'u':
+				  xsens2Eposcan.setCACurrent(-(float)gyroData[0].value(2));									  // CAC (tau_m)
 				  break;
 		      default:
 			      break;
@@ -491,6 +491,7 @@ int main(int argc, char** argv)
 					scan_file++;
 					if (record_count > 0)
 					{
+            xsens2Eposcan.save = true;
 						record_count--;
 					}
 
@@ -505,6 +506,7 @@ int main(int argc, char** argv)
 				if (record_count == 0)
 				{
 					xsens2Eposcan.StopLogging();
+          recorder_t.join();
 					record_count--;	// let record_count == -1 just to avoid this IF from now on
 				}
 
@@ -522,7 +524,7 @@ int main(int argc, char** argv)
             xsens2Eposcan.GainScan_Velocity();
 			      break;
 		      case 'a':
-          case 'u':
+          //case 'u':
 			      xsens2Eposcan.GainScan_Admittance();
             break;
           default:
@@ -546,7 +548,7 @@ int main(int argc, char** argv)
             xsens2Eposcan.UpdateCtrlWord_Velocity();
             break;
 		      case 'a':
-          case 'u':
+          //case 'u':
 			      xsens2Eposcan.UpdateCtrlWord_Admittance();
 			      break;
           default:
@@ -559,6 +561,10 @@ int main(int argc, char** argv)
 				}
 		}
 		(void)_getch();
+
+    controller_t.join();
+    gainscan_t.join();
+    update_t.join();
 
 		//Zera o comando do motor
 		xsens2Eposcan.~accBasedControl();

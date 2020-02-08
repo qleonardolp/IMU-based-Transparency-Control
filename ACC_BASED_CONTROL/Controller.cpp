@@ -184,7 +184,7 @@ void accBasedControl::CAdmittanceControl(float velHum)
 	IntAdm_In += d_torque_sea*DELTA_T;
 
 	// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
-	// Here, the reference torque is the torque required to sustain the Exo lower leg mass
+	// Here, the reference torque is zero!
 	vel_adm = damping_A / (damping_A + stiffness_d*DELTA_T) * vel_adm +
     (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / DELTA_T) * (-d_torque_sea);
 	vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
@@ -199,14 +199,6 @@ void accBasedControl::CAdmittanceControl(float velHum)
   if (resetInt == 370)
     IntInnerC = (vel_hum + vel_adm - vel_motor)*DELTA_T;
 
-	// Integration Saturation:
-  /*
-	if (abs(IntInnerC*Ki_adm) >= TORQUE_CONST*CURRENT_MAX)
-	{
-		if (IntInnerC < 0)
-			IntInnerC = -TORQUE_CONST*CURRENT_MAX / Ki_adm;
-		IntInnerC = TORQUE_CONST*CURRENT_MAX / Ki_adm;
-	}*/
 	// Inner Control Loop (PI):
 	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
 
@@ -221,14 +213,6 @@ void accBasedControl::CAdmittanceControl(float velHum)
     IntTorqueM = (torque_m / J_EQ)*DELTA_T;
     resetInt = 0;
   }
-	// IntTorqueM Saturation:
-  /*
-	if (abs(IntTorqueM) >= RPM2RADS*SPEED_CONST*VOLTAGE_MAX)
-	{
-		if (IntTorqueM < 0)
-			IntTorqueM = -RPM2RADS*SPEED_CONST*VOLTAGE_MAX;
-		IntTorqueM = RPM2RADS*SPEED_CONST*VOLTAGE_MAX;
-	}*/
 
 	vel_motor += LPF_SMF*(RADS2RPM*GEAR_RATIO*IntTorqueM - vel_motor);
 
@@ -255,16 +239,17 @@ void accBasedControl::CAdmittanceControl(float velHum)
 	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 	if (logging)
-		Recorder_Admittance();
+    save = true;
+		//Recorder_Admittance();
 }
 
-void accBasedControl::CACurrent(float velHum)
+void accBasedControl::CACurrent()
 {
   resetInt++;
 	m_epos->sync();	// CAN Synchronization
 
-	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
-	vel_hum_last = velHum;
+  vel_hum = HPF_SMF*vel_hum + HPF_SMF*(cacu_input - vel_hum_last);	// HPF on gyro
+  vel_hum_last = cacu_input;
 
 	// SEA Torque:
 	m_eixo_out->ReadPDO01();
@@ -317,8 +302,8 @@ void accBasedControl::CACurrent(float velHum)
 	m_eixo_in->ReadPDO01();
 	actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-	//m_eixo_in->ReadPDO02();
-	//vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+	//if (logging)
+		//Recorder_Admittance();
 }
 
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
@@ -594,14 +579,17 @@ void accBasedControl::Recorder_Velocity()
 
 void accBasedControl::Recorder_Admittance()
 {
-	logger = fopen(logger_filename, "a");
-	if (logger != NULL)
-	{
-		fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-			vel_hum, vel_exo, vel_adm, RPM2RADS*vel_motor, RPM2RADS*actualVelocity, torque_sea);
-		// everything logged in standard units (SI)
-		fclose(logger);
-	}
+  if (logging && save){
+    logger = fopen(logger_filename, "a");
+	  if (logger != NULL)
+	  {
+		  fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+			  vel_hum, vel_exo, vel_adm, RPM2RADS*vel_motor, RPM2RADS*actualVelocity, torque_sea);
+		  // everything logged in standard units (SI)
+		  fclose(logger);
+	  }
+    save = false;
+  }
 }
 
 void accBasedControl::savitskygolay(float window[], float newest_value, float* first_derivative)

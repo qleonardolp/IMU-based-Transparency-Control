@@ -146,7 +146,7 @@ public:
     IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
 		kd_max = STIFFNESS;
 		kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
-
+    cacu_input = 0;
 
 		vel_hum = 0;		vel_exo = 0;
 		vel_hum_last = 0;	vel_exo_last = 0;
@@ -207,6 +207,7 @@ public:
 			logging = false;
 		}
 
+    save = false;
 
 		//		KALMAN FILTER SETUP		//
 
@@ -260,7 +261,9 @@ public:
 	void CAdmittanceControl(float velHum, float velExo){};
 	void CAdmittanceControl(float velHum);
 	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrent(float velHum);
+  //void CACurrent(float velHum){};
+  void CACurrent();   // threading
+
 
 	// Controlling through the EPOS current control using Kalman Filter
 	void CurrentControlKF(float velHum, float velExo);
@@ -289,6 +292,8 @@ public:
 
 	void StopLogging(){ logging = false; }
 
+  void setCACurrent(float velHum){ cacu_input = velHum; }
+
 	// destructor
 	~accBasedControl()
 	{
@@ -311,6 +316,7 @@ public:
 	}
 
 	std::string ctrl_word;
+  bool save;
 
 private:
 
@@ -361,6 +367,8 @@ private:
 	float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
 	float vel_adm_last;	// [rad/s]
 	float kd_min; float kd_max;
+
+  float cacu_input;
 	// |-------------------------
 
 
