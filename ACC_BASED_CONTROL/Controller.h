@@ -118,7 +118,8 @@ public:
 		{
 		case 'c':
 		case 'k':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff or CurrentControlKF
+		case 'u':
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff, CurrentControlKF, CACurrent
 			break;
 		case 's':
 		case 'a':
@@ -255,9 +256,11 @@ public:
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float velHum, float velExo);
 
-	// Collocated Admittance Controller using q' and tau, according to A. Calanca, R. Muradore and P. Fiorini
+	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(float velHum, float velExo){};
 	void CAdmittanceControl(float velHum);
+	// Collocated Admittance Controller using q and tau_e and tau_m
+	void CACurrent(float velHum);
 
 	// Controlling through the EPOS current control using Kalman Filter
 	void CurrentControlKF(float velHum, float velExo);

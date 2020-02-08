@@ -329,17 +329,17 @@ int main(int argc, char** argv)
     bool proper_ctrl_mode = false;
 		int log_time;
 
-		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] Adimittance\n");
+		printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] Adimittance\n[u] CACu\n");
 		scanf("%c", &control_mode);
     while(!proper_ctrl_mode)
     {
-      if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'a')
+		if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'a' || control_mode == 'u')
       {
         proper_ctrl_mode = true;
       }
       else
       {
-        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]\n");
+        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]  [u]\n");
 		    scanf("%c", &control_mode);
       }
     }
@@ -469,17 +469,20 @@ int main(int argc, char** argv)
           switch (control_mode)
 		      {
 		      case 'c':
-			      xsens2Eposcan.FiniteDiff(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));        // For FiniteDiff
+			      xsens2Eposcan.FiniteDiff(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));        // FiniteDiff
 			      break;
 		      case 'k':
-			      xsens2Eposcan.CurrentControlKF(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));  // For CurrentControlKF
+			      xsens2Eposcan.CurrentControlKF(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));  // CurrentControlKF
 			      break;
 		      case 's':
-			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // For OmegaControl
+			      xsens2Eposcan.OmegaControl(-(float)gyroData[0].value(2), (float)gyroData[1].value(2));      // OmegaControl
 				  break;
 			  case 'a':
-				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2));
+				  xsens2Eposcan.CAdmittanceControl(-(float)gyroData[0].value(2));							  // CAC (q')
 			      break;
+			  case 'u':
+				  xsens2Eposcan.CACurrent(-(float)gyroData[0].value(2));									  // CAC (tau_m)
+				  break;
 		      default:
 			      break;
 		      }

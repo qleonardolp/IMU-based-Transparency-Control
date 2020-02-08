@@ -246,6 +246,70 @@ void accBasedControl::CAdmittanceControl(float velHum)
 		Recorder_Admittance();
 }
 
+void accBasedControl::CACurrent(float velHum)
+{
+	m_epos->sync();	// CAN Synchronization
+
+	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
+	vel_hum_last = velHum;
+
+	// SEA Torque:
+	m_eixo_out->ReadPDO01();
+	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+	m_eixo_in->ReadPDO01();
+	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
+	d_torque_sea = 13 * (torque_sea - IntAdm_In);
+	IntAdm_In += d_torque_sea*DELTA_T;
+
+	// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
+	// Here, the reference torque is the torque required to sustain the Exo lower leg mass
+	vel_adm = damping_A / (damping_A + stiffness_d*DELTA_T) * vel_adm +
+		(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / DELTA_T) * (-d_torque_sea);
+	vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
+	vel_adm_last = vel_adm;
+
+	m_eixo_in->ReadPDO02();
+	vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+	// Integration for the Inner Control (PI)
+	IntInnerC += (vel_hum + vel_adm - vel_motor)*DELTA_T;
+	// Integration Saturation:
+
+	if (abs(IntInnerC*Ki_adm) >= TORQUE_CONST*CURRENT_MAX)
+	{
+		if (IntInnerC < 0)
+			IntInnerC = -TORQUE_CONST*CURRENT_MAX / Ki_adm;
+		IntInnerC = TORQUE_CONST*CURRENT_MAX / Ki_adm;
+	}
+	// Inner Control Loop (PI):
+	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+
+	setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+	setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
+
+	if (abs(setpoint_filt) < CURRENT_MAX)
+	{
+		if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
+			m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
+		else
+			m_eixo_in->PDOsetCurrentSetpoint(0);
+	}
+	else
+	{
+		if (setpoint_filt < 0)
+			m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
+		m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
+	}
+	m_eixo_in->WritePDO01();
+
+	m_eixo_in->ReadPDO01();
+	actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+	//m_eixo_in->ReadPDO02();
+	//vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+}
+
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
 {
 	m_epos->sync();
