@@ -143,7 +143,7 @@ public:
 		// Admittance Control
 		Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
 		vel_adm = 0;	vel_adm_last = 0;	torque_ref = 0;
-		IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0;
+    IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
 		kd_max = STIFFNESS;
 		kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 
@@ -296,6 +296,7 @@ public:
 		{
 		case 'c':
 		case 'k':
+    case 'u':
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 			m_eixo_in->WritePDO01();
 			break;
@@ -350,6 +351,7 @@ private:
 	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
 	float IntInnerC;	// Integrator of the input in Cv(s)
 	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
+  int   resetInt;
 	// |- Admittance Control:
 	float torque_ref;	// Reference Torque for A(s). Compensate the lower leg exo mass and dynamics
 	float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)

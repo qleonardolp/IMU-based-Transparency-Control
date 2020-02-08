@@ -168,7 +168,8 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 
 void accBasedControl::CAdmittanceControl(float velHum)
 {
-	m_epos->sync();	// CAN Synchronization
+  resetInt++;
+  m_epos->sync();	// CAN Synchronization
 
   vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
 	vel_hum_last = velHum;
@@ -194,29 +195,40 @@ void accBasedControl::CAdmittanceControl(float velHum)
 
 	// Integration for the Inner Control (PI)
 	IntInnerC += (vel_hum + vel_adm - vel_motor)*DELTA_T;
+  // Integration reset:
+  if (resetInt == 370)
+    IntInnerC = (vel_hum + vel_adm - vel_motor)*DELTA_T;
+
 	// Integration Saturation:
-  
+  /*
 	if (abs(IntInnerC*Ki_adm) >= TORQUE_CONST*CURRENT_MAX)
 	{
 		if (IntInnerC < 0)
 			IntInnerC = -TORQUE_CONST*CURRENT_MAX / Ki_adm;
 		IntInnerC = TORQUE_CONST*CURRENT_MAX / Ki_adm;
-	}
+	}*/
 	// Inner Control Loop (PI):
 	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
 
 	// Motor Dynamics:
-	torque_m = torque_m - torque_sea + L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l);
+  torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
+  torque_m = torque_m - torque_sea;
 	// torque_m -> 1/(J_EQ*s) -> vel_motor:
 	IntTorqueM += (torque_m / J_EQ)*DELTA_T;
+  // Integration reset:
+  if (resetInt == 400)
+  {
+    IntTorqueM = (torque_m / J_EQ)*DELTA_T;
+    resetInt = 0;
+  }
 	// IntTorqueM Saturation:
-  
+  /*
 	if (abs(IntTorqueM) >= RPM2RADS*SPEED_CONST*VOLTAGE_MAX)
 	{
 		if (IntTorqueM < 0)
 			IntTorqueM = -RPM2RADS*SPEED_CONST*VOLTAGE_MAX;
 		IntTorqueM = RPM2RADS*SPEED_CONST*VOLTAGE_MAX;
-	}
+	}*/
 
 	vel_motor += LPF_SMF*(RADS2RPM*GEAR_RATIO*IntTorqueM - vel_motor);
 
@@ -248,6 +260,7 @@ void accBasedControl::CAdmittanceControl(float velHum)
 
 void accBasedControl::CACurrent(float velHum)
 {
+  resetInt++;
 	m_epos->sync();	// CAN Synchronization
 
 	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
@@ -274,14 +287,12 @@ void accBasedControl::CACurrent(float velHum)
 
 	// Integration for the Inner Control (PI)
 	IntInnerC += (vel_hum + vel_adm - vel_motor)*DELTA_T;
-	// Integration Saturation:
-
-	if (abs(IntInnerC*Ki_adm) >= TORQUE_CONST*CURRENT_MAX)
-	{
-		if (IntInnerC < 0)
-			IntInnerC = -TORQUE_CONST*CURRENT_MAX / Ki_adm;
-		IntInnerC = TORQUE_CONST*CURRENT_MAX / Ki_adm;
-	}
+	// Integration reset:
+  if (resetInt == 400)
+  {
+    IntInnerC = (vel_hum + vel_adm - vel_motor)*DELTA_T;
+    resetInt = 0;
+  }
 	// Inner Control Loop (PI):
 	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
 
@@ -545,7 +556,9 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	ctrl_word += " STF: " + (std::string) numbers_str;
 	sprintf(numbers_str, "%5.3f", damping_A);
 	ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
-	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
+	ctrl_word += " T_Sea: " + std::to_string(torque_sea);
+  //ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";  // CAC
+  ctrl_word += " | T_ref: " + std::to_string(torque_m) + " [N.m]\n";    // CACu
 	ctrl_word += " -> Passivity Constraints <-\n kd lower limit: ";
 	kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 	ctrl_word += std::to_string(kd_min);

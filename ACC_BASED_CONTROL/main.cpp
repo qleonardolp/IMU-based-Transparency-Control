@@ -520,9 +520,10 @@ int main(int argc, char** argv)
             break;
           case 's':
             xsens2Eposcan.GainScan_Velocity();
-			break;
-		  case 'a':
-			  xsens2Eposcan.GainScan_Admittance();
+			      break;
+		      case 'a':
+          case 'u':
+			      xsens2Eposcan.GainScan_Admittance();
             break;
           default:
             break;
@@ -545,6 +546,7 @@ int main(int argc, char** argv)
             xsens2Eposcan.UpdateCtrlWord_Velocity();
             break;
 		      case 'a':
+          case 'u':
 			      xsens2Eposcan.UpdateCtrlWord_Admittance();
 			      break;
           default:
