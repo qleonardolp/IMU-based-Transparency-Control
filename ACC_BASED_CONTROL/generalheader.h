@@ -1,7 +1,7 @@
 #ifndef GENERAL_HEADER_H
 #define GENERAL_HEADER_H
 
-#define		  SAMPLE_TIME		  0.0083333		    // Tempo de Amostragem [s]
+#define		  SAMPLE_TIME		  0.001		    // Tempo de Amostragem [s]
 
 // ENDEREÇAMENTO DA BASE DE DADOS CAN
 

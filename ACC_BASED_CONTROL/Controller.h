@@ -33,6 +33,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <math.h>
 #include <atomic>
 #include <thread>
+#include <chrono>
 #include <condition_variable>
 
 #include <Eigen/LU>
@@ -104,340 +105,352 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 class accBasedControl
 {
 public:
-	// constructor
-	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds)
-	{
+  // constructor
+  accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds)
+  {
+    m_epos = epos;
+    m_eixo_in = eixo_in;
+    m_eixo_out = eixo_out;
+    ctrl_mode = control_mode;
 
-		m_epos = epos;
-		m_eixo_in = eixo_in;
-		m_eixo_out = eixo_out;
-		ctrl_mode = control_mode;
+    pos0_out = -m_eixo_out->PDOgetActualPosition();
+    pos0_in = m_eixo_in->PDOgetActualPosition();
 
-		pos0_out = -m_eixo_out->PDOgetActualPosition();
-		pos0_in = m_eixo_in->PDOgetActualPosition();
-
-		switch (control_mode)
-		{
-		case 'c':
-		case 'k':
-		case 'u':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff, CurrentControlKF, CACurrent
-			break;
-		case 's':
-		case 'a':
-			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl or CAdmittanceControl
-			break;
-		default:
-			break;
-		}
-
-		// Current Control
-		K_ff = K_FF;	Kp_A = KP_A;	Ki_A = KI_A;	Kp_F = KP_F;	Kd_F = KD_F;
-		Amplifier = 100000; // initialized with a safe value
-
-		// Speed Control
-		Kff_V = 53.000;	Kp_V = 24.80;
-		Ki_V = 0.450;	Kd_V = 0.000;
-
-		vel_motor = 0;
-		vel_motor_filt = 0;
-
-		// Admittance Control
-		Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
-		vel_adm = 0;	vel_adm_last = 0;	torque_ref = 0;
-		IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
-		kd_max = STIFFNESS;
-		kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
-
-		vel_hum = 0;		vel_exo = 0;
-		vel_hum_last = 0;	vel_exo_last = 0;
-		setpoint = 0;		setpoint_filt = 0;
-		accbased_comp = 0;	torque_sea = 0;
-		d_accbased_comp = 0; d_torque_sea = 0;
-
-		theta_m = 0;
-
-		IntegratorHum = 0;
-		IntegratorExo = 0;
-		IntAccMotor = 0;
-		IntAccHum = 0;
-		IntAccExo = 0;
-		diffCutoff = CUTOFF;
-
-		for (size_t i = 0; i < SGVECT_SIZE; ++i)
-		{
-			velhumVec[i] = 0;
-			velexoVec[i] = 0;
-			theta_l_vec[i] = 0;
-			theta_c_vec[i] = 0;
-			torqueSeaVec[i] = 0;
-			torqueAccVec[i] = 0;
-		}
-
-		if (seconds != 0)
-		{
-			logging = true;
-
-			time_t rawtime;
-			struct tm* timeinfo;
-			time(&rawtime);
-			timeinfo = localtime(&rawtime);
-
-			strftime(logger_filename, 40, "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-			logger = fopen(logger_filename, "wt");
-			if (logger != NULL)
-			{
-				// printing the header into the file first line
-				if (control_mode == 'c' || control_mode == 'k')
-				{
-					fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]\n");
-				}
-				if (control_mode == 's')
-				{
-					fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
-				}
-				if (control_mode == 'a')
-				{
-					fprintf(logger, "vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
-				}
-				fclose(logger);
-			}
-		}
-		else
-		{
-			logging = false;
-		}
-
-    save = false;
-
-		//		KALMAN FILTER SETUP		//
-
-		Amp_kf = 1;
-
-		x_k.setZero();
-		z_k.setZero();
-
-		KG.setZero();
-
-		Fk.setZero();
-		Fk(0, 0) = 1;	Fk(0, 1) = DELTA_T;
-		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
-		Fk(2, 2) = 1;	Fk(2, 3) = DELTA_T;
-		Fk(3, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
-		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
-		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
-
-		Bk.setZero();
-		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
-		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
-
-		// How to define my uncertainties ?	//
-		Pk.setZero();
-		Pk(0, 0) = 0.00002; Pk(1, 1) = 0.010; Pk(2, 2) = 0.00002; Pk(3, 3) = 0.010; Pk(4, 4) = 0.050;
-
-		Qk.setZero();
-		Qk(0, 0) = 0.01; Qk(1, 1) = 0.0001; Qk(2, 2) = 0.01; Qk(3, 3) = 0.0001; Qk(4, 4) = 0.01;
-
-		//Qk(4, 4) = 0.010; // mechanical slack in the knee joint
-
-		//	----------------------------	//
-
-		Hk.setZero();
-		Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
-		Rk.setZero();
-		Rk(0, 0) = 0.00002;	Rk(1, 1) = 0.00002;	Rk(2, 2) = 0.107;	// sensors noise covariances
-
-	}
-
-	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
-	void savitskygolay(float window[], float newest_value, float* first_derivative);
-
-	// numdiff, controlling through the EPOS current control
-	void FiniteDiff(float velHum, float velExo);
-
-	// Controlling through the EPOS motor speed control
-	void OmegaControl(float velHum, float velExo);
-
-	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControl(float velHum, float velExo){};
-	void CAdmittanceControl(float velHum);
-	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);   // threading
-
-
-	// Controlling through the EPOS current control using Kalman Filter
-	void CurrentControlKF(float velHum, float velExo);
-
-	void GainScan_Current();
-
-	void GainScan_CurrentKF();
-
-	void GainScan_Velocity();
-
-	void GainScan_Admittance();
-
-	void Recorder_Current();
-
-	void Recorder_Velocity();
-
-	void Recorder_Admittance();
-
-	void UpdateCtrlWord_Current();
-
-	void UpdateCtrlWord_CurrentKF();
-
-	void UpdateCtrlWord_Velocity();
-
-	void UpdateCtrlWord_Admittance();
-
-	void StopLogging(){ logging = false; }
-
-	// destructor
-	~accBasedControl()
-	{
-		switch (ctrl_mode)
-		{
-		case 'c':
-		case 'k':
+    switch (control_mode)
+    {
+    case 'c':
+    case 'k':
     case 'u':
-			m_eixo_in->PDOsetCurrentSetpoint(0);
-			m_eixo_in->WritePDO01();
-			break;
-		case 's':
-		case 'a':
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-			m_eixo_in->WritePDO02();
-			break;
-		default:
-			break;
-		}
-	}
+      m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff, CurrentControlKF, CACurrent
+      break;
+    case 's':
+    case 'a':
+      m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl or CAdmittanceControl
+      break;
+    default:
+      break;
+    }
 
-	std::string ctrl_word;
-	static std::atomic<bool> Run;
-	bool save;
+    // Current Control
+    K_ff = K_FF;	Kp_A = KP_A;	Ki_A = KI_A;	Kp_F = KP_F;	Kd_F = KD_F;
+    Amplifier = 100000; // initialized with a safe value
+
+    // Speed Control
+    Kff_V = 53.000;	Kp_V = 24.80;
+    Ki_V = 0.450;	Kd_V = 0.000;
+
+
+    /*
+    vel_motor = 0;
+    vel_motor_filt = 0;
+
+    // Admittance Control
+    Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
+    vel_adm = 0;	vel_adm_last = 0;	torque_ref = 0;
+    IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
+    kd_max = STIFFNESS;
+    kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
+
+    vel_hum = 0;		vel_exo = 0;
+    vel_hum_last = 0;	vel_exo_last = 0;
+    setpoint = 0;		setpoint_filt = 0;
+    accbased_comp = 0;	torque_sea = 0;
+    d_accbased_comp = 0; d_torque_sea = 0;
+
+    theta_m = 0;
+
+    IntegratorHum = 0;
+    IntegratorExo = 0;
+    IntAccMotor = 0;
+    IntAccHum = 0;
+    IntAccExo = 0;
+    diffCutoff = CUTOFF;
+
+    for (size_t i = 0; i < SGVECT_SIZE; ++i)
+    {
+    velhumVec[i] = 0;
+    velexoVec[i] = 0;
+    theta_l_vec[i] = 0;
+    theta_c_vec[i] = 0;
+    torqueSeaVec[i] = 0;
+    torqueAccVec[i] = 0;
+    }
+    */
+
+    if (seconds != 0)
+    {
+      logging = true;
+
+      time_t rawtime;
+      struct tm* timeinfo;
+      time(&rawtime);
+      timeinfo = localtime(&rawtime);
+
+      strftime(logger_filename, 40, "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
+      logger = fopen(logger_filename, "wt");
+      if (logger != NULL)
+      {
+        // printing the header into the file first line
+        if (control_mode == 'c' || control_mode == 'k')
+        {
+          fprintf(logger, "SetPt[mA]  I_m[mA] theta_l[deg]  theta_c[deg]  T_acc[N.m]  acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_motor[rad/s]\n");
+        }
+        else if (control_mode == 's')
+        {
+          fprintf(logger, "acc_hum[rad/s2]  acc_exo[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  exo_Vel[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
+        }
+        else if (control_mode == 'a')
+        {
+          fprintf(logger, "vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
+        }
+        else if (control_mode == 'u')
+        {
+          fprintf(logger, "vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
+        }
+        fclose(logger);
+      }
+    }
+    else
+    {
+      logging = false;
+    }
+
+    //		KALMAN FILTER SETUP		//
+
+    Amp_kf = 1;
+
+    x_k.setZero();
+    z_k.setZero();
+
+    KG.setZero();
+
+    Fk.setZero();
+    Fk(0, 0) = 1;	Fk(0, 1) = DELTA_T;
+    Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
+    Fk(2, 2) = 1;	Fk(2, 3) = DELTA_T;
+    Fk(3, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
+    Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
+    Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
+
+    Bk.setZero();
+    Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
+    Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
+
+    // How to define my uncertainties ?	//
+    Pk.setZero();
+    Pk(0, 0) = 0.00002; Pk(1, 1) = 0.010; Pk(2, 2) = 0.00002; Pk(3, 3) = 0.010; Pk(4, 4) = 0.050;
+
+    Qk.setZero();
+    Qk(0, 0) = 0.01; Qk(1, 1) = 0.0001; Qk(2, 2) = 0.01; Qk(3, 3) = 0.0001; Qk(4, 4) = 0.01;
+
+    //Qk(4, 4) = 0.010; // mechanical slack in the knee joint
+
+    //	----------------------------	//
+    Hk.setZero();
+    Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
+    Rk.setZero();
+    Rk(0, 0) = 0.00002;	Rk(1, 1) = 0.00002;	Rk(2, 2) = 0.107;	// sensors noise covariances
+
+  }
+
+  // Savitsky-Golay Smoothing and First Derivative based on the last 11 points
+  void savitskygolay(float window[], float newest_value, float* first_derivative);
+
+  // numdiff, controlling through the EPOS current control
+  void FiniteDiff(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m);
+
+  // Controlling through the EPOS motor speed control
+  void OmegaControl(float &velHum, float &velExo,  std::condition_variable &cv, std::mutex &m);
+
+  // Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
+  void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m);
+
+  // Collocated Admittance Controller using q and tau_e and tau_m
+  void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
+
+  // Controlling through the EPOS current control using Kalman Filter
+  void CurrentControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m);
+
+  void GainScan_Current();
+
+  void GainScan_CurrentKF();
+
+  void GainScan_Velocity();
+
+  void GainScan_CAC();
+
+  void GainScan_CACu();
+
+  void Recorder_Current();
+
+  void Recorder_Velocity();
+
+  void Recorder_CAC();
+
+  void Recorder_CACu();
+
+  void UpdateCtrlWord_Current();
+
+  void UpdateCtrlWord_CurrentKF();
+
+  void UpdateCtrlWord_Velocity();
+
+  void UpdateCtrlWord_Admittance();
+
+  void StopLogging(){ logging = false; }
+
+  void StopCtrlThread(){ Run = false; }
+
+  // destructor
+  ~accBasedControl()
+  {
+    switch (ctrl_mode)
+    {
+    case 'c':
+    case 'k':
+    case 'u':
+      m_eixo_in->PDOsetCurrentSetpoint(0);
+      m_eixo_in->WritePDO01();
+      break;
+    case 's':
+    case 'a':
+      m_eixo_in->PDOsetVelocitySetpoint(0);
+      m_eixo_in->WritePDO02();
+      break;
+    default:
+      break;
+    }
+  }
+
+  std::string ctrl_word;
 
 private:
 
-	EPOS_NETWORK* m_epos;
-	AXIS* m_eixo_in;
-	AXIS* m_eixo_out;
-	char ctrl_mode;
+  static EPOS_NETWORK* m_epos;
+  static AXIS* m_eixo_in;
+  static AXIS* m_eixo_out;
+  char ctrl_mode;
 
-	FILE* logger;
-	char logger_filename[40];
-	bool logging;
+  FILE* logger;
+  char logger_filename[40];
+  bool logging;
 
-	FILE* gains_values;
+  FILE* gains_values;
 
-	int pos0_out;
-	int pos0_in;
+  static int pos0_out;
+  static int pos0_in;
 
-	//		GAINS		//
-	// Current Control
-	int Amplifier;
-	float K_ff;
-	float Kp_A;
-	float Ki_A;
-	float Kp_F;
-	float Kd_F;
+  static std::atomic<bool> Run;
 
-	// Speed Control
-	float Kff_V;        // [dimensionless]
-	float Kp_V;         // [dimensionless]
-	float Ki_V;         // [1/s]
-	float Kd_V;         // [s]
+  static float control_t_Dt;
+  static std::chrono::system_clock::time_point control_t_begin;
 
-	// |-> Admittance Control <---
-	// |
-	// |- Inner Control:
-	float Ki_adm;		// in the reference is the P [N.m s/rad]
-	float Kp_adm;       // in the reference is the D [N.m/rad]
-	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
-	float IntInnerC;	// Integrator of the input in Cv(s)
-	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
-	int   resetInt;
-	// |- Admittance Control:
-	float torque_ref;	// Reference Torque for A(s). Compensate the lower leg exo mass and dynamics
-	float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)
-	float IntAdm_In;	// A(s) Input integrator
-	float stiffness_d;  // k_d	  [N.m/rad]
-	float damping_A;    // d_{dm} [N.m s/rad]
-	float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
-	float vel_adm_last;	// [rad/s]
-	float kd_min; float kd_max;
-	// |-------------------------
+  //		GAINS		//
+  // Current Control
+  int Amplifier;
+  float K_ff;
+  float Kp_A;
+  float Ki_A;
+  float Kp_F;
+  float Kd_F;
 
+  // Speed Control
+  float Kff_V;        // [dimensionless]
+  float Kp_V;         // [dimensionless]
+  float Ki_V;         // [1/s]
+  float Kd_V;         // [s]
 
-	//	 STATE VARIABLES	//
-
-	float acc_hum;			// [rad/s^2]
-	float acc_exo;			// [rad/s^2]
-	static float vel_hum;			// [rad/s]
-	float vel_exo;			// [rad/s]
-	float jerk_hum;			// [rad/s^3]
-	float jerk_exo;			// [rad/s^3]
-
-	float theta_l;			// [rad]
-	float theta_c;			// [rad]
-
-	//		STATE MEMORY VECTORS        //
-
-	float velhumVec[SGVECT_SIZE];		// [rad/s]
-	float velexoVec[SGVECT_SIZE];		// [rad/s]
-	float torqueSeaVec[SGVECT_SIZE];	// [N.m]
-	float torqueAccVec[SGVECT_SIZE];	// [N.m]
-	float theta_l_vec[SGVECT_SIZE];		// [rad]
-	float theta_c_vec[SGVECT_SIZE];		// [rad]
+  // |-> Admittance Control <---
+  // |
+  // |- Inner Control:
+  static float Ki_adm;		// in the reference is the P [N.m s/rad]
+  static float Kp_adm;       // in the reference is the D [N.m/rad]
+  static float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
+  static float IntInnerC;	// Integrator of the input in Cv(s)
+  static float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
+  static int   resetInt;
+  // |- Admittance Control:
+  static float torque_ref;	// Reference Torque for A(s). Compensate the lower leg exo mass and dynamics
+  static float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)
+  static float IntAdm_In;	// A(s) Input integrator
+  static float stiffness_d;  // k_d	  [N.m/rad]
+  static float damping_A;    // d_{dm} [N.m s/rad]
+  static float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
+  static float vel_adm_last;	// [rad/s]
+  static float kd_min; 
+  static float kd_max;
+  // |-------------------------
 
 
-	float setpoint;			// [mA]
-	float setpoint_filt;	// [mA]
+  //	 STATE VARIABLES	//
+
+  static float acc_hum;			// [rad/s^2]
+  static float acc_exo;			// [rad/s^2]
+  static float vel_hum;			// [rad/s]
+  static float vel_exo;			// [rad/s]
+  static float jerk_hum;		// [rad/s^3]
+  static float jerk_exo;		// [rad/s^3]
+
+  static float theta_l;			// [rad]
+  static float theta_c;			// [rad]
+
+  //		STATE MEMORY VECTORS        //
+
+  float velhumVec[SGVECT_SIZE];		// [rad/s]
+  float velexoVec[SGVECT_SIZE];		// [rad/s]
+  float torqueSeaVec[SGVECT_SIZE];	// [N.m]
+  float torqueAccVec[SGVECT_SIZE];	// [N.m]
+  float theta_l_vec[SGVECT_SIZE];		// [rad]
+  float theta_c_vec[SGVECT_SIZE];		// [rad]
 
 
-	float torque_sea;		// [N.m]
-	float d_torque_sea;		// [N.m/s]
-	float accbased_comp;	// [N.m]
-	float d_accbased_comp;	// [N.m/s]
-	float grav_comp;		// [N.m]
+  static float setpoint;			// [A]
+  static float setpoint_filt;	// [A]
 
-	float vel_leg;			// [rpm]
-	float acc_motor;		// [rad/s^2]
-	float vel_motor;		// [rad/s]
-	float vel_motor_filt;
-	float voltage;			// [V]
 
-	float theta_m;			// [encoder pulses]
+  static float torque_sea;		// [N.m]
+  static float d_torque_sea;		// [N.m/s]
+  float accbased_comp;	// [N.m]
+  float d_accbased_comp;	// [N.m/s]
+  float grav_comp;		// [N.m]
 
-	int actualCurrent;		// [mA]
-	int actualVelocity;		// [rpm]
-	int exoVelocity;		// [rpm]
+  float vel_leg;			// [rpm]
+  float acc_motor;		// [rad/s^2]
+  static float vel_motor;		// [rad/s]
+  static float vel_motor_filt;
+  float voltage;			// [V]
 
-	float diffCutoff;
-	float IntegratorHum;
-	float IntegratorExo;
-	float IntAccMotor;
-	float IntAccHum;
-	float IntAccExo;
+  float theta_m;			// [encoder pulses]
 
-	static float vel_hum_last;
-	float vel_exo_last;
+  static int actualCurrent;		// [mA]
+  int actualVelocity;		// [rpm]
+  int exoVelocity;		// [rpm]
 
-	//		KALMAN FILTER		//
+  static float diffCutoff;
+  static float IntegratorHum;
+  static float IntegratorExo;
+  static float IntAccMotor;
+  static float IntAccHum;
+  static float IntAccExo;
 
-	Eigen::Matrix<float, STATE_DIM, 1> x_k;					// State Vector
-	Eigen::Matrix<float, SENSOR_DIM, 1> z_k;				// Sensor reading Vector
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Pk;			// State Covariance Matrix
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Fk;			// Prediction Matrix
-	Eigen::Matrix<float, STATE_DIM, 1> Bk;					// Control Matrix* (is a vector but called matrix)
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Qk;			// Process noise Covariance
-	Eigen::Matrix<float, SENSOR_DIM, SENSOR_DIM> Rk;		// Sensor noise Covariance
-	Eigen::Matrix<float, SENSOR_DIM, STATE_DIM> Hk;			// Sensor Expectations Matrix
-	Eigen::Matrix<float, STATE_DIM, SENSOR_DIM> KG;			// Kalman Gain Matrix
+  static float vel_hum_last;
+  float vel_exo_last;
 
-	float Amp_kf;
+  //		KALMAN FILTER		//
 
-	std::string kf_error;
+  Eigen::Matrix<float, STATE_DIM, 1> x_k;					// State Vector
+  Eigen::Matrix<float, SENSOR_DIM, 1> z_k;				// Sensor reading Vector
+  Eigen::Matrix<float, STATE_DIM, STATE_DIM> Pk;			// State Covariance Matrix
+  Eigen::Matrix<float, STATE_DIM, STATE_DIM> Fk;			// Prediction Matrix
+  Eigen::Matrix<float, STATE_DIM, 1> Bk;					// Control Matrix* (is a vector but called matrix)
+  Eigen::Matrix<float, STATE_DIM, STATE_DIM> Qk;			// Process noise Covariance
+  Eigen::Matrix<float, SENSOR_DIM, SENSOR_DIM> Rk;		// Sensor noise Covariance
+  Eigen::Matrix<float, SENSOR_DIM, STATE_DIM> Hk;			// Sensor Expectations Matrix
+  Eigen::Matrix<float, STATE_DIM, SENSOR_DIM> KG;			// Kalman Gain Matrix
+
+  float Amp_kf;
+
+  std::string kf_error;
 
 };
 
