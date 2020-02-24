@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////
 // Leonardo Felipe Lima Santos dos Santos, 2019     ///
 // leonardo.felipe.santos@usp.br	_____ ___  ___   //
-// github/bitbucket qleonardolp		| |  | \ \/   \  //
+// github/bitbucket qleonardolp		| |  | . \/   \  //
 ////////////////////////////////	| |   \ \   |_|  //
 ////////////////////////////////	\_'_/\_`_/__|    //
 ///////////////////////////////////////////////////////
@@ -27,6 +27,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include "Controller.h"
 
 using namespace Eigen;
+
+float accBasedControl::vel_hum = 0;
+float accBasedControl::vel_hum_last = 0;
+
+std::atomic<bool> accBasedControl::Run = true;
 
 // Control Functions //
 
@@ -168,10 +173,10 @@ void accBasedControl::OmegaControl(float velHum, float velExo)
 
 void accBasedControl::CAdmittanceControl(float velHum)
 {
-  resetInt++;
-  m_epos->sync();	// CAN Synchronization
+	resetInt++;	// counter to periodically reset the Inner Loop Integrator 
+	m_epos->sync();	// CAN Synchronization
 
-  vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
+	vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
 	vel_hum_last = velHum;
 
 	// SEA Torque:
@@ -239,71 +244,76 @@ void accBasedControl::CAdmittanceControl(float velHum)
 	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 	if (logging)
-    save = true;
-		//Recorder_Admittance();
+		Recorder_Admittance();
 }
 
-void accBasedControl::CACurrent()
+void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m)
 {
-  resetInt++;
-	m_epos->sync();	// CAN Synchronization
-
-  vel_hum = HPF_SMF*vel_hum + HPF_SMF*(cacu_input - vel_hum_last);	// HPF on gyro
-  vel_hum_last = cacu_input;
-
-	// SEA Torque:
-	m_eixo_out->ReadPDO01();
-	theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-	m_eixo_in->ReadPDO01();
-	theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
-	d_torque_sea = 13 * (torque_sea - IntAdm_In);
-	IntAdm_In += d_torque_sea*DELTA_T;
-
-	// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
-	// Here, the reference torque is the torque required to sustain the Exo lower leg mass
-	vel_adm = damping_A / (damping_A + stiffness_d*DELTA_T) * vel_adm +
-		(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / DELTA_T) * (-d_torque_sea);
-	vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
-	vel_adm_last = vel_adm;
-
-	m_eixo_in->ReadPDO02();
-	vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-
-	// Integration for the Inner Control (PI)
-	IntInnerC += (vel_hum + vel_adm - vel_motor)*DELTA_T;
-	// Integration reset:
-  if (resetInt == 400)
-  {
-    IntInnerC = (vel_hum + vel_adm - vel_motor)*DELTA_T;
-    resetInt = 0;
-  }
-	// Inner Control Loop (PI):
-	torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
-
-	setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
-	setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
-
-	if (abs(setpoint_filt) < CURRENT_MAX)
+	while (Run.load())
 	{
-		if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
-			m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
+		std::unique_lock<std::mutex> Lk(m);
+		cv.notify_one();
+
+		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
+		m_epos->sync();	// CAN Synchronization
+
+		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
+		vel_hum_last = velHum;
+
+		// SEA Torque:
+		m_eixo_out->ReadPDO01();
+		theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();
+		theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
+		d_torque_sea = 13 * (torque_sea - IntAdm_In);
+		IntAdm_In += d_torque_sea*DELTA_T;
+
+		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
+		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
+		vel_adm = damping_A / (damping_A + stiffness_d*DELTA_T) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / DELTA_T) * (-d_torque_sea);
+		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
+		vel_adm_last = vel_adm;
+
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		// Integration for the Inner Control (PI)
+		IntInnerC += (vel_hum + vel_adm - vel_motor)*DELTA_T;
+		// Integration reset:
+		if (resetInt == 400)
+		{
+			IntInnerC = (vel_hum + vel_adm - vel_motor)*DELTA_T;
+			resetInt = 0;
+		}
+		// Inner Control Loop (PI):
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+
+		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
+
+		if (abs(setpoint_filt) < CURRENT_MAX)
+		{
+			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
+				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
+			else
+				m_eixo_in->PDOsetCurrentSetpoint(0);
+		}
 		else
-			m_eixo_in->PDOsetCurrentSetpoint(0);
-	}
-	else
-	{
-		if (setpoint_filt < 0)
-			m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
-		m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
-	}
-	m_eixo_in->WritePDO01();
+		{
+			if (setpoint_filt < 0)
+				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
+			m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
+		}
+		m_eixo_in->WritePDO01();
 
-	m_eixo_in->ReadPDO01();
-	actualCurrent = m_eixo_in->PDOgetActualCurrent();
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-	//if (logging)
-		//Recorder_Admittance();
+		if (logging)
+			Recorder_Admittance();
+	}
 }
 
 void accBasedControl::CurrentControlKF(float velHum, float velExo)
@@ -527,7 +537,7 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 {
 	char numbers_str[20];
 	ctrl_word = " COLLOCATED ADMITTANCE CONTROLLER\n";
-	sprintf(numbers_str, "%+5.3f", vel_motor);
+	sprintf(numbers_str, "%+5.3f", vel_hum); // test with vel_hum
 	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
 	sprintf(numbers_str, "%+4d", actualVelocity);
 	ctrl_word += " [" + (std::string) numbers_str + " rpm	";
@@ -579,17 +589,14 @@ void accBasedControl::Recorder_Velocity()
 
 void accBasedControl::Recorder_Admittance()
 {
-  if (logging && save){
-    logger = fopen(logger_filename, "a");
-	  if (logger != NULL)
-	  {
-		  fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-			  vel_hum, vel_exo, vel_adm, RPM2RADS*vel_motor, RPM2RADS*actualVelocity, torque_sea);
-		  // everything logged in standard units (SI)
-		  fclose(logger);
-	  }
-    save = false;
-  }
+	logger = fopen(logger_filename, "a");
+	if (logger != NULL)
+	{
+		fprintf(logger, "%5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",
+		vel_hum, vel_exo, vel_adm, RPM2RADS*vel_motor, RPM2RADS*actualVelocity, torque_sea);
+		// everything logged in standard units (SI)
+		fclose(logger);
+	}
 }
 
 void accBasedControl::savitskygolay(float window[], float newest_value, float* first_derivative)

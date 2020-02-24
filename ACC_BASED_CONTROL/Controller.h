@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////
 // Leonardo Felipe Lima Santos dos Santos, 2019     ///
 // leonardo.felipe.santos@usp.br	_____ ___  ___   //
-// github/bitbucket qleonardolp		| |  | \ \/   \  //
+// github/bitbucket qleonardolp		| |  | . \/   \  //
 ////////////////////////////////	| |   \ \   |_|  //
 ////////////////////////////////	\_'_/\_`_/__|    //
 ///////////////////////////////////////////////////////
@@ -31,7 +31,9 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <atomic>
 #include <thread>
+#include <condition_variable>
 
 #include <Eigen/LU>
 #include <Eigen/Core>
@@ -143,10 +145,9 @@ public:
 		// Admittance Control
 		Ki_adm = 0;	Kp_adm = 0;	stiffness_d = STIFFNESS / 2;	damping_A = 0.001;
 		vel_adm = 0;	vel_adm_last = 0;	torque_ref = 0;
-    IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
+		IntAdm_In = 0;	IntInnerC = 0;	 IntTorqueM = 0; resetInt = 0;
 		kd_max = STIFFNESS;
 		kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
-    cacu_input = 0;
 
 		vel_hum = 0;		vel_exo = 0;
 		vel_hum_last = 0;	vel_exo_last = 0;
@@ -261,8 +262,7 @@ public:
 	void CAdmittanceControl(float velHum, float velExo){};
 	void CAdmittanceControl(float velHum);
 	// Collocated Admittance Controller using q and tau_e and tau_m
-  //void CACurrent(float velHum){};
-  void CACurrent();   // threading
+	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);   // threading
 
 
 	// Controlling through the EPOS current control using Kalman Filter
@@ -292,8 +292,6 @@ public:
 
 	void StopLogging(){ logging = false; }
 
-  void setCACurrent(float velHum){ cacu_input = velHum; }
-
 	// destructor
 	~accBasedControl()
 	{
@@ -316,7 +314,8 @@ public:
 	}
 
 	std::string ctrl_word;
-  bool save;
+	static std::atomic<bool> Run;
+	bool save;
 
 private:
 
@@ -349,7 +348,7 @@ private:
 	float Ki_V;         // [1/s]
 	float Kd_V;         // [s]
 
-	// |-> Admittance Control <--
+	// |-> Admittance Control <---
 	// |
 	// |- Inner Control:
 	float Ki_adm;		// in the reference is the P [N.m s/rad]
@@ -357,7 +356,7 @@ private:
 	float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
 	float IntInnerC;	// Integrator of the input in Cv(s)
 	float IntTorqueM;   // Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
-  int   resetInt;
+	int   resetInt;
 	// |- Admittance Control:
 	float torque_ref;	// Reference Torque for A(s). Compensate the lower leg exo mass and dynamics
 	float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)
@@ -367,8 +366,6 @@ private:
 	float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
 	float vel_adm_last;	// [rad/s]
 	float kd_min; float kd_max;
-
-  float cacu_input;
 	// |-------------------------
 
 
@@ -376,7 +373,7 @@ private:
 
 	float acc_hum;			// [rad/s^2]
 	float acc_exo;			// [rad/s^2]
-	float vel_hum;			// [rad/s]
+	static float vel_hum;			// [rad/s]
 	float vel_exo;			// [rad/s]
 	float jerk_hum;			// [rad/s^3]
 	float jerk_exo;			// [rad/s^3]
@@ -423,7 +420,7 @@ private:
 	float IntAccHum;
 	float IntAccExo;
 
-	float vel_hum_last;
+	static float vel_hum_last;
 	float vel_exo_last;
 
 	//		KALMAN FILTER		//
