@@ -1,15 +1,15 @@
 #ifndef GENERAL_HEADER_H
 #define GENERAL_HEADER_H
 
-#define		  SAMPLE_TIME		  0.001		    // Tempo de Amostragem [s]
+#define		SAMPLE_TIME		0.0010f		// Tempo de Amostragem [s]
 
 // ENDEREÇAMENTO DA BASE DE DADOS CAN
 
-char* CAN_INTERFACE =		"CAN1";
-char* CAN_DATABASE =	"database";
-char* CAN_CLUSTER =		  "NETCAN";
-char* NET_ID_SERVO_01 =		   "1";
-char* NET_ID_SERVO_02 =		   "2";
+char* CAN_INTERFACE = "CAN1";
+char* CAN_DATABASE = "database";
+char* CAN_CLUSTER = "NETCAN";
+char* NET_ID_SERVO_01 = "1";
+char* NET_ID_SERVO_02 = "2";
 
 //INICIALIZANDO O QUERY PERFORMANCE PARA CONTROLE DOS CICLOS DE 8.333 MS
 
@@ -18,7 +18,7 @@ long long int ticksSampleTime, final_time;
 
 //INICIALIZAÇÃO DA REDE CAN
 
-EPOS_NETWORK  epos (CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
+EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
 
 //INICIALIZAÇÃO DAS EPOS
 

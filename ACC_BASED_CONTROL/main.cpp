@@ -325,23 +325,16 @@ int main(int argc, char** argv)
     }
 
     char control_mode;
-    bool proper_ctrl_mode = false;
     int log_time;
 
-    printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] Adimittance\n[u] CACu\n");
+    printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] CAC\n[u] CACu\n");
     scanf("%c", &control_mode);
-    while(!proper_ctrl_mode)
-    {
-      if (control_mode == 'c' || control_mode == 's' || control_mode == 'k' || control_mode == 'a' || control_mode == 'u')
-      {
-        proper_ctrl_mode = true;
-      }
-      else
-      {
-        printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]  [u]\n");
-        scanf("%c", &control_mode);
-      }
-    }
+	while (control_mode != 'c' && control_mode != 's' && 
+		   control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
+	{
+		printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]  [u]\n");
+		scanf("%c", &control_mode);
+	}
 
     printf("How long (sec) do you want to record this run? Zero (0) to do not record: ");
     scanf("%d", &log_time);
@@ -398,7 +391,7 @@ int main(int argc, char** argv)
       }
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(6));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 
     std::vector<XsVector> accData(mtwCallbacks.size());
     std::vector<XsVector> gyroData(mtwCallbacks.size());
@@ -416,7 +409,7 @@ int main(int argc, char** argv)
 
     Habilita_Eixo(2);
 
-    // Função de Controle (loop MTw + Controle) ...
+    // Loop MTw + Controle EPOS:
     epos.sync();
     eixo_out.ReadPDO01();
     eixo_in.ReadPDO01();
@@ -430,6 +423,7 @@ int main(int argc, char** argv)
     int record_count = log_time * RATE;
 
     std::chrono::system_clock::time_point mtw_data_stamp;
+	std::chrono::system_clock::time_point log_begin;
     clock_t beginning = 0;
     clock_t loop_duration;
     float freq;
@@ -440,31 +434,21 @@ int main(int argc, char** argv)
     std::condition_variable Cv;
     std::mutex Mtx;
 
-    if (control_mode == 'c')
-    {
-      controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, 
-                                 std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    }
+		 if(control_mode == 'c')
+      controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
-    {
-      controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, 
-                                 std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    }
+      controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 's')
-    {
-      controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan,
-                                 std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    }
+		controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'a')
-    {
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, 
-                                 std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    }
+		controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
-    {
-      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, 
-                                 std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    }
+      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+
+	std::unique_lock<std::mutex> Lck(Mtx);
+	Cv.notify_one();
+	Cv.wait(Lck);
+	log_begin = std::chrono::steady_clock::now();
 
     while (!_kbhit())
     {		
@@ -495,26 +479,23 @@ int main(int argc, char** argv)
         Cv.notify_one();
         Cv.wait(Lck);
 
+		auto control_stamp = std::chrono::steady_clock::now();
+		delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+
         printer++;
         scan_file++;
-        if (record_count > 0)
-        {
-          record_count--;
-        }
-
-        auto control_stamp = std::chrono::steady_clock::now();
-        delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+        //if (record_count > 0) record_count--;
 
         loop_duration = clock() - beginning;
         beginning = clock();
         freq = (float)CLOCKS_PER_SEC / loop_duration;
       }
 
-      if (record_count == 0)
-      {
+	  /*
+      if (record_count == 0){
         xsens2Eposcan.StopLogging();
         record_count--;	// let record_count == -1 just to avoid this IF from now on
-      }
+      }*/
 
       if (scan_file == (int)RATE * 6)  // every 6s reads the gains_values.txt 
       {
@@ -555,8 +536,7 @@ int main(int argc, char** argv)
         case 's':
           xsens2Eposcan.UpdateCtrlWord_Velocity();
           break;
-        case 'a':
-        case 'u':
+        case 'a': case 'u':
           xsens2Eposcan.UpdateCtrlWord_Admittance();
           break;
         default:
