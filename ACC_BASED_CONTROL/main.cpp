@@ -423,7 +423,7 @@ int main(int argc, char** argv)
     int record_count = log_time * RATE;
 
     std::chrono::system_clock::time_point mtw_data_stamp;
-	std::chrono::system_clock::time_point log_begin;
+	  std::chrono::system_clock::time_point log_begin;
     clock_t beginning = 0;
     clock_t loop_duration;
     float freq;
@@ -438,10 +438,11 @@ int main(int argc, char** argv)
       controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 's')
-		controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+    else if(control_mode == 's'){}
+		  //controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      // 'no overloaded function takes 7 arguments'
     else if(control_mode == 'a')
-		controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+		  controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 

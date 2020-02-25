@@ -174,9 +174,11 @@ void accBasedControl::OmegaControl(float &velHum, float &velExo, std::condition_
 		actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float) duration_cast<seconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
+    control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<seconds>(control_t_end - begin).count();
+		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+    timestamp = 1e-6*timestamp;
 		if (timestamp < m_seconds) Recorder_Velocity();
 	}
 }
@@ -266,9 +268,11 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float) duration_cast<seconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
+    control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<seconds>(control_t_end - begin).count();
+		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+    timestamp = 1e-6*timestamp;
 		if (timestamp < m_seconds) Recorder_CAC();
 	}
 }
@@ -346,9 +350,11 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float) duration_cast<seconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
+    control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float) duration_cast<seconds>(control_t_end - begin).count();
+		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+    timestamp = 1e-6*timestamp;
 		if (timestamp < m_seconds) Recorder_CACu();
 	}
 }
@@ -370,7 +376,7 @@ void accBasedControl::GainScan_CurrentKF()
 
 	if (gains_values != NULL)
 	{
-		fscanf(gains_values, "AMP %d\n", &Amp_kf);
+		//fscanf(gains_values, "AMP %d\n", &Amp_kf);
 		fclose(gains_values);
 	}
 }
@@ -454,11 +460,11 @@ void accBasedControl::UpdateCtrlWord_CurrentKF()
 	ctrl_word += " T_sea: " + (std::string) numbers_str + " N.m";
 	sprintf(numbers_str, "%+.3f", accbased_comp);
 	ctrl_word += " T_acc: " + (std::string) numbers_str + " N.m\n";
-	sprintf(numbers_str, "%.3f", Amp_kf);
-	ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
+	//sprintf(numbers_str, "%.3f", Amp_kf);
+	//ctrl_word += " Amplifier: " + (std::string) numbers_str + "\n";
 	sprintf(numbers_str, "%+5.3f", RADS2RPM*vel_motor);
 	ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm\n";
-	ctrl_word += " " + kf_error + "\n";
+	//ctrl_word += " " + kf_error + "\n";
 }
 
 
