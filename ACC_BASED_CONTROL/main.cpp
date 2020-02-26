@@ -423,7 +423,7 @@ int main(int argc, char** argv)
     int record_count = log_time * RATE;
 
     std::chrono::system_clock::time_point mtw_data_stamp;
-	  std::chrono::system_clock::time_point log_begin;
+	// std::chrono::system_clock::time_point log_begin;
     clock_t beginning = 0;
     clock_t loop_duration;
     float freq;
@@ -434,13 +434,22 @@ int main(int argc, char** argv)
     std::condition_variable Cv;
     std::mutex Mtx;
 
+	auto log_begin = std::chrono::steady_clock::now();
+
 		 if(control_mode == 'c')
       controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 's'){}
-		  //controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
-      // 'no overloaded function takes 7 arguments'
+    else if(control_mode == 's')
+		controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+	// 'no overloaded function takes 7 arguments'
+	/* (https://stackoverflow.com/questions/3496754/vc-says-no-overloaded-function-takes-7-arguments-i-say-yes-it-does)
+	So, you get an error when the 6-parameter constructor is being compiled when you've commented it out in the header - 
+	but is that the same source file that contains the calls to the constructor? Is it possible that a different header 
+	is being used for that compilation somehow (maybe precompiled header weirdness is involved).
+	Try using the /showIncludes option ("C++ | Advanced | Show includes" in the IDE's project settings) and/or turning off 
+	precompiled headers and see if you get any further clues or better behavior.
+	*/
     else if(control_mode == 'a')
 		  controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
@@ -449,6 +458,7 @@ int main(int argc, char** argv)
 	std::unique_lock<std::mutex> Lck(Mtx);
 	Cv.notify_one();
 	Cv.wait(Lck);
+
 	log_begin = std::chrono::steady_clock::now();
 
     while (!_kbhit())

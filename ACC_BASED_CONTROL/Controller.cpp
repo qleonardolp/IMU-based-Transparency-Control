@@ -522,7 +522,7 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 
 	ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n";
-	sprintf(numbers_str, "%.8f", control_t_Dt);
+	sprintf(numbers_str, "%3.6f", control_t_Dt);
 	ctrl_word += " Control Dt: " + (std::string) numbers_str + " sec\n";
 }
 
