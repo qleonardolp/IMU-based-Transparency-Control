@@ -327,7 +327,7 @@ int main(int argc, char** argv)
     char control_mode;
     int log_time;
 
-    printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CurrentKF\n[a] CAC\n[u] CACu\n");
+    printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CACuKF\n[a] CAC\n[u] CACu\n");
     scanf("%c", &control_mode);
 	while (control_mode != 'c' && control_mode != 's' && 
 		   control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
@@ -438,7 +438,7 @@ int main(int argc, char** argv)
 		 if(control_mode == 'c')
       controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
+      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 's'){}
 		//controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 	// 'no overloaded function takes 7 arguments'

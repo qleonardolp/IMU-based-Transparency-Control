@@ -102,6 +102,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		STATE_DIM		5
 #define		SENSOR_DIM		3
 
+using namespace Eigen;
+
 class accBasedControl
 {
 public:
@@ -173,6 +175,46 @@ public:
 		}
 
 		//		KALMAN FILTER SETUP		//
+		float Dt = 0.001f;
+
+		if (control_mode == 's'){}
+		else if (control_mode == 'k')
+		{	
+			CACu_xk.setZero();	CACu_zk.setZero(); CACu_KG.setZero();
+
+			CACu_Fk.setZero();
+			// Row 1
+			CACu_Fk(0, 0) = 1; 
+			// Row 2
+			CACu_Fk(1, 1) = damping_A / (damping_A + stiffness_d*Dt);
+			CACu_Fk(1, 6) = -(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / Dt);
+			// Row 3
+			CACu_Fk(2, 2) = 1;
+			// Row 4
+			CACu_Fk(3, 2) = Dt; CACu_Fk(3, 3) = 1;
+			// Row 5
+			CACu_Fk(4, 4) = 1;
+			// Row 6
+			CACu_Fk(5, 3) = STIFFNESS; CACu_Fk(5, 4) = -STIFFNESS; CACu_Fk(5, 6) = Dt;
+			// Row 7
+			CACu_Fk(6, 6) = 1;
+
+			CACu_Bk.setZero();
+			CACu_Bk(2, 0) = Dt; CACu_Bk(3, 0) = 0.500f*Dt*Dt;
+
+			CACu_Hk.setZero();
+			CACu_Hk(0, 0) = 1;	CACu_Hk(1, 2) = 1;	CACu_Hk(2, 3) = 1;	CACu_Hk(3, 4) = 1;
+
+			CACu_Pk.setZero();
+			CACu_Pk(0, 0) = 0.0002;	CACu_Pk(1, 1) = 0.0009;	CACu_Pk(2, 2) = 0.0004;	CACu_Pk(3, 3) = 0.0002;	
+			CACu_Pk(4, 4) = 0.0001;	CACu_Pk(5, 5) = STIFFNESS*0.0003; CACu_Pk(6, 6) = STIFFNESS*0.0010;
+
+			CACu_Qk.setIdentity();
+			CACu_Qk = 0.001*CACu_Qk;
+
+			CACu_Rk.setZero();
+			CACu_Rk(0, 0) = 0.002;	CACu_Rk(1, 1) = 0.005;	CACu_Rk(2, 2) = 0.001;	CACu_Rk(3, 3) = 0.001;
+		}
 		/*
 		Amp_kf = 1;
 		x_k.setZero(); z_k.setZero(); KG.setZero();
@@ -211,17 +253,20 @@ public:
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
+	// Controlling through the EPOS motor speed control assisted by Kalman Filter estimation
+	void OmegaControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
-	// Controlling through the EPOS current control using Kalman Filter (Deprecated)
-	void CurrentControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m){}
+	// Collocated Admittance Controller using q and tau_e and tau_m
+	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
-	void savitskygolay(float window[], float newest_value, float* first_derivative);
+	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
 
 	// GainScan are the methods to scan the file with the values to update the gains in runtime
 	void GainScan_Current();
@@ -380,5 +425,47 @@ private:
 	Eigen::Matrix<float, SENSOR_DIM, STATE_DIM> Hk;			// Sensor Expectations Matrix
 	Eigen::Matrix<float, STATE_DIM, SENSOR_DIM> KG;			// Kalman Gain Matrix
 	*/
+
+	//		OmegaControl KF				//
+
+	static Matrix<float, 9, 1> Ome_xk;	// State Vector				[vel_h acc_h jerk_h vel_e acc_e jerk_e vel_m theta_c theta_l]
+	static Matrix<float, 5, 1> Ome_zk;	// Sensor reading Vector	[vel_hum vel_exo vel_motor theta_c theta_l]
+	static Matrix<float, 9, 9> Ome_Pk;	// State Covariance Matrix
+	static Matrix<float, 9, 9> Ome_Fk;	// Prediction Matrix
+	static Matrix<float, 9, 1> Ome_Bk;	// Control Matrix (is a vector but called matrix)
+	static Matrix<float, 9, 9> Ome_Qk;	// Process noise Covariance
+	static Matrix<float, 5, 5> Ome_Rk;	// Sensor noise Covariance
+	static Matrix<float, 5, 9> Ome_Hk;	// Sensor Expectations Matrix
+	static Matrix<float, 9, 5> Ome_KG;	// Kalman Gain Matrix
+
+	//		CACu Kalman Filter			//
+
+	static Matrix<float, 7, 1> CACu_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
+	static Matrix<float, 4, 1> CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
+	static Matrix<float, 7, 7> CACu_Pk;	// State Covariance Matrix
+	static Matrix<float, 7, 7> CACu_Fk;	// Prediction Matrix
+	static Matrix<float, 7, 1> CACu_Bk;	// Control Matrix (is a vector but called matrix)
+	static Matrix<float, 7, 7> CACu_Qk;	// Process noise Covariance
+	static Matrix<float, 4, 4> CACu_Rk;	// Sensor noise Covariance
+	static Matrix<float, 4, 7> CACu_Hk;	// Sensor Expectations Matrix
+	static Matrix<float, 7, 4> CACu_KG;	// Kalman Gain Matrix
 };
+
+// Speed Control [s]
+float accBasedControl::Kp_V = 0;
+float accBasedControl::Ki_V = 0;
+float accBasedControl::Kd_V = 0;
+float accBasedControl::Kff_V = 0;
+
+//		CACu Kalman Filter						//
+Matrix<float, 7, 1> accBasedControl::CACu_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
+Matrix<float, 4, 1> accBasedControl::CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
+Matrix<float, 7, 7> accBasedControl::CACu_Pk;	// State Covariance Matrix
+Matrix<float, 7, 7> accBasedControl::CACu_Fk;	// Prediction Matrix
+Matrix<float, 7, 1> accBasedControl::CACu_Bk;	// Control Matrix (is a vector but called matrix)
+Matrix<float, 7, 7> accBasedControl::CACu_Qk;	// Process noise Covariance
+Matrix<float, 4, 4> accBasedControl::CACu_Rk;	// Sensor noise Covariance
+Matrix<float, 4, 7> accBasedControl::CACu_Hk;	// Sensor Expectations Matrix
+Matrix<float, 7, 4> accBasedControl::CACu_KG;	// Kalman Gain Matrix
+
 #endif // !CURRENT_CONTROL_H

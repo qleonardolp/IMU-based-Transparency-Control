@@ -28,6 +28,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 using namespace std;
 using namespace chrono;
+using namespace Eigen;
 
 // accBasedControl Paramount Variables
 EPOS_NETWORK* accBasedControl::m_epos;
@@ -38,14 +39,9 @@ int   accBasedControl::pos0_out;
 int   accBasedControl::pos0_in;
 atomic<bool> accBasedControl::Run(true);
 system_clock::time_point accBasedControl::control_t_begin;
-float accBasedControl::control_t_Dt = 0.008333;	// [s] initialized with the old value from 120 Hz
+float accBasedControl::control_t_Dt = 0.001;				// [s]
 float accBasedControl::timestamp = 0.000000000f;
 
-// Speed Control [s]
-float accBasedControl::Kp_V = 0;
-float accBasedControl::Ki_V = 0;
-float accBasedControl::Kd_V = 0;
-float accBasedControl::Kff_V = 0;
 
 // Adimittance Control [a,u] Variables
 float accBasedControl::Ki_adm = 0;
@@ -573,7 +569,7 @@ void accBasedControl::Recorder_CACu()
 	}
 }
 
-void accBasedControl::savitskygolay(float window[], float newest_value, float* first_derivative)
+void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)
 {
 	// shifting values in 1 position, updating the window with one sample:
 	for (int i = 10; i > 0; --i)
@@ -596,3 +592,84 @@ void accBasedControl::savitskygolay(float window[], float newest_value, float* f
 		3 * window[8] - 4 * window[9] - 5 * window[10]) / (110) * RATE;
 
 }
+
+void accBasedControl::OmegaControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+{
+
+}
+
+void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+{
+	while (Run.load())
+	{
+		unique_lock<std::mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(150));
+
+		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
+		m_epos->sync();	// CAN Synchronization
+
+		// SEA Torque:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		torque_sea = STIFFNESS*(theta_c - theta_l);
+
+		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
+		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
+		vel_adm = damping_A / (damping_A + stiffness_d*control_t_Dt) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt) * (-d_torque_sea);
+		// testar sem as duas linhas abaixo
+		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
+		vel_adm_last = vel_adm;
+
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		// Integration for the Inner Control (PI)
+		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+		// Integration reset:
+		if (resetInt == 2000)
+		{
+			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+			resetInt = 0;
+		}
+		// Inner Control Loop (PI):
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
+
+		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
+
+		if (abs(setpoint_filt) < CURRENT_MAX)
+		{
+			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
+				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
+			else
+				m_eixo_in->PDOsetCurrentSetpoint(0);
+		}
+		else
+		{
+			if (setpoint_filt < 0)
+				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
+			else
+				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
+		}
+		m_eixo_in->WritePDO01();
+
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+		timestamp = 1e-6*timestamp;
+		if (timestamp < m_seconds) Recorder_CACu();
+	}
+}
+
