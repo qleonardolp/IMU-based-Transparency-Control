@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //#include <math.h>
 //#include <time.h>
 //#include <thread>
-//#include <chrono>
+#include <chrono>
 
 void Habilita_Eixo(int ID);
 
@@ -420,10 +420,9 @@ int main(int argc, char** argv)
     float delay;
     int printer = 0;
     int scan_file = 0;
-    int record_count = log_time * RATE;
 
     std::chrono::system_clock::time_point mtw_data_stamp;
-	// std::chrono::system_clock::time_point log_begin;
+    //std::chrono::system_clock::time_point log_begin;
     clock_t beginning = 0;
     clock_t loop_duration;
     float freq;
@@ -433,15 +432,15 @@ int main(int argc, char** argv)
     std::thread controller_t;
     std::condition_variable Cv;
     std::mutex Mtx;
-
-	auto log_begin = std::chrono::steady_clock::now();
+    
+    auto log_begin = std::chrono::steady_clock::now();
 
 		 if(control_mode == 'c')
       controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CurrentControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 's')
-		controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+    else if(control_mode == 's'){}
+		//controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 	// 'no overloaded function takes 7 arguments'
 	/* (https://stackoverflow.com/questions/3496754/vc-says-no-overloaded-function-takes-7-arguments-i-say-yes-it-does)
 	So, you get an error when the 6-parameter constructor is being compiled when you've commented it out in the header - 
@@ -454,10 +453,6 @@ int main(int argc, char** argv)
 		  controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
-
-	std::unique_lock<std::mutex> Lck(Mtx);
-	Cv.notify_one();
-	Cv.wait(Lck);
 
 	log_begin = std::chrono::steady_clock::now();
 
@@ -495,18 +490,11 @@ int main(int argc, char** argv)
 
         printer++;
         scan_file++;
-        //if (record_count > 0) record_count--;
 
         loop_duration = clock() - beginning;
         beginning = clock();
         freq = (float)CLOCKS_PER_SEC / loop_duration;
       }
-
-	  /*
-      if (record_count == 0){
-        xsens2Eposcan.StopLogging();
-        record_count--;	// let record_count == -1 just to avoid this IF from now on
-      }*/
 
       if (scan_file == (int)RATE * 6)  // every 6s reads the gains_values.txt 
       {

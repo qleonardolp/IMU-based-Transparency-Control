@@ -36,11 +36,10 @@ AXIS* accBasedControl::m_eixo_out;
 float accBasedControl::m_seconds;
 int   accBasedControl::pos0_out;
 int   accBasedControl::pos0_in;
-atomic<bool> accBasedControl::logging(false);	// just for safety
-system_clock::time_point accBasedControl::control_t_begin;
-float accBasedControl::control_t_Dt = 0.008333;	// initialized with the old value from 120 Hz
-float accBasedControl::timestamp = 0.000000000f;
 atomic<bool> accBasedControl::Run(true);
+system_clock::time_point accBasedControl::control_t_begin;
+float accBasedControl::control_t_Dt = 0.008333;	// [s] initialized with the old value from 120 Hz
+float accBasedControl::timestamp = 0.000000000f;
 
 // Speed Control [s]
 float accBasedControl::Kp_V = 0;
@@ -522,8 +521,8 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 
 	ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n";
-	sprintf(numbers_str, "%3.6f", control_t_Dt);
-	ctrl_word += " Control Dt: " + (std::string) numbers_str + " sec\n";
+	sprintf(numbers_str, "%3.2f", 1/control_t_Dt);
+	ctrl_word += " Control Rate: " + (std::string) numbers_str + " Hz\n";
 }
 
 

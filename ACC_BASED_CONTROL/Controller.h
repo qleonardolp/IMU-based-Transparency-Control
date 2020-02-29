@@ -145,7 +145,6 @@ public:
 
 		if (seconds > 0)
 		{
-			logging = true;
 
 			time_t rawtime;
 			struct tm* timeinfo;
@@ -171,10 +170,6 @@ public:
 				}
 				fclose(logger);
 			}
-		}
-		else
-		{
-			logging = false;
 		}
 
 		//		KALMAN FILTER SETUP		//
@@ -247,9 +242,6 @@ public:
 	void UpdateCtrlWord_Velocity();
 	void UpdateCtrlWord_Admittance();
 
-	// Stop the Recording
-	void StopLogging(){ logging = false; }
-
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
 
@@ -285,7 +277,6 @@ private:
 
 	FILE* logger;
 	char logger_filename[40];
-	static std::atomic<bool> logging;
 	static float timestamp;
 
 	FILE* gains_values;
