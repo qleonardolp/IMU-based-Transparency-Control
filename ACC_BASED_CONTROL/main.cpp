@@ -503,15 +503,13 @@ int main(int argc, char** argv)
         case 'c':
           xsens2Eposcan.GainScan_Current();
           break;
-        case 'k':
-          xsens2Eposcan.GainScan_Current();
-          break;
         case 's':
           xsens2Eposcan.GainScan_Velocity();
           break;
         case 'a':
           xsens2Eposcan.GainScan_CAC();
           break;
+		case 'k':
         case 'u':
           xsens2Eposcan.GainScan_CACu();
           break;
@@ -521,7 +519,7 @@ int main(int argc, char** argv)
         scan_file = 0;
       }
 
-      if (printer == (int)RATE / 3)   // printing the status @ 3Hz
+      if (printer == (int)RATE / 5)   // printing the status @ 5Hz
       {
         system("cls");
         switch (control_mode)
@@ -529,13 +527,10 @@ int main(int argc, char** argv)
         case 'c':
           xsens2Eposcan.UpdateCtrlWord_Current();
           break;
-        case 'k':
-          xsens2Eposcan.UpdateCtrlWord_CurrentKF();
-          break;
         case 's':
           xsens2Eposcan.UpdateCtrlWord_Velocity();
           break;
-        case 'a': case 'u':
+		case 'a': case 'u': case 'k':
           xsens2Eposcan.UpdateCtrlWord_Admittance();
           break;
         default:

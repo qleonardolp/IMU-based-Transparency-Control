@@ -562,8 +562,8 @@ void accBasedControl::Recorder_CACu()
 	logger = fopen(logger_filename, "a");
 	if (logger != NULL)
 	{
-		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5d  %5.3f\n",
-			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
+		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5d  %5.3f  %5.3f\n",
+			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea, d_torque_sea);
 		// everything logged in standard units (SI)
 		fclose(logger);
 	}
@@ -613,36 +613,60 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
 		m_epos->sync();	// CAN Synchronization
 
-		// SEA Torque:
+		// Positions
 		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		torque_sea = STIFFNESS*(theta_c - theta_l);
-
-		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
-		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
-		vel_adm = damping_A / (damping_A + stiffness_d*control_t_Dt) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt) * (-d_torque_sea);
-		// testar sem as duas linhas abaixo
-		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
-		vel_adm_last = vel_adm;
-
+		//torque_sea = STIFFNESS*(theta_c - theta_l);
+		// Motor Velocity
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
-		// Integration for the Inner Control (PI)
+		// Assigning the measured states to the Sensor reading Vector
+		CACu_zk << velHum, vel_motor, theta_c, theta_l;
+
+		static float C1 = damping_A / (damping_A + stiffness_d*control_t_Dt);
+		static float C2 = -(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt);
+
+		// *Updating Fk, Pk
+		CACu_Fk(1, 1) = C1;	CACu_Fk(1, 6) = C2;
+		CACu_Fk(3, 2) = CACu_Fk(5, 6) = control_t_Dt;
+
+		CACu_Pk(1, 1) = C1*CACu_Pk(1, 1) + C2*CACu_Pk(6, 6);
+
+		// Predicting (test without the Control Mtx)	//
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+		CACu_xk = CACu_Fk * CACu_xk + CACu_Bk * (0.001*actualCurrent * TORQUE_CONST / J_EQ);
+		CACu_Pk = CACu_Fk * CACu_Pk * CACu_Fk.transpose() + CACu_Qk;
+
+		// Kalman Gain	//
+		static FullPivLU<Matrix3f> TotalCovariance(CACu_Hk * CACu_Pk * CACu_Hk.transpose() + CACu_Rk);
+		if (TotalCovariance.isInvertible())
+			CACu_KG = CACu_Pk * CACu_Hk.transpose() * TotalCovariance.inverse();
+
+		// Updating		//
+		CACu_xk = CACu_xk + CACu_KG * (CACu_zk - CACu_Hk*CACu_xk);
+		CACu_Pk = CACu_Pk - CACu_KG * CACu_Hk*CACu_Pk;
+
+		// Controlling using the state estimations
+		vel_hum = CACu_xk(0, 0);
+		vel_adm = CACu_xk(1, 0);
+		vel_motor = CACu_xk(2, 0);
+		theta_c = CACu_xk(3, 0);
+		theta_l = CACu_xk(4, 0);
+		torque_sea = CACu_xk(5, 0);
+		d_torque_sea = CACu_xk(6, 0);
+
+		// Inner Control (PI)	//
 		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 		// Integration reset:
-		if (resetInt == 2000)
+		if (resetInt == 2000000)
 		{
 			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 			resetInt = 0;
 		}
-		// Inner Control Loop (PI):
 		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
-		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
-
 		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
-		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
 
 		if (abs(setpoint_filt) < CURRENT_MAX)
 		{
@@ -659,9 +683,6 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
 		}
 		m_eixo_in->WritePDO01();
-
-		m_eixo_in->ReadPDO01();
-		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();

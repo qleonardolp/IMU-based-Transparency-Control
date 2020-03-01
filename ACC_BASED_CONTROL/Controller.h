@@ -124,7 +124,7 @@ public:
 		case 'c':
 		case 'k':
 		case 'u':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For FiniteDiff, CurrentControlKF, CACurrent
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF
 			break;
 		case 's':
 		case 'a':
@@ -168,7 +168,11 @@ public:
 				}
 				else if (control_mode == 'u')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
+					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
+				}
+				else if (control_mode == 'k')
+				{
+					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
 				}
 				fclose(logger);
 			}
@@ -206,45 +210,30 @@ public:
 			CACu_Hk(0, 0) = 1;	CACu_Hk(1, 2) = 1;	CACu_Hk(2, 3) = 1;	CACu_Hk(3, 4) = 1;
 
 			CACu_Pk.setZero();
-			CACu_Pk(0, 0) = 0.0002;	CACu_Pk(1, 1) = 0.0009;	CACu_Pk(2, 2) = 0.0004;	CACu_Pk(3, 3) = 0.0002;	
-			CACu_Pk(4, 4) = 0.0001;	CACu_Pk(5, 5) = STIFFNESS*0.0003; CACu_Pk(6, 6) = STIFFNESS*0.0010;
-
-			CACu_Qk.setIdentity();
-			CACu_Qk = 0.001*CACu_Qk;
+			CACu_Pk(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
+			CACu_Pk(1, 1) = pow(0.0070838, 2);	// devpad = C1*devpad_k-1 + C2*devpad(d_torque_sea), recursive
+			CACu_Pk(2, 2) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
+			CACu_Pk(3, 3) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CACu_Pk(4, 4) = pow(0.0030700, 2);	// 2*pi/2048
+			CACu_Pk(5, 5) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
+			CACu_Pk(6, 6) = pow(0.7508800, 2);	// devpad = Ksea*(devpad(vel_motor) + devpad(vel_hum))
 
 			CACu_Rk.setZero();
-			CACu_Rk(0, 0) = 0.002;	CACu_Rk(1, 1) = 0.005;	CACu_Rk(2, 2) = 0.001;	CACu_Rk(3, 3) = 0.001;
+			CACu_Rk(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+			CACu_Rk(1, 1) = pow(0.0048800, 2);	// Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
+			CACu_Rk(2, 2) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
+			CACu_Rk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
+
+			// additional uncertainty from the environment
+			CACu_Qk.setZero();
+			CACu_Qk(0, 0) = pow(0.0000234, 2);
+			CACu_Qk(1, 1) = pow(0.08*0.75088, 2);
+			CACu_Qk(2, 2) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
+			CACu_Qk(3, 3) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CACu_Qk(4, 4) = pow(0.0000307, 2);
+			CACu_Qk(5, 5) = pow(0.0032034, 2);
+			CACu_Qk(6, 6) = pow(0.0075088, 2);
 		}
-		/*
-		Amp_kf = 1;
-		x_k.setZero(); z_k.setZero(); KG.setZero();
-
-		Fk.setZero();
-		Fk(0, 0) = 1;	Fk(0, 1) = DELTA_T;
-		Fk(1, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
-		Fk(2, 2) = 1;	Fk(2, 3) = DELTA_T;
-		Fk(3, 2) = -(B_EQ / (J_EQ + INERTIA_EXO));
-		Fk(3, 4) = -(1 / (J_EQ + INERTIA_EXO));
-		Fk(4, 0) = -STIFFNESS*DELTA_T; Fk(4, 2) = STIFFNESS*DELTA_T; Fk(4, 4) = 1;
-
-		Bk.setZero();
-		Bk(1, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
-		Bk(3, 0) = GEAR_RATIO / (J_EQ + INERTIA_EXO);
-
-		// How to define my uncertainties ?	//
-		Pk.setZero();
-		Pk(0, 0) = 0.00002; Pk(1, 1) = 0.010; Pk(2, 2) = 0.00002; Pk(3, 3) = 0.010; Pk(4, 4) = 0.050;
-
-		Qk.setZero();
-		Qk(0, 0) = 0.01; Qk(1, 1) = 0.0001; Qk(2, 2) = 0.01; Qk(3, 3) = 0.0001; Qk(4, 4) = 0.01;
-
-		//Qk(4, 4) = 0.010; // mechanical slack in the knee joint
-
-		Hk.setZero();
-		Hk(0, 0) = 1;	Hk(1, 2) = 1;	Hk(2, 4) = 1;
-		Rk.setZero();
-		Rk(0, 0) = 0.00002;	Rk(1, 1) = 0.00002;	Rk(2, 2) = 0.107;	// sensors noise covariances
-		*/
 	}
 
 	// numdiff, controlling through the EPOS current control (Deprecated)
