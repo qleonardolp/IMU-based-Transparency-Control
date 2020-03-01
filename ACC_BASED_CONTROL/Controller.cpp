@@ -42,6 +42,24 @@ system_clock::time_point accBasedControl::control_t_begin;
 float accBasedControl::control_t_Dt = 0.001;				// [s]
 float accBasedControl::timestamp = 0.000000000f;
 
+// Speed Control [s]
+float accBasedControl::Kp_V = 0;
+float accBasedControl::Ki_V = 0;
+float accBasedControl::Kd_V = 0;
+float accBasedControl::Kff_V = 0;
+
+//		CACu Kalman Filter						//
+Matrix<float, 5, 1> accBasedControl::CACu_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
+Matrix<float, 4, 1> accBasedControl::CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
+Matrix<float, 5, 5> accBasedControl::CACu_Pk;	// State Covariance Matrix
+Matrix<float, 5, 5> accBasedControl::CACu_Fk;	// Prediction Matrix
+Matrix<float, 5, 1> accBasedControl::CACu_Bk;	// Control Matrix (is a vector but called matrix)
+Matrix<float, 1, 1> accBasedControl::CACu_uk; // Control Vector
+Matrix<float, 5, 5> accBasedControl::CACu_Qk;	// Process noise Covariance
+Matrix<float, 4, 4> accBasedControl::CACu_Rk;	// Sensor noise Covariance
+Matrix<float, 4, 5> accBasedControl::CACu_Hk;	// Sensor Expectations Matrix
+Matrix<float, 5, 4> accBasedControl::CACu_KG;	// Kalman Gain Matrix
+
 
 // Adimittance Control [a,u] Variables
 float accBasedControl::Ki_adm = 0;
@@ -496,7 +514,7 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 		ctrl_word += (std::string) numbers_str + " V]\n";
 	}
-	else if (m_control_mode == 'u')
+	else if (m_control_mode == 'u' || m_control_mode == 'k')
 	{
 		ctrl_word += " Torque: " + std::to_string(torque_m) + " N.m";
 		ctrl_word += " [ " + std::to_string(1000 * setpoint_filt) + " ";
@@ -608,7 +626,7 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(150));
+		this_thread::sleep_for(nanoseconds(15));
 
 		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
 		m_epos->sync();	// CAN Synchronization
@@ -624,23 +642,15 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		// Assigning the measured states to the Sensor reading Vector
 		CACu_zk << velHum, vel_motor, theta_c, theta_l;
 
-		static float C1 = damping_A / (damping_A + stiffness_d*control_t_Dt);
-		static float C2 = -(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt);
-
-		// *Updating Fk, Pk
-		CACu_Fk(1, 1) = C1;	CACu_Fk(1, 6) = C2;
-		CACu_Fk(3, 2) = CACu_Fk(5, 6) = control_t_Dt;
-
-		CACu_Pk(1, 1) = C1*CACu_Pk(1, 1) + C2*CACu_Pk(6, 6);
-
-		// Predicting (test without the Control Mtx)	//
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-		CACu_xk = CACu_Fk * CACu_xk + CACu_Bk * (0.001*actualCurrent * TORQUE_CONST / J_EQ);
+    CACu_uk << (float) (0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l))/ J_EQ;
+    // Predicting (test without the Control Mtx)	//
+    CACu_xk = CACu_Fk * CACu_xk + CACu_Bk * CACu_uk;
 		CACu_Pk = CACu_Fk * CACu_Pk * CACu_Fk.transpose() + CACu_Qk;
 
 		// Kalman Gain	//
-		static FullPivLU<Matrix3f> TotalCovariance(CACu_Hk * CACu_Pk * CACu_Hk.transpose() + CACu_Rk);
+		static FullPivLU<Matrix4f> TotalCovariance(CACu_Hk * CACu_Pk * CACu_Hk.transpose() + CACu_Rk);  // DECLARATION MUST MATCH THE SENSOR DIM
 		if (TotalCovariance.isInvertible())
 			CACu_KG = CACu_Pk * CACu_Hk.transpose() * TotalCovariance.inverse();
 
@@ -650,12 +660,21 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 		// Controlling using the state estimations
 		vel_hum = CACu_xk(0, 0);
-		vel_adm = CACu_xk(1, 0);
-		vel_motor = CACu_xk(2, 0);
-		theta_c = CACu_xk(3, 0);
-		theta_l = CACu_xk(4, 0);
-		torque_sea = CACu_xk(5, 0);
-		d_torque_sea = CACu_xk(6, 0);
+		vel_motor = CACu_xk(1, 0);
+		theta_c = CACu_xk(2, 0);
+		theta_l = CACu_xk(3, 0);
+
+    //d_torque_sea = (STIFFNESS*(theta_c - theta_l) - torque_sea)*C_RATE;
+		//torque_sea = CACu_xk(4, 0);
+
+    static float C1 = damping_A / (damping_A + stiffness_d*C_DT);
+    // Putting Dt from (Tsea_k - Tsea_k-1)/Dt
+    // into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT)
+    static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_A);
+
+    vel_adm = C1*vel_adm - C2*(CACu_xk(4, 0) - torque_sea);   // C2*(Tsea_k - Tsea_k-1)
+
+    torque_sea = CACu_xk(4, 0); // Tsea_k-1 <- Tsea_k
 
 		// Inner Control (PI)	//
 		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
@@ -666,7 +685,7 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 			resetInt = 0;
 		}
 		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
-		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 
 		if (abs(setpoint_filt) < CURRENT_MAX)
 		{

@@ -81,6 +81,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KP_F			1.5310f     // [dimensionless]
 #define     KD_F			0.0200f     // [s]
 
+#define     C_RATE    1000.0f
+#define     C_DT      (float) 1/C_RATE
 
 #define     RATE            125.0f		// [Hz]	Use the control loop rate running
 #define		DELTA_T			(float) 1/RATE  // [s]
@@ -179,7 +181,7 @@ public:
 		}
 
 		//		KALMAN FILTER SETUP		//
-		float Dt = 0.001f;
+		float Dt = 0.00100f;
 
 		if (control_mode == 's'){}
 		else if (control_mode == 'k')
@@ -190,33 +192,27 @@ public:
 			// Row 1
 			CACu_Fk(0, 0) = 1; 
 			// Row 2
-			CACu_Fk(1, 1) = damping_A / (damping_A + stiffness_d*Dt);
-			CACu_Fk(1, 6) = -(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / Dt);
+			CACu_Fk(1, 1) = 1;
 			// Row 3
-			CACu_Fk(2, 2) = 1;
+			CACu_Fk(2, 1) = Dt; CACu_Fk(2, 2) = 1;
 			// Row 4
-			CACu_Fk(3, 2) = Dt; CACu_Fk(3, 3) = 1;
+			CACu_Fk(3, 3) = 1;
 			// Row 5
-			CACu_Fk(4, 4) = 1;
-			// Row 6
-			CACu_Fk(5, 3) = STIFFNESS; CACu_Fk(5, 4) = -STIFFNESS; CACu_Fk(5, 6) = Dt;
-			// Row 7
-			CACu_Fk(6, 6) = 1;
+			CACu_Fk(4, 2) = STIFFNESS; CACu_Fk(4, 3) = -STIFFNESS;
 
 			CACu_Bk.setZero();
-			CACu_Bk(2, 0) = Dt; CACu_Bk(3, 0) = 0.500f*Dt*Dt;
+			CACu_Bk(1, 0) = Dt; CACu_Bk(2, 0) = 0.500f*Dt*Dt;
 
 			CACu_Hk.setZero();
-			CACu_Hk(0, 0) = 1;	CACu_Hk(1, 2) = 1;	CACu_Hk(2, 3) = 1;	CACu_Hk(3, 4) = 1;
+			CACu_Hk(0, 0) = 1;	CACu_Hk(1, 1) = 1;	CACu_Hk(2, 2) = 1;	CACu_Hk(3, 3) = 1;
 
 			CACu_Pk.setZero();
 			CACu_Pk(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
-			CACu_Pk(1, 1) = pow(0.0070838, 2);	// devpad = C1*devpad_k-1 + C2*devpad(d_torque_sea), recursive
-			CACu_Pk(2, 2) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
-			CACu_Pk(3, 3) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CACu_Pk(4, 4) = pow(0.0030700, 2);	// 2*pi/2048
-			CACu_Pk(5, 5) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
-			CACu_Pk(6, 6) = pow(0.7508800, 2);	// devpad = Ksea*(devpad(vel_motor) + devpad(vel_hum))
+			CACu_Pk(1, 1) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
+			CACu_Pk(2, 2) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CACu_Pk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
+			CACu_Pk(4, 4) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
+
 
 			CACu_Rk.setZero();
 			CACu_Rk(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
@@ -227,12 +223,11 @@ public:
 			// additional uncertainty from the environment
 			CACu_Qk.setZero();
 			CACu_Qk(0, 0) = pow(0.0000234, 2);
-			CACu_Qk(1, 1) = pow(0.08*0.75088, 2);
-			CACu_Qk(2, 2) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
-			CACu_Qk(3, 3) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CACu_Qk(4, 4) = pow(0.0000307, 2);
-			CACu_Qk(5, 5) = pow(0.0032034, 2);
-			CACu_Qk(6, 6) = pow(0.0075088, 2);
+			CACu_Qk(1, 1) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
+			CACu_Qk(2, 2) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CACu_Qk(3, 3) = pow(0.0000307, 2);
+			CACu_Qk(4, 4) = pow(0.0032034, 2);
+
 		}
 	}
 
@@ -416,7 +411,7 @@ private:
 	*/
 
 	//		OmegaControl KF				//
-
+  /*
 	static Matrix<float, 9, 1> Ome_xk;	// State Vector				[vel_h acc_h jerk_h vel_e acc_e jerk_e vel_m theta_c theta_l]
 	static Matrix<float, 5, 1> Ome_zk;	// Sensor reading Vector	[vel_hum vel_exo vel_motor theta_c theta_l]
 	static Matrix<float, 9, 9> Ome_Pk;	// State Covariance Matrix
@@ -426,35 +421,19 @@ private:
 	static Matrix<float, 5, 5> Ome_Rk;	// Sensor noise Covariance
 	static Matrix<float, 5, 9> Ome_Hk;	// Sensor Expectations Matrix
 	static Matrix<float, 9, 5> Ome_KG;	// Kalman Gain Matrix
-
+  */
 	//		CACu Kalman Filter			//
 
-	static Matrix<float, 7, 1> CACu_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
+	static Matrix<float, 5, 1> CACu_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
 	static Matrix<float, 4, 1> CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
-	static Matrix<float, 7, 7> CACu_Pk;	// State Covariance Matrix
-	static Matrix<float, 7, 7> CACu_Fk;	// Prediction Matrix
-	static Matrix<float, 7, 1> CACu_Bk;	// Control Matrix (is a vector but called matrix)
-	static Matrix<float, 7, 7> CACu_Qk;	// Process noise Covariance
+	static Matrix<float, 5, 5> CACu_Pk;	// State Covariance Matrix
+	static Matrix<float, 5, 5> CACu_Fk;	// Prediction Matrix
+	static Matrix<float, 5, 1> CACu_Bk;	// Control Matrix (is a vector but called matrix)
+  static Matrix<float, 1, 1> CACu_uk; // Control Vector
+	static Matrix<float, 5, 5> CACu_Qk;	// Process noise Covariance
 	static Matrix<float, 4, 4> CACu_Rk;	// Sensor noise Covariance
-	static Matrix<float, 4, 7> CACu_Hk;	// Sensor Expectations Matrix
-	static Matrix<float, 7, 4> CACu_KG;	// Kalman Gain Matrix
+	static Matrix<float, 4, 5> CACu_Hk;	// Sensor Expectations Matrix
+	static Matrix<float, 5, 4> CACu_KG;	// Kalman Gain Matrix
 };
-
-// Speed Control [s]
-float accBasedControl::Kp_V = 0;
-float accBasedControl::Ki_V = 0;
-float accBasedControl::Kd_V = 0;
-float accBasedControl::Kff_V = 0;
-
-//		CACu Kalman Filter						//
-Matrix<float, 7, 1> accBasedControl::CACu_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
-Matrix<float, 4, 1> accBasedControl::CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
-Matrix<float, 7, 7> accBasedControl::CACu_Pk;	// State Covariance Matrix
-Matrix<float, 7, 7> accBasedControl::CACu_Fk;	// Prediction Matrix
-Matrix<float, 7, 1> accBasedControl::CACu_Bk;	// Control Matrix (is a vector but called matrix)
-Matrix<float, 7, 7> accBasedControl::CACu_Qk;	// Process noise Covariance
-Matrix<float, 4, 4> accBasedControl::CACu_Rk;	// Sensor noise Covariance
-Matrix<float, 4, 7> accBasedControl::CACu_Hk;	// Sensor Expectations Matrix
-Matrix<float, 7, 4> accBasedControl::CACu_KG;	// Kalman Gain Matrix
 
 #endif // !CURRENT_CONTROL_H

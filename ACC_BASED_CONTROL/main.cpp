@@ -438,7 +438,7 @@ int main(int argc, char** argv)
 		 if(control_mode == 'c')
       controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
+      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 's'){}
 		//controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 	// 'no overloaded function takes 7 arguments'
