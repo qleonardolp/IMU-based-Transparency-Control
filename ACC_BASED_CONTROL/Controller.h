@@ -100,7 +100,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		HPF_FC			0.7f	// [Hz]
 #define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
-// Kalman Filter Dimensions
+// Kalman Filter Dimensions (Deprecated)
 #define		STATE_DIM		5
 #define		SENSOR_DIM		3
 
@@ -123,7 +123,8 @@ public:
 
 		switch (control_mode)
 		{
-		case 'c':
+		case 'p':
+			m_eixo_in->VCS_SetOperationMode(POSITION_MODE);	// For accBasedPosition
 		case 'k':
 		case 'u':
 			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF
@@ -166,7 +167,7 @@ public:
 				}
 				else if (control_mode == 'a')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  actual_Vel[rad/s]  T_Sea[N.m]\n");
+					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n");
 				}
 				else if (control_mode == 'u')
 				{
@@ -174,7 +175,7 @@ public:
 				}
 				else if (control_mode == 'k')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
+					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
 				}
 				fclose(logger);
 			}
@@ -184,55 +185,52 @@ public:
 		float Dt = 0.00100f;
 
 		if (control_mode == 's'){}
-		else if (control_mode == 'k')
+		else if (control_mode == 'k' || control_mode == 'a')
 		{	
-			CACu_xk.setZero();	CACu_zk.setZero(); CACu_KG.setZero();
+			CAC_xk.setZero();	CAC_zk.setZero(); CAC_KG.setZero();
 
-			CACu_Fk.setZero();
+			CAC_Fk.setZero();
 			// Row 1
-			CACu_Fk(0, 0) = 1; 
+			CAC_Fk(0, 0) = 1; 
 			// Row 2
-			CACu_Fk(1, 1) = 1;
+			CAC_Fk(1, 1) = 1;
 			// Row 3
-			CACu_Fk(2, 1) = Dt; CACu_Fk(2, 2) = 1;
+			CAC_Fk(2, 1) = Dt; CAC_Fk(2, 2) = 1;
 			// Row 4
-			CACu_Fk(3, 3) = 1;
+			CAC_Fk(3, 3) = 1;
 			// Row 5
-			CACu_Fk(4, 2) = STIFFNESS; CACu_Fk(4, 3) = -STIFFNESS;
+			CAC_Fk(4, 2) = STIFFNESS; CAC_Fk(4, 3) = -STIFFNESS;
 
-			CACu_Bk.setZero();
-			CACu_Bk(1, 0) = Dt; CACu_Bk(2, 0) = 0.500f*Dt*Dt;
+			CAC_Bk.setZero();
+			CAC_Bk(1, 0) = Dt; CAC_Bk(2, 0) = 0.500f*Dt*Dt;
 
-			CACu_Hk.setZero();
-			CACu_Hk(0, 0) = 1;	CACu_Hk(1, 1) = 1;	CACu_Hk(2, 2) = 1;	CACu_Hk(3, 3) = 1;
+			CAC_Hk.setZero();
+			CAC_Hk(0, 0) = 1;	CAC_Hk(1, 1) = 1;	CAC_Hk(2, 2) = 1;	CAC_Hk(3, 3) = 1;
 
-			CACu_Pk.setZero();
-			CACu_Pk(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
-			CACu_Pk(1, 1) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
-			CACu_Pk(2, 2) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CACu_Pk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
-			CACu_Pk(4, 4) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
+			CAC_Pk.setZero();
+			CAC_Pk(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
+			CAC_Pk(1, 1) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
+			CAC_Pk(2, 2) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CAC_Pk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
+			CAC_Pk(4, 4) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
 
 
-			CACu_Rk.setZero();
-			CACu_Rk(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
-			CACu_Rk(1, 1) = pow(0.0048800, 2);	// Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
-			CACu_Rk(2, 2) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
-			CACu_Rk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
+			CAC_Rk.setZero();
+			CAC_Rk(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+			CAC_Rk(1, 1) = pow(0.0048800, 2);	// Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
+			CAC_Rk(2, 2) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
+			CAC_Rk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
 
 			// additional uncertainty from the environment
-			CACu_Qk.setZero();
-			CACu_Qk(0, 0) = pow(0.0000234, 2);
-			CACu_Qk(1, 1) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
-			CACu_Qk(2, 2) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CACu_Qk(3, 3) = pow(0.0000307, 2);
-			CACu_Qk(4, 4) = pow(0.0032034, 2);
+			CAC_Qk.setZero();
+			CAC_Qk(0, 0) = pow(0.0000234, 2);
+			CAC_Qk(1, 1) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
+			CAC_Qk(2, 2) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			CAC_Qk(3, 3) = pow(0.0000307, 2);
+			CAC_Qk(4, 4) = pow(0.0032034, 2);
 
 		}
 	}
-
-	// numdiff, controlling through the EPOS current control (Deprecated)
-	void FiniteDiff(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m){}
 
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
@@ -243,31 +241,32 @@ public:
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
+	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
+	void CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
+	// Controlling through the EPOS Position control
+	void accBasedPosition(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
 
 	// GainScan are the methods to scan the file with the values to update the gains in runtime
-	void GainScan_Current();
-	void GainScan_CurrentKF();
 	void GainScan_Velocity();
 	void GainScan_CAC();
 	void GainScan_CACu();
 
 	// Recorder are the methods to log the desired variables in a .txt file
-	void Recorder_Current();
 	void Recorder_Velocity();
 	void Recorder_CAC();
 	void Recorder_CACu();
 
 	// Update the 'Control Word' to show info at the console screen
-	void UpdateCtrlWord_Current();
-	void UpdateCtrlWord_CurrentKF();
 	void UpdateCtrlWord_Velocity();
 	void UpdateCtrlWord_Admittance();
 
@@ -279,7 +278,7 @@ public:
 	{
 		switch (m_control_mode)
 		{
-		case 'c': case 'k': case 'u':
+		case 'p': case 'k': case 'u':
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 			m_eixo_in->WritePDO01();
 			break;
@@ -395,22 +394,7 @@ private:
 	float theta_l_vec[SGVECT_SIZE];		// [rad]
 	float theta_c_vec[SGVECT_SIZE];		// [rad]
 
-	//		KALMAN FILTER				//
-	/*
-	float Amp_kf;
-	std::string kf_error;
-	Eigen::Matrix<float, STATE_DIM, 1> x_k;					// State Vector
-	Eigen::Matrix<float, SENSOR_DIM, 1> z_k;				// Sensor reading Vector
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Pk;			// State Covariance Matrix
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Fk;			// Prediction Matrix
-	Eigen::Matrix<float, STATE_DIM, 1> Bk;					// Control Matrix* (is a vector but called matrix)
-	Eigen::Matrix<float, STATE_DIM, STATE_DIM> Qk;			// Process noise Covariance
-	Eigen::Matrix<float, SENSOR_DIM, SENSOR_DIM> Rk;		// Sensor noise Covariance
-	Eigen::Matrix<float, SENSOR_DIM, STATE_DIM> Hk;			// Sensor Expectations Matrix
-	Eigen::Matrix<float, STATE_DIM, SENSOR_DIM> KG;			// Kalman Gain Matrix
-	*/
-
-	//		OmegaControl KF				//
+	//	OmegaControl Kalman Filter		//
   /*
 	static Matrix<float, 9, 1> Ome_xk;	// State Vector				[vel_h acc_h jerk_h vel_e acc_e jerk_e vel_m theta_c theta_l]
 	static Matrix<float, 5, 1> Ome_zk;	// Sensor reading Vector	[vel_hum vel_exo vel_motor theta_c theta_l]
@@ -422,18 +406,18 @@ private:
 	static Matrix<float, 5, 9> Ome_Hk;	// Sensor Expectations Matrix
 	static Matrix<float, 9, 5> Ome_KG;	// Kalman Gain Matrix
   */
-	//		CACu Kalman Filter			//
+	//		CAC & CACu Kalman Filter	//
 
-	static Matrix<float, 5, 1> CACu_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
-	static Matrix<float, 4, 1> CACu_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
-	static Matrix<float, 5, 5> CACu_Pk;	// State Covariance Matrix
-	static Matrix<float, 5, 5> CACu_Fk;	// Prediction Matrix
-	static Matrix<float, 5, 1> CACu_Bk;	// Control Matrix (is a vector but called matrix)
-  static Matrix<float, 1, 1> CACu_uk; // Control Vector
-	static Matrix<float, 5, 5> CACu_Qk;	// Process noise Covariance
-	static Matrix<float, 4, 4> CACu_Rk;	// Sensor noise Covariance
-	static Matrix<float, 4, 5> CACu_Hk;	// Sensor Expectations Matrix
-	static Matrix<float, 5, 4> CACu_KG;	// Kalman Gain Matrix
+	static Matrix<float, 5, 1> CAC_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
+	static Matrix<float, 4, 1> CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
+	static Matrix<float, 5, 5> CAC_Pk;	// State Covariance Matrix
+	static Matrix<float, 5, 5> CAC_Fk;	// Prediction Matrix
+	static Matrix<float, 5, 1> CAC_Bk;	// Control Matrix (is a vector but called matrix)
+	static Matrix<float, 1, 1> CAC_uk; // Control Vector
+	static Matrix<float, 5, 5> CAC_Qk;	// Process noise Covariance
+	static Matrix<float, 4, 4> CAC_Rk;	// Sensor noise Covariance
+	static Matrix<float, 4, 5> CAC_Hk;	// Sensor Expectations Matrix
+	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
 };
 
 #endif // !CURRENT_CONTROL_H

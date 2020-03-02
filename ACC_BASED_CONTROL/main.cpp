@@ -327,12 +327,11 @@ int main(int argc, char** argv)
     char control_mode;
     int log_time;
 
-    printf("Choose the control mode:\n[c] Current\n[s] Speed\n[k] CACuKF\n[a] CAC\n[u] CACu\n");
+    printf("Choose the control mode:\n[p] Position\n[s] Speed\n[k] CACuKF\n[a] CAC\n[u] CACu\n");
     scanf("%c", &control_mode);
-	while (control_mode != 'c' && control_mode != 's' && 
-		   control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
+	while (control_mode != 'p' && control_mode != 's' && control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
 	{
-		printf("CHOOSE A PROPER CONTROL MODE: [c]  [s]  [k]  [a]  [u]\n");
+		printf("CHOOSE A PROPER CONTROL MODE: [p]  [s]  [k]  [a]  [u]\n");
 		scanf("%c", &control_mode);
 	}
 
@@ -435,10 +434,8 @@ int main(int argc, char** argv)
     
     auto log_begin = std::chrono::steady_clock::now();
 
-		 if(control_mode == 'c')
-      controller_t = std::thread(&accBasedControl::FiniteDiff, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+		 if(control_mode == 'k')
+		controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 's'){}
 		//controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 	// 'no overloaded function takes 7 arguments'
@@ -449,8 +446,10 @@ int main(int argc, char** argv)
 	Try using the /showIncludes option ("C++ | Advanced | Show includes" in the IDE's project settings) and/or turning off 
 	precompiled headers and see if you get any further clues or better behavior.
 	*/
+	else if (control_mode == 'p')
+		controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'a')
-		  controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+		  controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 
@@ -500,9 +499,6 @@ int main(int argc, char** argv)
       {
         switch (control_mode)
         {
-        case 'c':
-          xsens2Eposcan.GainScan_Current();
-          break;
         case 's':
           xsens2Eposcan.GainScan_Velocity();
           break;
@@ -524,9 +520,6 @@ int main(int argc, char** argv)
         system("cls");
         switch (control_mode)
         {
-        case 'c':
-          xsens2Eposcan.UpdateCtrlWord_Current();
-          break;
         case 's':
           xsens2Eposcan.UpdateCtrlWord_Velocity();
           break;
