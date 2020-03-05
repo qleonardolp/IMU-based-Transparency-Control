@@ -38,6 +38,7 @@ float accBasedControl::m_seconds;
 int   accBasedControl::pos0_out;
 int   accBasedControl::pos0_in;
 atomic<bool> accBasedControl::Run(true);
+atomic<bool> accBasedControl::logging(false);
 system_clock::time_point accBasedControl::control_t_begin;
 float accBasedControl::control_t_Dt = 0.001;				// [s]
 float accBasedControl::timestamp = 0.000000000f;
@@ -188,11 +189,17 @@ void accBasedControl::OmegaControl(float &velHum, float &velExo, std::condition_
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
-    control_t_Dt = 1e-6*control_t_Dt;
-
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-    timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_Velocity();
+		control_t_Dt = 1e-6*control_t_Dt;
+		
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_Velocity();
+			else
+				logging = false;
+		}
 	}
 }
 
@@ -282,11 +289,17 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
-    control_t_Dt = 1e-6*control_t_Dt;
+		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-    timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_CAC();
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_CAC();
+			else
+				logging = false;
+		}
 	}
 }
 
@@ -364,11 +377,17 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
-    control_t_Dt = 1e-6*control_t_Dt;
+		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-    timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_CACu();
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_CACu();
+			else
+				logging = false;
+		}
 	}
 }
 
@@ -492,7 +511,7 @@ void accBasedControl::Recorder_CACu()
 	logger = fopen(logger_filename, "a");
 	if (logger != NULL)
 	{
-		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5d  %5.3f\n",
+		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n",
 			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
 		// everything logged in standard units (SI)
 		fclose(logger);
@@ -567,9 +586,15 @@ void accBasedControl::accBasedPosition(float &velHum, float &velExo, std::condit
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-		timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_Velocity();
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_Velocity(); // Change
+			else
+				logging = false;
+		}
 	}
 }
 
@@ -577,6 +602,58 @@ void accBasedControl::accBasedPosition(float &velHum, float &velExo, std::condit
 void accBasedControl::OmegaControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
 	// ???
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(1500));
+
+		m_epos->sync();	// CAN Synchronization
+
+		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
+		vel_hum_last = velHum;
+		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
+		vel_exo_last = velExo;
+
+		// velocities derivative using a Gain and a Discrete Integrator in loop
+		acc_exo = 24 * (vel_exo - IntegratorExo);
+		IntegratorExo += acc_exo*C_DT;
+		acc_hum = 24 * (vel_hum - IntegratorHum);
+		IntegratorHum += acc_hum*C_DT;
+
+		// SEA Torque:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
+
+		// Position Set	//
+		// Using setpoint as [rad]
+		setpoint = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kp_V*(acc_hum - acc_exo) + Ki_V*(vel_hum - vel_exo)) / STIFFNESS;
+		// using setpoint_filt as encoder steps:
+		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * setpoint / (2 * MY_PI) + pos0_in;
+
+		if ((setpoint >= -1.5708) && (setpoint <= 0.5236)) //(caminhando)
+			m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
+		m_eixo_in->WritePDO01();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_Velocity(); // Change
+			else
+				logging = false;
+		}
+	}
 }
 
 void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
@@ -678,9 +755,15 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-		timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_CAC();
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_CAC();
+			else
+				logging = false;
+		}
 	}
 }
 
@@ -772,9 +855,15 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-		timestamp = 1e-6*timestamp;
-		if (timestamp < m_seconds) Recorder_CACu();
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder_CACu(); // Change
+			else
+				logging = false;
+		}
 	}
 }
 

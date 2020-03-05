@@ -150,7 +150,7 @@ public:
 
 		if (seconds > 0)
 		{
-
+			logging = true;
 			time_t rawtime;
 			struct tm* timeinfo;
 			time(&rawtime);
@@ -163,19 +163,19 @@ public:
 				// printing the header into the file first line
 				if (control_mode == 's')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/s2]  acc_exo[rad/s2]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  actual_Vel[rad/s]  exo_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
+					fprintf(logger, "OmegaControl\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/s2]  acc_exo[rad/s2]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  actual_Vel[rad/s]  exo_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
 				}
 				else if (control_mode == 'a')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n");
+					fprintf(logger, "CAC\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n");
 				}
 				else if (control_mode == 'u')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
+					fprintf(logger, "CACurrent\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
 				}
 				else if (control_mode == 'k')
 				{
-					fprintf(logger, "time[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
+					fprintf(logger, "CACu_KF\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
 				}
 				fclose(logger);
 			}
@@ -304,6 +304,7 @@ private:
 	static int pos0_in;
 
 	FILE* logger;
+	static std::atomic<bool> logging;
 	char logger_filename[40];
 	static float timestamp;
 
