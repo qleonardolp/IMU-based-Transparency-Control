@@ -54,9 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <xsens/xsmutex.h>
 #include "xstypes.h"
 #include <conio.h>
-//#include <math.h>
-//#include <time.h>
-//#include <thread>
+#include <thread>
 #include <chrono>
 
 void Habilita_Eixo(int ID);
@@ -428,28 +426,21 @@ int main(int argc, char** argv)
 
     float mtw_hum = 0;
     float mtw_exo = 0;
+    std::vector<float> gyros(mtwCallbacks.size());
     std::thread controller_t;
     std::condition_variable Cv;
     std::mutex Mtx;
     
     auto log_begin = std::chrono::steady_clock::now();
 
-		 if(control_mode == 'k')
-		controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
-    else if(control_mode == 's'){}
-		//controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
-	// 'no overloaded function takes 7 arguments'
-	/* (https://stackoverflow.com/questions/3496754/vc-says-no-overloaded-function-takes-7-arguments-i-say-yes-it-does)
-	So, you get an error when the 6-parameter constructor is being compiled when you've commented it out in the header - 
-	but is that the same source file that contains the calls to the constructor? Is it possible that a different header 
-	is being used for that compilation somehow (maybe precompiled header weirdness is involved).
-	Try using the /showIncludes option ("C++ | Advanced | Show includes" in the IDE's project settings) and/or turning off 
-	precompiled headers and see if you get any further clues or better behavior.
-	*/
-	else if (control_mode == 'p')
-		controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(mtw_hum), std::ref(mtw_exo), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+    if(control_mode == 'k')
+      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+    else if(control_mode == 's')
+      controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+    else if (control_mode == 'p')
+      controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'a')
-		  controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
 
@@ -479,8 +470,8 @@ int main(int argc, char** argv)
       if (newDataAvailable)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
-        mtw_hum = -(float)gyroData[0].value(2);
-        //mtw_exo =  (float)gyroData[1].value(2);
+        gyros[0] = mtw_hum = -(float)gyroData[0].value(2);
+        gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
         Cv.notify_one();
         Cv.wait(Lck);
 

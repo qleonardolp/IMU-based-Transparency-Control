@@ -118,7 +118,7 @@ float accBasedControl::IntAccExo = 0;
 
 // Control Functions //
 
-void accBasedControl::OmegaControl(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
 	while (Run.load())
 	{
@@ -132,10 +132,10 @@ void accBasedControl::OmegaControl(float &velHum, float &velExo, std::condition_
 
 		m_epos->sync();	// CAN Synchronization
 
-		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
-		vel_hum_last = velHum;
-		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
-		vel_exo_last = velExo;
+    vel_hum = HPF_SMF*vel_hum + HPF_SMF*(ang_vel[0] - vel_hum_last);	// HPF on gyroscopes
+		vel_hum_last = ang_vel[0];
+		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(ang_vel[1] - vel_exo_last);	// HPF on gyroscopes
+		vel_exo_last = ang_vel[1];
 
 		// velocities derivative using a Gain and a Discrete Integrator in loop
 		acc_exo = 24 * (vel_exo - IntegratorExo);
@@ -542,7 +542,7 @@ void accBasedControl::SavitskyGolay(float window[], float newest_value, float* f
 
 }
 
-void accBasedControl::accBasedPosition(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
 	while (Run.load())
 	{
@@ -556,10 +556,10 @@ void accBasedControl::accBasedPosition(float &velHum, float &velExo, std::condit
 
 		m_epos->sync();	// CAN Synchronization
 
-		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyroscopes
-		vel_hum_last = velHum;
-		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(velExo - vel_exo_last);	// HPF on gyroscopes
-		vel_exo_last = velExo;
+		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(ang_vel[0] - vel_hum_last);	// HPF on gyroscopes
+		vel_hum_last = ang_vel[0];
+		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(ang_vel[1] - vel_exo_last);	// HPF on gyroscopes
+		vel_exo_last = ang_vel[1];
 
 		// velocities derivative using a Gain and a Discrete Integrator in loop
 		acc_exo = 24 * (vel_exo - IntegratorExo);

@@ -29,6 +29,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
 #include <stdio.h>
+#include <vector>
 #include <time.h>
 #include <math.h>
 #include <atomic>
@@ -233,7 +234,7 @@ public:
 	}
 
 	// Controlling through the EPOS motor speed control
-	void OmegaControl(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Controlling through the EPOS motor speed control assisted by Kalman Filter estimation
 	void OmegaControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
@@ -251,7 +252,7 @@ public:
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Controlling through the EPOS Position control
-	void accBasedPosition(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
