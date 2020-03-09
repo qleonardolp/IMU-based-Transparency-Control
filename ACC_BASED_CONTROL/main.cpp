@@ -471,12 +471,13 @@ int main(int argc, char** argv)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
         gyros[0] = mtw_hum = -(float)gyroData[0].value(2);
-        gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
+        //gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
         Cv.notify_one();
         Cv.wait(Lck);
 
 		auto control_stamp = std::chrono::steady_clock::now();
-		delay = std::chrono::duration_cast<std::chrono::milliseconds>(control_stamp - mtw_data_stamp).count();
+		delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
+    delay = 1e-3*delay;
 
         printer++;
         scan_file++;
@@ -521,7 +522,7 @@ int main(int argc, char** argv)
           break;
         }
         std::cout << xsens2Eposcan.ctrl_word;
-        printf(" delay %4.2f ms MTw Rate: %5.2f Hz\n\n MasterCallback:", delay, freq);
+        printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
         std::cout << wirelessMasterCallback.mtw_event << std::endl; 
         printer = 0;

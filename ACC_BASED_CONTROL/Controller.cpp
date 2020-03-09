@@ -473,13 +473,13 @@ void accBasedControl::UpdateCtrlWord_Admittance()
 	ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
 	ctrl_word += " T_Sea: " + std::to_string(torque_sea);
 	ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
-	ctrl_word += " -> Passivity Constraints <-\n ";
+	ctrl_word += "\n -> Passivity Constraints <-\n ";
 
 	kd_min = damping_A*(Ki_adm / Kp_adm - damping_A / (J_EQ*(1 - stiffness_d / STIFFNESS)) - Kp_adm / J_EQ);
 
-	ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n";
-	sprintf(numbers_str, "%3.2f", 1/control_t_Dt);
-	ctrl_word += " Control Rate: " + (std::string) numbers_str + " Hz\n";
+	ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
+	sprintf(numbers_str, "%4.2f", 1/control_t_Dt);
+	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
 }
 
 void accBasedControl::Recorder_Velocity()

@@ -51,6 +51,9 @@
     <ClInclude Include="generalheader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Controller.h">
+      <Filter>Header Files\epos_canopen</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="findClosestUpdateRate.cpp">
@@ -64,6 +67,9 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Controller.cpp">
+      <Filter>Source Files\eposcan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

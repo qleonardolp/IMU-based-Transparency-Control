@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClInclude Include="AXIS.h" />
     <ClInclude Include="CAN_FRAME.h" />
+    <ClInclude Include="Controller.h" />
     <ClInclude Include="EPOS_NETWORK.h" />
     <ClInclude Include="findClosestUpdateRate.h" />
     <ClInclude Include="generalheader.h" />
@@ -21,6 +22,7 @@
     <ClInclude Include="nixnet.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Controller.cpp" />
     <ClCompile Include="findClosestUpdateRate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mastercallback.cpp" />
@@ -67,21 +69,21 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>C:\Users\Leonardo Felipe\Documents\AccBasedControl\ACC_BASED_CONTROL\Win32\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\MATLAB\R2017b\extern\include;C:\Eigen3\eigen-eigen-323c052e1731;C:\Users\guilherme\Desktop\Leonardo_Felipe_EPOS\accbasedcontrol_xsens_epos\Win32\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ShowIncludes>true</ShowIncludes>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(NIEXTCCOMPILERSUPP)\lib32\msvc;C:\Users\Leonardo Felipe\Documents\AccBasedControl\ACC_BASED_CONTROL\Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>odbc32.lib;odbccp32.lib;nixnet.lib;xsensdeviceapi32.lib;xstypes32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2017b\extern\lib\win64\microsoft;$(NIEXTCCOMPILERSUPP)\lib32\msvc;C:\Users\guilherme\Desktop\Leonardo_Felipe_EPOS\accbasedcontrol_xsens_epos\Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>odbc32.lib;odbccp32.lib;nixnet.lib;xsensdeviceapi32.lib;xstypes32.lib;libmx.lib;libmat.lib;libeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
