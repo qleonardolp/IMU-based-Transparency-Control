@@ -131,6 +131,79 @@ float accBasedControl::IntAccExo = 0;
 
 // Control Functions //
 
+void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+{
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(150));
+
+		m_epos->sync();	// CAN Synchronization
+
+		// Positions Measurement:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+
+		// Assigning the measured states to the Sensor reading Vector
+		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
+
+		// Predicting	//
+		xk_omg = Fk_omg * xk_omg;
+		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
+
+		// Kalman Gain	//
+
+		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
+		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
+		if (TotalCovariance.isInvertible())
+			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
+
+		// Updating		//
+		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
+		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
+
+		// Controlling using the state estimations:
+		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
+		vel_hum = xk_omg(0, 0);
+		vel_exo = xk_omg(1, 0);
+		theta_l = xk_omg(2, 0);
+		theta_c = xk_omg(3, 0);
+		torque_sea = STIFFNESS*(theta_c - theta_l);
+
+		// Position Set	//
+		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
+		// using setpoint_filt as encoder steps:
+		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
+
+		if ((theta_m >= -1.5708) && (theta_m <= 0.5236)) //(caminhando)
+			m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
+		m_eixo_in->WritePDO01();
+
+		// Motor Velocity to log
+		m_eixo_in->ReadPDO02();
+		vel_motor = 1 / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder();
+			else
+				logging = false;
+		}
+	}
+}
+
 void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
 	while (Run.load())
@@ -216,6 +289,95 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 	}
 }
 
+void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+{
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(150));
+
+		m_epos->sync();	// CAN Synchronization
+
+		// Positions Measurement:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+
+		// Assigning the measured states to the Sensor reading Vector
+		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
+
+		// Motor Velocity
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		// Predicting	//
+		xk_omg = Fk_omg * xk_omg + Bk_omg * vel_motor;
+		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
+
+		// Kalman Gain	//
+
+		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
+		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
+		if (TotalCovariance.isInvertible())
+			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
+
+		// Updating		//
+		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
+		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
+
+		// Controlling using the state estimations:
+		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
+		vel_hum = xk_omg(0, 0);
+		vel_exo = xk_omg(1, 0);
+		theta_l = xk_omg(2, 0);
+		theta_c = xk_omg(3, 0);
+		torque_sea = STIFFNESS*(theta_c - theta_l);
+
+		// Position Set	//
+		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
+
+		vel_motor = (theta_m - theta_m_last) / C_DT;
+		theta_m_last = theta_m;
+
+		vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
+		voltage = abs(vel_motor / SPEED_CONST);
+
+		if ((voltage > 0.010) && (voltage <= VOLTAGE_MAX))
+		{
+			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
+		}
+		else if (voltage > VOLTAGE_MAX)	// upper saturation
+		{
+			if (vel_motor < 0)
+				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
+			else
+				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
+		}
+		else                            // lower saturation
+		{
+			m_eixo_in->PDOsetVelocitySetpoint(0);
+		}
+		m_eixo_in->WritePDO02();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder();
+			else
+				logging = false;
+		}
+	}
+}
 
 void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
@@ -246,8 +408,8 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
 		// Here, the reference torque is zero!
-		vel_adm = damping_A / (damping_A + stiffness_d*control_t_Dt) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt) * (-d_torque_sea);
+		vel_adm = damping_A / (damping_A + stiffness_d*C_DT) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT) * (-d_torque_sea);
 		// testar sem as duas linhas abaixo
 		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
 		vel_adm_last = vel_adm;
@@ -302,426 +464,6 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
-		control_t_Dt = 1e-6*control_t_Dt;
-
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
-	}
-}
-
-void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
-{
-	while (Run.load())
-	{
-		unique_lock<std::mutex> Lk(m);
-		cv.notify_one();
-
-		control_t_begin = steady_clock::now();
-
-		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(1500));
-
-		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
-		m_epos->sync();	// CAN Synchronization
-
-		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
-		vel_hum_last = velHum;
-
-		// SEA Torque:
-		m_eixo_out->ReadPDO01();
-		theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-		m_eixo_in->ReadPDO01();
-		theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
-		d_torque_sea = 13 * (torque_sea - IntAdm_In);
-		IntAdm_In += d_torque_sea*control_t_Dt;
-
-		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
-		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
-		vel_adm = damping_A / (damping_A + stiffness_d*control_t_Dt) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / control_t_Dt) * (-d_torque_sea);
-		// testar sem as duas linhas abaixo
-		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
-		vel_adm_last = vel_adm;
-
-		m_eixo_in->ReadPDO02();
-		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-
-		// Integration for the Inner Control (PI)
-		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-		// Integration reset:
-		if (resetInt == 2000)
-		{
-			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-			resetInt = 0;
-		}
-		// Inner Control Loop (PI):
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
-		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
-
-		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
-		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
-
-		if (abs(setpoint_filt) < CURRENT_MAX)
-		{
-			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
-				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
-			else
-				m_eixo_in->PDOsetCurrentSetpoint(0);
-		}
-		else
-		{
-			if (setpoint_filt < 0)
-				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
-			else
-				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
-		}
-		m_eixo_in->WritePDO01();
-
-		m_eixo_in->ReadPDO01();
-		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-
-		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
-		control_t_Dt = 1e-6*control_t_Dt;
-
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
-	}
-}
-
-void accBasedControl::GainScan_Velocity()
-{
-	gains_values = fopen("gainsSpeed.txt", "rt");
-
-	if (gains_values != NULL)
-	{
-		fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
-		fclose(gains_values);
-	}
-}
-
-void accBasedControl::GainScan_CAC()
-{
-	gains_values = fopen("gainsCAC.txt", "rt");
-
-	if (gains_values != NULL)
-	{
-		fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
-		fclose(gains_values);
-	}
-}
-
-void accBasedControl::GainScan_CACu()
-{
-	gains_values = fopen("gainsCACu.txt", "rt");
-
-	if (gains_values != NULL)
-	{
-		fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
-		fclose(gains_values);
-	}
-}
-
-void accBasedControl::UpdateCtrlWord_Velocity()
-{
-	char numbers_str[20];
-	sprintf(numbers_str, "%+5.3f", vel_motor_filt);
-	ctrl_word = " vel_motor: " + (std::string) numbers_str + " rpm";
-	sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
-	ctrl_word += "[" + (std::string) numbers_str + " V]\n";
-	sprintf(numbers_str, "%5.3f", Kff_V);
-	ctrl_word += " Kff_V: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", Kp_V);
-	ctrl_word += " Kp_V: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", Ki_V);
-	ctrl_word += " Ki_V: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", Kd_V);
-	ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
-	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
-}
-
-void accBasedControl::UpdateCtrlWord_Admittance()
-{
-	char numbers_str[20];
-	ctrl_word = " COLLOCATED ADMITTANCE CONTROLLER\n";
-	if (m_control_mode == 'a')
-	{
-		sprintf(numbers_str, "%+5.3f", vel_motor);
-		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
-		sprintf(numbers_str, "%+4d", actualVelocity);
-		ctrl_word += " [" + (std::string) numbers_str + " rpm	";
-		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
-		ctrl_word += (std::string) numbers_str + " V]\n";
-	}
-	else if (m_control_mode == 'u' || m_control_mode == 'k')
-	{
-		ctrl_word += " Torque: " + std::to_string(torque_m) + " N.m";
-		ctrl_word += " [ " + std::to_string(1000 * setpoint_filt) + " ";
-		ctrl_word += std::to_string(actualCurrent) + " mA]\n";
-	}
-	sprintf(numbers_str, "%5.3f", Kp_adm);
-	ctrl_word += " Kp: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", Ki_adm);
-	ctrl_word += " Ki: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", stiffness_d);
-	ctrl_word += " STF: " + (std::string) numbers_str;
-	sprintf(numbers_str, "%5.3f", damping_A);
-	ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
-	ctrl_word += " T_Sea: " + std::to_string(torque_sea);
-	ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
-	ctrl_word += "\n -> Passivity Constraints <-\n ";
-
-	k_bar = 1 - stiffness_d / STIFFNESS;
-	kd_min = damping_A*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_A / k_bar - Kp_adm));
-
-	ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
-	sprintf(numbers_str, "%4.2f", 1/control_t_Dt);
-	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
-}
-
-void accBasedControl::Recorder()
-{
-	logger = fopen(logger_filename, "a");
-	if (logger != NULL)
-	{
-		switch (m_control_mode)
-		{
-		case 'a':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
-			break;
-		case 'p':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
-			break;
-		case 's':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, RPM2RADS*vel_motor_filt);
-			break;
-		case 'k':
-		case 'u':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n", timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
-			// currents in mA
-			break;
-		default:
-			break;
-		}// everything logged in standard units (SI)
-		fclose(logger);
-	}
-}
-
-void accBasedControl::Recorder_CAC()
-{
-	logger = fopen(logger_filename, "a");
-	if (logger != NULL)
-	{
-		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n",
-			timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
-		// everything logged in standard units (SI)
-		fclose(logger);
-	}
-}
-
-void accBasedControl::Recorder_CACu()
-{
-	logger = fopen(logger_filename, "a");
-	if (logger != NULL)
-	{
-		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n",
-			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
-		// everything logged in standard units (SI)
-		fclose(logger);
-	}
-}
-
-void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)
-{
-	// shifting values in 1 position, updating the window with one sample:
-	for (int i = 10; i > 0; --i)
-	{
-		window[i] = window[i - 1];
-	}
-
-	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
-	// Norm: 143 |	Coeff: 6	-10	-5	5	10	6	-5	-15	-10	30	131
-
-	window[0] = (6 * window[10] - 10 * window[9] - 5 * window[8]
-		+ 5 * window[7] + 10 * window[6] + 6 * window[5]
-		- 5 * window[4] - 15 * window[3] - 10 * window[2]
-		+ 30 * window[1] + 131 * newest_value) / 143;
-
-
-	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
-	*first_derivative = (5 * window[0] + 4 * window[1] + 3 * window[2] + 2 * window[3] +
-		1 * window[4] + 0 * window[5] - 1 * window[6] - 2 * window[7] -
-		3 * window[8] - 4 * window[9] - 5 * window[10]) / (110) * RATE;
-
-}
-
-void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
-{
-	while (Run.load())
-	{
-		unique_lock<mutex> Lk(m);
-		cv.notify_one();
-
-		control_t_begin = steady_clock::now();
-
-		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(150));
-
-		m_epos->sync();	// CAN Synchronization
-
-		// Positions Measurement:
-		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		
-		// Assigning the measured states to the Sensor reading Vector
-		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
-
-		// Predicting	//
-		xk_omg = Fk_omg * xk_omg;
-		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
-
-		// Kalman Gain	//
-
-		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
-		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
-		if (TotalCovariance.isInvertible())
-			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
-
-		// Updating		//
-		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
-		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
-
-		// Controlling using the state estimations:
-		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
-		vel_hum = xk_omg(0, 0);
-		vel_exo = xk_omg(1, 0);
-		theta_l = xk_omg(2, 0);
-		theta_c = xk_omg(3, 0);
-		torque_sea = STIFFNESS*(theta_c - theta_l);
-
-		// Position Set	//
-		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / control_t_Dt*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
-		// using setpoint_filt as encoder steps:
-		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
-
-		if ((theta_m >= -1.5708) && (theta_m <= 0.5236)) //(caminhando)
-			m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
-		m_eixo_in->WritePDO01();
-
-		// Motor Velocity to log
-		m_eixo_in->ReadPDO02();
-		vel_motor_filt = 1/ GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-		
-		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
-		control_t_Dt = 1e-6*control_t_Dt;
-
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
-	}
-}
-
-
-void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
-{
-	while (Run.load())
-	{
-		unique_lock<mutex> Lk(m);
-		cv.notify_one();
-
-		control_t_begin = steady_clock::now();
-
-		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(150));
-
-		m_epos->sync();	// CAN Synchronization
-
-		// Positions Measurement:
-		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-
-		// Assigning the measured states to the Sensor reading Vector
-		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
-
-		// Motor Velocity
-		m_eixo_in->ReadPDO02();
-		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-
-		// Predicting	//
-		xk_omg = Fk_omg * xk_omg + Bk_omg * vel_motor;
-		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
-
-		// Kalman Gain	//
-
-		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
-		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
-		if (TotalCovariance.isInvertible())
-			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
-
-		// Updating		//
-		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
-		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
-
-		// Controlling using the state estimations:
-		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
-		vel_hum = xk_omg(0, 0);
-		vel_exo = xk_omg(1, 0);
-		theta_l = xk_omg(2, 0);
-		theta_c = xk_omg(3, 0);
-		torque_sea = STIFFNESS*(theta_c - theta_l);
-
-		// Position Set	//
-		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / control_t_Dt*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
-
-		vel_motor = (theta_m - theta_m_last) / control_t_Dt;
-		theta_m_last = theta_m;
-
-		vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
-		vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
-
-		voltage = abs(vel_motor_filt / SPEED_CONST);
-
-		if ((voltage > 0.010) && (voltage <= VOLTAGE_MAX))
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor_filt);
-		}
-		else if (voltage > VOLTAGE_MAX)	// upper saturation
-		{
-			if (vel_motor_filt < 0)
-				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-			else
-				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-		}
-		else                            // lower saturation
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-		}
-		m_eixo_in->WritePDO02();
-
-		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
 		if (logging.load())
@@ -849,6 +591,94 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 	}
 }
 
+void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+{
+	while (Run.load())
+	{
+		unique_lock<std::mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(1500));
+
+		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
+		m_epos->sync();	// CAN Synchronization
+
+		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
+		vel_hum_last = velHum;
+
+		// SEA Torque:
+		m_eixo_out->ReadPDO01();
+		theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();
+		theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
+		d_torque_sea = 13 * (torque_sea - IntAdm_In);
+		IntAdm_In += d_torque_sea*control_t_Dt;
+
+		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
+		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
+		vel_adm = damping_A / (damping_A + stiffness_d*C_DT) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT) * (-d_torque_sea);
+		// testar sem as duas linhas abaixo
+		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
+		vel_adm_last = vel_adm;
+
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		// Integration for the Inner Control (PI)
+		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+		// Integration reset:
+		if (resetInt == 2000)
+		{
+			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+			resetInt = 0;
+		}
+		// Inner Control Loop (PI):
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
+
+		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
+
+		if (abs(setpoint_filt) < CURRENT_MAX)
+		{
+			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
+				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
+			else
+				m_eixo_in->PDOsetCurrentSetpoint(0);
+		}
+		else
+		{
+			if (setpoint_filt < 0)
+				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
+			else
+				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
+		}
+		m_eixo_in->WritePDO01();
+
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		if (logging.load())
+		{
+			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
+			timestamp = 1e-6*timestamp;
+			if (timestamp < m_seconds)
+				Recorder();
+			else
+				logging = false;
+		}
+	}
+}
+
 void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
 {
 	while (Run.load())
@@ -951,3 +781,184 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 	}
 }
 
+void accBasedControl::GainScan()
+{
+	switch (m_control_mode)
+	{
+	case 'p':	// GainScan_Position()
+		gains_values = fopen("gainsPosition.txt", "rt");
+
+		if (gains_values != NULL)
+		{
+			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
+			fclose(gains_values);
+		}
+		break;
+	case 's':	// GainScan_Velocity()
+		gains_values = fopen("gainsSpeed.txt", "rt");
+
+		if (gains_values != NULL)
+		{
+			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
+			fclose(gains_values);
+		}
+		break;
+	case 'a':	// GainScan_CAC()
+		gains_values = fopen("gainsCAC.txt", "rt");
+
+		if (gains_values != NULL)
+		{
+			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
+			fclose(gains_values);
+		}
+		break;
+	case 'k':
+	case 'u':	// GainScan_CACu()
+		gains_values = fopen("gainsCACu.txt", "rt");
+
+		if (gains_values != NULL)
+		{
+			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
+			fclose(gains_values);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+void accBasedControl::Recorder()
+{
+	logger = fopen(logger_filename, "a");
+	if (logger != NULL)
+	{
+		switch (m_control_mode)
+		{
+		case 'a':
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
+			break;
+		case 'p':
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
+			break;
+		case 's':
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, RPM2RADS*vel_motor);
+			break;
+		case 'k':
+		case 'u':
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n", timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
+			// currents in mA
+			break;
+		default:
+			break;
+		}// everything logged in standard units (SI)
+		fclose(logger);
+	}
+}
+
+void accBasedControl::UpdateControlStatus()
+{
+	char numbers_str[20];
+	switch (m_control_mode)
+	{
+	case 'p':
+		ctrl_word = " POSITION CONTROLLER\n";
+		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_m);
+		ctrl_word += " Setpoint Position: " + (std::string) numbers_str + " | ";
+		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_l);
+		ctrl_word += "Leg Position: " + (std::string) numbers_str + " deg\n";
+		sprintf(numbers_str, "%+5.3f", vel_motor);
+		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
+		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
+		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
+		sprintf(numbers_str, "%5.3f", Kff_V);
+		ctrl_word += " Kff_P: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kp_V);
+		ctrl_word += " Kp_P: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Ki_V);
+		ctrl_word += " Ki_P: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kd_V);
+		ctrl_word += " Kd_P: " + (std::string) numbers_str + "\n";
+		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+		break;
+	case 's':
+		ctrl_word = " SPEED CONTROLLER\n";
+		sprintf(numbers_str, "%+5.3f", vel_motor);
+		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
+		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
+		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
+		sprintf(numbers_str, "%5.3f", Kff_V);
+		ctrl_word += " Kff_V: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kp_V);
+		ctrl_word += " Kp_V: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Ki_V);
+		ctrl_word += " Ki_V: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kd_V);
+		ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
+		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+		break;
+	case 'a':
+	case 'u':
+	case 'k':
+		ctrl_word = " COLLOCATED ADMITTANCE CONTROLLER\n";
+		if (m_control_mode == 'a')
+		{
+			sprintf(numbers_str, "%+5.3f", vel_motor);
+			ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
+			sprintf(numbers_str, "%+4d", actualVelocity);
+			ctrl_word += " [" + (std::string) numbers_str + " rpm	";
+			sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
+			ctrl_word += (std::string) numbers_str + " V]\n";
+		}
+		else if (m_control_mode == 'u' || m_control_mode == 'k')
+		{
+			ctrl_word += " Torque: " + std::to_string(torque_m) + " N.m";
+			ctrl_word += " [ " + std::to_string(1000 * setpoint_filt) + " ";
+			ctrl_word += std::to_string(actualCurrent) + " mA]\n";
+		}
+		sprintf(numbers_str, "%5.3f", Kp_adm);
+		ctrl_word += " Kp: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Ki_adm);
+		ctrl_word += " Ki: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", stiffness_d);
+		ctrl_word += " STF: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", damping_A);
+		ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
+		ctrl_word += " T_Sea: " + std::to_string(torque_sea);
+		ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
+		ctrl_word += "\n -> Passivity Constraints <-\n ";
+
+		k_bar = 1 - stiffness_d / STIFFNESS;
+		kd_min = damping_A*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_A / k_bar - Kp_adm));
+
+		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
+		break;
+	default:
+		break;
+	}
+	sprintf(numbers_str, "%4.2f", 1 / control_t_Dt);
+	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
+}
+
+void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)
+{
+	// shifting values in 1 position, updating the window with one sample:
+	for (int i = 10; i > 0; --i)
+	{
+		window[i] = window[i - 1];
+	}
+
+	// *Savitsky-Golay Smoothing Coefficients, 4th order fit with 11 pts and +5 offset from the centre point
+	// Norm: 143 |	Coeff: 6	-10	-5	5	10	6	-5	-15	-10	30	131
+
+	window[0] = (6 * window[10] - 10 * window[9] - 5 * window[8]
+		+ 5 * window[7] + 10 * window[6] + 6 * window[5]
+		- 5 * window[4] - 15 * window[3] - 10 * window[2]
+		+ 30 * window[1] + 131 * newest_value) / 143;
+
+
+	// *Finite Difference, SG Coefficients, First Derivative, linear fit with 11 pts and +5 offset
+	*first_derivative = (5 * window[0] + 4 * window[1] + 3 * window[2] + 2 * window[3] +
+		1 * window[4] + 0 * window[5] - 1 * window[6] - 2 * window[7] -
+		3 * window[8] - 4 * window[9] - 5 * window[10]) / (110) * RATE;
+
+}

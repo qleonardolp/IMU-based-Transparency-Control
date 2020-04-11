@@ -274,6 +274,9 @@ public:
 		}
 	}
 
+	// Controlling through the EPOS Position control
+	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
@@ -292,26 +295,17 @@ public:
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
-	// Controlling through the EPOS Position control
-	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	// The method to scan the file with the values to update the gains in runtime
+	void GainScan();
+
+	// The method to log the desired variables in a .txt file
+	void Recorder();
+
+	// Update the 'Control Word' to show info at the console screen
+	void UpdateControlStatus();
 
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
-
-	// GainScan are the methods to scan the file with the values to update the gains in runtime
-	void GainScan_Velocity();
-	void GainScan_CAC();
-	void GainScan_CACu();
-
-	// Recorder are the methods to log the desired variables in a .txt file
-	void Recorder();
-	void Recorder_Velocity(){}
-	void Recorder_CAC();
-	void Recorder_CACu();
-
-	// Update the 'Control Word' to show info at the console screen
-	void UpdateCtrlWord_Velocity();
-	void UpdateCtrlWord_Admittance();
 
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }

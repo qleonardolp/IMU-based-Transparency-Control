@@ -481,7 +481,7 @@ int main(int argc, char** argv)
 
 		auto control_stamp = std::chrono::steady_clock::now();
 		delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
-	delay = 1e-3*delay;
+		delay = 1e-3*delay;
 
         printer++;
         scan_file++;
@@ -493,38 +493,14 @@ int main(int argc, char** argv)
 
       if (scan_file == (int)RATE * 6)  // every 6s reads the gains_values.txt 
       {
-        switch (control_mode)
-        {
-        case 's':
-          xsens2Eposcan.GainScan_Velocity();
-          break;
-        case 'a':
-          xsens2Eposcan.GainScan_CAC();
-          break;
-		case 'k':
-        case 'u':
-          xsens2Eposcan.GainScan_CACu();
-          break;
-        default:
-          break;
-        }
-        scan_file = 0;
+		  xsens2Eposcan.GainScan();
+		  scan_file = 0;
       }
 
-      if (printer == (int)RATE / 5)   // printing the status @ 5Hz
+      if (printer == (int)RATE / 4)   // printing the status @ 4Hz
       {
         system("cls");
-        switch (control_mode)
-        {
-        case 's':
-          xsens2Eposcan.UpdateCtrlWord_Velocity();
-          break;
-		case 'a': case 'u': case 'k':
-          xsens2Eposcan.UpdateCtrlWord_Admittance();
-          break;
-        default:
-          break;
-        }
+		xsens2Eposcan.UpdateControlStatus();
         std::cout << xsens2Eposcan.ctrl_word;
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
