@@ -162,9 +162,14 @@ public:
 			if (logger != NULL)
 			{
 				// printing the header into the file first line
-				if (control_mode == 's')
+
+				if (control_mode == 'p')
 				{
-					fprintf(logger, "OmegaControl\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/s2]  acc_exo[rad/s2]  jerk_hum[rad/s3]  jerk_exo[rad/s3]  vel_motor[rad/s]  actual_Vel[rad/s]  exo_Vel[rad/s]  T_Sea[N.m]  theta_c[rad]  theta_l[rad]\n");
+					fprintf(logger, "accBasedPosition\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n");
+				}
+				else if (control_mode == 's')
+				{
+					fprintf(logger, "OmegaControlKF\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  vel_motor[rad / s]\n");
 				}
 				else if (control_mode == 'a')
 				{
@@ -185,7 +190,43 @@ public:
 		//		KALMAN FILTER SETUP		//
 		float Dt = 0.00100f;
 
-		if (control_mode == 's'){}
+		if (control_mode == 's' || control_mode == 'p')
+		{
+			xk_omg.setZero();	zk_omg.setZero(); KG_omg.setZero();
+
+			Fk_omg.setIdentity();
+			// Row 3
+			Fk_omg(2, 1) = Dt;	//or use DELTA_T?
+
+			Bk_omg.setZero(); Bk_omg(3, 0) = Dt;
+
+			Hk_omg.setZero();
+			Hk_omg(0, 0) = 1;	Hk_omg(1, 1) = 1;	Hk_omg(2, 2) = 1;	Hk_omg(3, 3) = 1;
+			Hk_omg(4, 0) = 1;	Hk_omg(4, 1) = -1;
+
+			Pk_omg.setZero();
+			Pk_omg(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
+			Pk_omg(1, 1) = pow(0.0023400, 2);	// Idem
+			Pk_omg(2, 2) = pow(0.0030700, 2);	// 2*pi/2048
+			Pk_omg(3, 3) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			Pk_omg(4, 4) = pow(0.0046800, 2);	// 2*devpad(MTw)
+
+
+			Rk_omg.setZero();
+			Rk_omg(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+			Rk_omg(1, 1) = pow(0.0023400, 2);	// Idem
+			Rk_omg(2, 2) = pow(0.0030700, 2);	// 2*pi/2048
+			Rk_omg(3, 3) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
+			Rk_omg(4, 4) = pow(0.0046800, 2);	// 2*devpad(MTw)
+
+			// additional uncertainty from the environment
+			Qk_omg.setZero();
+			Qk_omg(0, 0) = pow(0.0000234, 2);
+			Qk_omg(1, 1) = pow(0.0000234, 2);
+			Qk_omg(2, 2) = pow(0.0000307, 2);
+			Qk_omg(3, 3) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+			Qk_omg(4, 4) = pow(0.0000468, 2);
+		}
 		else if (control_mode == 'k' || control_mode == 'a')
 		{	
 			CAC_xk.setZero();	CAC_zk.setZero(); CAC_KG.setZero();
@@ -237,7 +278,7 @@ public:
 	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Controlling through the EPOS motor speed control assisted by Kalman Filter estimation
-	void OmegaControlKF(float &velHum, float &velExo, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
@@ -263,7 +304,8 @@ public:
 	void GainScan_CACu();
 
 	// Recorder are the methods to log the desired variables in a .txt file
-	void Recorder_Velocity();
+	void Recorder();
+	void Recorder_Velocity(){}
 	void Recorder_CAC();
 	void Recorder_CACu();
 
@@ -338,6 +380,7 @@ private:
 	static float IntAdm_In;		// A(s) Input integrator
 	static float stiffness_d;	// k_d	  [N.m/rad]
 	static float damping_A;		// d_{dm} [N.m s/rad]
+	static float k_bar;			// 1 - k_d/K
 	static float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
 	static float vel_adm_last;	// [rad/s]
 	static float kd_min;
@@ -376,7 +419,8 @@ private:
 	static float vel_motor_filt;	// [rad/s]
 	static float voltage;			// [V]
 
-	static float theta_m;			// [encoder pulses]
+	static float theta_m;			// [rad]
+	static float theta_m_last;
 	static int actualVelocity;		// [rpm]
 	static int exoVelocity;			// [rpm]
 
@@ -396,19 +440,19 @@ private:
 	float theta_l_vec[SGVECT_SIZE];		// [rad]
 	float theta_c_vec[SGVECT_SIZE];		// [rad]
 
-	//	OmegaControl Kalman Filter		//
-  /*
-	static Matrix<float, 9, 1> Ome_xk;	// State Vector				[vel_h acc_h jerk_h vel_e acc_e jerk_e vel_m theta_c theta_l]
-	static Matrix<float, 5, 1> Ome_zk;	// Sensor reading Vector	[vel_hum vel_exo vel_motor theta_c theta_l]
-	static Matrix<float, 9, 9> Ome_Pk;	// State Covariance Matrix
-	static Matrix<float, 9, 9> Ome_Fk;	// Prediction Matrix
-	static Matrix<float, 9, 1> Ome_Bk;	// Control Matrix (is a vector but called matrix)
-	static Matrix<float, 9, 9> Ome_Qk;	// Process noise Covariance
-	static Matrix<float, 5, 5> Ome_Rk;	// Sensor noise Covariance
-	static Matrix<float, 5, 9> Ome_Hk;	// Sensor Expectations Matrix
-	static Matrix<float, 9, 5> Ome_KG;	// Kalman Gain Matrix
-  */
-	//		CAC & CACu Kalman Filter	//
+	//	accBasedPostion & OmegaControl KF	//
+
+	static Matrix<float, 5, 1> xk_omg;	// State Vector				[vel_h vel_e theta_l theta_c pid_e]
+	static Matrix<float, 5, 1> zk_omg;	// Sensor reading Vector	[vel_h vel_e theta_l theta_c pid_e]
+	static Matrix<float, 5, 5> Pk_omg;	// State Covariance Matrix
+	static Matrix<float, 5, 5> Fk_omg;	// Prediction Matrix
+	static Matrix<float, 5, 1> Bk_omg;	// Control Matrix (is a vector but called matrix)
+	static Matrix<float, 5, 5> Qk_omg;	// Process noise Covariance
+	static Matrix<float, 5, 5> Rk_omg;	// Sensor noise Covariance
+	static Matrix<float, 5, 5> Hk_omg;	// Sensor Expectations Matrix
+	static Matrix<float, 5, 5> KG_omg;	// Kalman Gain Matrix
+
+	//		CAC & CACu Kalman Filter		//
 
 	static Matrix<float, 5, 1> CAC_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
 	static Matrix<float, 4, 1> CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]

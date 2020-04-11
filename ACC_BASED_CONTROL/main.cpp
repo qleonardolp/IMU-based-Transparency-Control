@@ -436,7 +436,7 @@ int main(int argc, char** argv)
     if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 's')
-      controller_t = std::thread(&accBasedControl::OmegaControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::OmegaControlKF, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if (control_mode == 'p')
       controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
     else if(control_mode == 'a')
@@ -471,13 +471,17 @@ int main(int argc, char** argv)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
         gyros[0] = mtw_hum = -(float)gyroData[0].value(2);
-        //gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
+
+		// For accBasedPosition and OmegaControlKF
+		if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's'))
+			gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
+
         Cv.notify_one();
         Cv.wait(Lck);
 
 		auto control_stamp = std::chrono::steady_clock::now();
 		delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
-    delay = 1e-3*delay;
+	delay = 1e-3*delay;
 
         printer++;
         scan_file++;
