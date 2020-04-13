@@ -366,6 +366,7 @@ private:
 	static float Kp_adm;		// in the reference is the D [N.m/rad]
 	static float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
 	static float IntInnerC;		// Integrator of the input in Cv(s)
+	static float vel_inner;		// Input velocity to the Inner Loop Controller. It's the k-1 value to be used in the Trapezoidal Integration IntInnerC += (v_k + v_k-1)/2*dt
 	static float IntTorqueM;	// Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
 	static int   resetInt;
 	// |- Admittance Control:

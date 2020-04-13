@@ -78,6 +78,7 @@ float accBasedControl::Ki_adm = 0;
 float accBasedControl::Kp_adm = 0;
 float accBasedControl::torque_m;
 float accBasedControl::IntInnerC = 0;
+float accBasedControl::vel_inner = 0;
 float accBasedControl::IntTorqueM = 0;
 int   accBasedControl::resetInt = 0;
 float accBasedControl::torque_ref = 0;
@@ -420,7 +421,7 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		// Integration for the Inner Control (PI)
 		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 		// Integration reset:
-		if (resetInt == 1700)
+		if (resetInt == 1700000)
 			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 
 		// Inner Control Loop (PI):
@@ -432,7 +433,7 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		// torque_m -> 1/(J_EQ*s) -> vel_motor:
 		IntTorqueM += (torque_m / J_EQ)*control_t_Dt;
 		// Integration reset:
-		if (resetInt == 2000)
+		if (resetInt == 2000000)
 		{
 			IntTorqueM = (torque_m / J_EQ)*control_t_Dt;
 			resetInt = 0;
@@ -629,13 +630,12 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
-		// Integration for the Inner Control (PI)
-		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+		// Integration for the Inner Control (PI), Trapezoidal Rule
+		IntInnerC += 0.5*(vel_inner + vel_hum + vel_adm - vel_motor)*control_t_Dt;
+		vel_inner = vel_hum + vel_adm - vel_motor;
 		// Integration reset:
-		if (resetInt == 2000)
-		{
-			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-			resetInt = 0;
+		if (resetInt == 2718281){
+			IntInnerC = resetInt = vel_inner = 0;
 		}
 		// Inner Control Loop (PI):
 		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
