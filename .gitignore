@@ -157,3 +157,5 @@ $RECYCLE.BIN/
 
 # My ignored
 .vs/
+MATLAB/*.slxc
+MATLAB/slprj/
