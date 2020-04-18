@@ -85,11 +85,11 @@ float accBasedControl::torque_ref = 0;
 float accBasedControl::Adm_In;
 float accBasedControl::IntAdm_In = 0;
 float accBasedControl::stiffness_d = STIFFNESS / 2;
-float accBasedControl::damping_A = 0.001;
+float accBasedControl::damping_d = 0.001;
 float accBasedControl::k_bar = 1 - stiffness_d / STIFFNESS;
 float accBasedControl::vel_adm = 0;
 float accBasedControl::vel_adm_last = 0;
-float accBasedControl::kd_min = damping_A*(Ki_adm / Kp_adm - 1/J_EQ*(damping_A / k_bar - Kp_adm));
+float accBasedControl::kd_min = damping_d*(Ki_adm / Kp_adm - 1/J_EQ*(damping_d / k_bar - Kp_adm));
 float accBasedControl::kd_max = STIFFNESS;
 float accBasedControl::torque_u = 0;
 float accBasedControl::IntTsea = 0;
@@ -412,8 +412,8 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
 		// Here, the reference torque is zero!
-		vel_adm = damping_A / (damping_A + stiffness_d*C_DT) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT) * (-d_torque_sea);
+		vel_adm = damping_d / (damping_d + stiffness_d*C_DT) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT) * (-d_torque_sea);
 		// testar sem as duas linhas abaixo
 		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
 		vel_adm_last = vel_adm;
@@ -532,9 +532,9 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 		theta_l = CAC_xk(3, 0);
 
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
-		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT)
-		static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_A);
-		static float C1 = damping_A / (damping_A + stiffness_d*C_DT);
+		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
+		static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
+		static float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
 		vel_adm = C1*vel_adm - C2*(CAC_xk(4, 0) - torque_sea);   // C2*(Tsea_k - Tsea_k-1)
 
@@ -624,8 +624,8 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 
 		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
 		// Here, the reference torque is the torque required to sustain the Exo lower leg mass
-		vel_adm = damping_A / (damping_A + stiffness_d*C_DT) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT) * (-d_torque_sea);
+		vel_adm = damping_d / (damping_d + stiffness_d*C_DT) * vel_adm +
+			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT) * (-d_torque_sea);
 		// testar sem as duas linhas abaixo
 		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
 		vel_adm_last = vel_adm;
@@ -733,20 +733,20 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		theta_l = CAC_xk(3, 0);
 
     // Putting Dt from (Tsea_k - Tsea_k-1)/Dt
-    // into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT)
+    // into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
 	// Back to the old C2:
-    static float C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A/C_DT);
-	static float C1 = damping_A / (damping_A + stiffness_d*C_DT);
+    static float C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d/C_DT);
+	static float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
 	d_torque_sea = (CAC_xk(4, 0) - torque_sea) / C_DT;
 	torque_sea = CAC_xk(4, 0); // Tsea_k-1 <- Tsea_k
 
 	// Acc-based Admittance Control*: ----------------
-	static float Pu = J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_A;
-	static float Iu = (Ki_adm*damping_A + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS;
+	static float Pu = J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_d;
+	static float Iu = (Ki_adm*damping_d + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS;
 	static float I2u = Ki_adm*stiffness_d / STIFFNESS;
 	k_bar = 1 - stiffness_d / STIFFNESS;
-	static float Du = J_EQ*damping_A / STIFFNESS - J_EQ*k_bar;
+	static float Du = J_EQ*damping_d / STIFFNESS - J_EQ*k_bar;
 
 	IntTsea += C_DT*torque_sea;
 	Int2Tsea += C_DT*IntTsea;
@@ -826,7 +826,7 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
+			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
 			fclose(gains_values);
 		}
 		break;
@@ -836,7 +836,7 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_A);
+			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
 			fclose(gains_values);
 		}
 		break;
@@ -939,14 +939,14 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += " Ki: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", stiffness_d);
 		ctrl_word += " STF: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", damping_A);
+		sprintf(numbers_str, "%5.3f", damping_d);
 		ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
 		ctrl_word += " T_Sea: " + std::to_string(torque_sea);
 		ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
 		ctrl_word += "\n -> Passivity Constraints <-\n ";
 
 		k_bar = 1 - stiffness_d / STIFFNESS;
-		kd_min = damping_A*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_A / k_bar - Kp_adm));
+		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_d / k_bar - Kp_adm));
 
 		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
 		break;

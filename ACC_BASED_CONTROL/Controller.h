@@ -295,13 +295,13 @@ public:
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
-	float getPu(){ return J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_A; }
+	float getPu(){ return J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_d; }
 
-	float getIu(){ return (Ki_adm*damping_A + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS; }
+	float getIu(){ return (Ki_adm*damping_d + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS; }
 
 	float getI2u(){ return Ki_adm*stiffness_d / STIFFNESS; }
 
-	float getDu(){ return J_EQ*damping_A / STIFFNESS - J_EQ*(1 - stiffness_d / STIFFNESS); }
+	float getDu(){ return J_EQ*damping_d / STIFFNESS - J_EQ*(1 - stiffness_d / STIFFNESS); }
 
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
@@ -382,7 +382,7 @@ private:
 	static float Adm_In;		// A(s) Input Derivative = d/dt(torque_ref - torque_sea)
 	static float IntAdm_In;		// A(s) Input integrator
 	static float stiffness_d;	// k_d	  [N.m/rad]
-	static float damping_A;		// d_{dm} [N.m s/rad]
+	static float damping_d;		// d_{dm} [N.m s/rad]
 	static float k_bar;			// 1 - k_d/K
 	static float vel_adm;		// [rad/s] output from A(s), the velocity required to guarantee the desired Admittance
 	static float vel_adm_last;	// [rad/s]
