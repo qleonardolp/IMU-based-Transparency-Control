@@ -295,6 +295,14 @@ public:
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
 
+	float getPu(){ return J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_A; }
+
+	float getIu(){ return (Ki_adm*damping_A + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS; }
+
+	float getI2u(){ return Ki_adm*stiffness_d / STIFFNESS; }
+
+	float getDu(){ return J_EQ*damping_A / STIFFNESS - J_EQ*(1 - stiffness_d / STIFFNESS); }
+
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
 
@@ -380,6 +388,10 @@ private:
 	static float vel_adm_last;	// [rad/s]
 	static float kd_min;
 	static float kd_max;
+	// |- Acc-based Admittance Control*:
+	static float torque_u;
+	static float IntTsea;
+	static float Int2Tsea;
 	// |-------------------------
 
 

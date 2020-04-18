@@ -91,6 +91,9 @@ float accBasedControl::vel_adm = 0;
 float accBasedControl::vel_adm_last = 0;
 float accBasedControl::kd_min = damping_A*(Ki_adm / Kp_adm - 1/J_EQ*(damping_A / k_bar - Kp_adm));
 float accBasedControl::kd_max = STIFFNESS;
+float accBasedControl::torque_u = 0;
+float accBasedControl::IntTsea = 0;
+float accBasedControl::Int2Tsea = 0;
 
 // State Variables
 float accBasedControl::vel_hum = 0;			// [rad/s]
@@ -544,7 +547,7 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 		{
 			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 		}
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea;
 
 		//-> vel_motor = 1/s * torque_m/J_EQ
 		IntTorqueM += (torque_m / J_EQ)*control_t_Dt;
@@ -638,7 +641,7 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 			IntInnerC = resetInt = vel_inner = 0;
 		}
 		// Inner Control Loop (PI):
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea;
 		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
 
 		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
@@ -731,12 +734,27 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
     // Putting Dt from (Tsea_k - Tsea_k-1)/Dt
     // into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A / C_DT)
-    static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_A);
+	// Back to the old C2:
+    static float C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_A/C_DT);
 	static float C1 = damping_A / (damping_A + stiffness_d*C_DT);
 
-    vel_adm = C1*vel_adm - C2*(CAC_xk(4, 0) - torque_sea);   // C2*(Tsea_k - Tsea_k-1)
+	d_torque_sea = (CAC_xk(4, 0) - torque_sea) / C_DT;
+	torque_sea = CAC_xk(4, 0); // Tsea_k-1 <- Tsea_k
 
-    torque_sea = CAC_xk(4, 0); // Tsea_k-1 <- Tsea_k
+	// Acc-based Admittance Control*: ----------------
+	static float Pu = J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_A;
+	static float Iu = (Ki_adm*damping_A + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS;
+	static float I2u = Ki_adm*stiffness_d / STIFFNESS;
+	k_bar = 1 - stiffness_d / STIFFNESS;
+	static float Du = J_EQ*damping_A / STIFFNESS - J_EQ*k_bar;
+
+	IntTsea += C_DT*torque_sea;
+	Int2Tsea += C_DT*IntTsea;
+
+	torque_u = Pu*torque_sea + Iu*IntTsea + I2u*Int2Tsea + Du*d_torque_sea;
+	// -----------------------------------------------
+
+    vel_adm = C1*vel_adm + C2*(0 - d_torque_sea);   // 
 
 		// Inner Control (PI)	//
 		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
@@ -746,7 +764,7 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 			resetInt = 0;
 		}
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea + torque_u;
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 
 		if (abs(setpoint_filt) < CURRENT_MAX)
