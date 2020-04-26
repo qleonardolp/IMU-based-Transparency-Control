@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mastercallback.h"
 #include "mtwcallback.h"
 
+#include "qcustomplot\qcustomplot.h"
 #include <xsensdeviceapi.h> // The Xsens device API header 
 #include <xsens/xsmutex.h>
 #include "xstypes.h"
