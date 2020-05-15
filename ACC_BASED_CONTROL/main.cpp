@@ -431,21 +431,21 @@ int main(int argc, char** argv)
     std::thread controller_t;
     std::condition_variable Cv;
     std::mutex Mtx;
-    
-    auto log_begin = std::chrono::steady_clock::now();
+
+	// xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
     if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 's')
-      controller_t = std::thread(&accBasedControl::OmegaControlKF, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::OmegaControlKF, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if (control_mode == 'p')
-      controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'a')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'u')
-      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx), std::ref(log_begin));
+      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
 
-	log_begin = std::chrono::steady_clock::now();
+	xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
     while (!_kbhit())
     {		

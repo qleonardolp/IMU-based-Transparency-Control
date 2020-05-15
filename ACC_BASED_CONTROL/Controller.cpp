@@ -41,7 +41,7 @@ atomic<bool> accBasedControl::Run(true);
 atomic<bool> accBasedControl::logging(false);
 system_clock::time_point accBasedControl::control_t_begin;
 float accBasedControl::control_t_Dt = 0.001;				// [s]
-float accBasedControl::timestamp = 0.000000000f;
+float accBasedControl::timestamp = 0.0;
 
 // Speed Control [s]
 float accBasedControl::Kp_V = 0;
@@ -135,7 +135,7 @@ float accBasedControl::IntAccExo = 0;
 
 // Control Functions //
 
-void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -180,6 +180,7 @@ void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::conditi
 		torque_sea = STIFFNESS*(theta_c - theta_l);
 
 		// Position Set	//
+		// Using the same gains variables from Speed controller, but loading then from the gains file of the Position controller
 		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
 		// using setpoint_filt as encoder steps:
 		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
@@ -196,19 +197,11 @@ void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::conditi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -254,24 +247,7 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		vel_motor = RADS2RPM * GEAR_RATIO * vel_motor;
 		vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
-		voltage = abs(vel_motor_filt / SPEED_CONST);
-
-		if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor_filt);
-		}
-		else if (voltage > VOLTAGE_MAX)	// upper saturation
-		{
-			if (vel_motor_filt < 0)
-				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-			else
-				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-		}
-		else                            // lower saturation
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-		}
-		m_eixo_in->WritePDO02();
+		SetEposVelocityLimited(vel_motor_filt);
 
 		// Precisa ??
 		m_eixo_in->ReadPDO02();
@@ -281,19 +257,11 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 		
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -348,42 +316,18 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 		theta_m_last = theta_m;
 
 		vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
-		voltage = abs(vel_motor / SPEED_CONST);
 
-		if ((voltage > 0.010) && (voltage <= VOLTAGE_MAX))
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
-		}
-		else if (voltage > VOLTAGE_MAX)	// upper saturation
-		{
-			if (vel_motor < 0)
-				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-			else
-				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-		}
-		else                            // lower saturation
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-		}
-		m_eixo_in->WritePDO02();
+		SetEposVelocityLimited(vel_motor);
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -444,24 +388,7 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		vel_motor = RADS2RPM*GEAR_RATIO*IntTorqueM;
 
-		voltage = abs(vel_motor / SPEED_CONST);
-
-		if ((voltage > 0.100) && (voltage <= VOLTAGE_MAX))
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
-		}
-		else if (voltage > VOLTAGE_MAX)	// upper saturation
-		{
-			if (vel_motor < 0)
-				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-			else
-				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-		}
-		else                            // lower saturation
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-		}
-		m_eixo_in->WritePDO02();
+		SetEposVelocityLimited(vel_motor);
 
 		m_eixo_in->ReadPDO02();
 		actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
@@ -470,19 +397,11 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -560,42 +479,17 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 
 		vel_motor = RADS2RPM*GEAR_RATIO*IntTorqueM;
 
-		voltage = abs(vel_motor / SPEED_CONST);
-
-		if ((voltage > 0.010) && (voltage <= VOLTAGE_MAX))
-		{
-			m_eixo_in->PDOsetVelocitySetpoint((int)vel_motor);
-		}
-		else if (voltage > VOLTAGE_MAX)	// upper saturation
-		{
-			if (vel_motor < 0)
-				m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-			else
-				m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-		}
-		else                            // lower saturation
-		{
-			m_eixo_in->PDOsetVelocitySetpoint(0);
-		}
-		m_eixo_in->WritePDO02();
+		SetEposVelocityLimited(vel_motor);
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -647,21 +541,7 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 		setpoint = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		setpoint_filt += LPF_SMF * (setpoint - setpoint_filt);
 
-		if (abs(setpoint_filt) < CURRENT_MAX)
-		{
-			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
-				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
-			else
-				m_eixo_in->PDOsetCurrentSetpoint(0);
-		}
-		else
-		{
-			if (setpoint_filt < 0)
-				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
-			else
-				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
-		}
-		m_eixo_in->WritePDO01();
+		SetEposCurrentLimited(setpoint_filt);
 
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
@@ -670,19 +550,11 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
 
-void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin)
+void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -767,37 +639,57 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea + torque_u;
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 
-		if (abs(setpoint_filt) < CURRENT_MAX)
-		{
-			if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
-				m_eixo_in->PDOsetCurrentSetpoint((int)(setpoint_filt * 1000));	// esse argumento é em mA !!!
-			//else
-			//	m_eixo_in->PDOsetCurrentSetpoint(0);
-		}
-		else
-		{
-			if (setpoint_filt < 0)
-				m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
-			else
-				m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
-		}
-		m_eixo_in->WritePDO01();
+		SetEposCurrentLimited(setpoint_filt);
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		if (logging.load())
-		{
-			timestamp = (float)duration_cast<microseconds>(control_t_end - begin).count();
-			timestamp = 1e-6*timestamp;
-			if (timestamp < m_seconds)
-				Recorder();
-			else
-				logging = false;
-		}
+		Run_Logger();
 	}
 }
+
+void accBasedControl::SetEposVelocityLimited(float speed_stp)
+{
+	voltage = abs(speed_stp / SPEED_CONST);
+
+	if ((voltage > 0.060) && (voltage <= VOLTAGE_MAX))
+	{
+		m_eixo_in->PDOsetVelocitySetpoint((int)speed_stp); // speed in RPM
+	}
+	else if (voltage > VOLTAGE_MAX)	// upper saturation
+	{
+		if (speed_stp < 0)
+			m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
+		else
+			m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
+	}
+	else                            // lower saturation
+	{
+		m_eixo_in->PDOsetVelocitySetpoint(0);
+	}
+	m_eixo_in->WritePDO02();
+}
+
+void accBasedControl::SetEposCurrentLimited(float current_stp)
+{
+	if (abs(current_stp) < CURRENT_MAX)
+	{
+		if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
+			m_eixo_in->PDOsetCurrentSetpoint((int)(current_stp * 1000));	// esse argumento é em mA !!!
+		//else
+		//	m_eixo_in->PDOsetCurrentSetpoint(0);
+	}
+	else
+	{
+		if (current_stp < 0)
+			m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
+		else
+			m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
+	}
+	m_eixo_in->WritePDO01();
+}
+
 
 void accBasedControl::GainScan()
 {
@@ -871,6 +763,29 @@ void accBasedControl::Recorder()
 		}// everything logged in standard units (SI)
 		fclose(logger);
 	}
+}
+
+void accBasedControl::Run_Logger()
+{
+	if (logging.load())
+	{
+		timestamp = (float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		timestamp = 1e-6*timestamp;
+		if (timestamp < m_seconds)
+			Recorder();
+		else
+			logging = false;
+	}
+
+	/*
+	timestamp = (float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+	timestamp = 1e-6*timestamp;
+	while(timestamp < m_seconds)
+	{
+		Recorder();
+	}
+	// faltaria apenas ter logging = false;
+	*/
 }
 
 void accBasedControl::UpdateControlStatus()

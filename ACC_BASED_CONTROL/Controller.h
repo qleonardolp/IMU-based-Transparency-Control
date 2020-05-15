@@ -111,13 +111,14 @@ class accBasedControl
 {
 public:
 	// Class Constructor
-	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds)
+	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds) : 
+		m_control_mode(control_mode)
 	{
 		m_epos = epos;
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
 		m_seconds = seconds;
-		m_control_mode = control_mode;
+		//m_control_mode = control_mode;
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -138,10 +139,6 @@ public:
 			break;
 		}
 
-		// Current Control
-		K_ff = K_FF;	Kp_A = KP_A;	Ki_A = KI_A;	Kp_F = KP_F;	Kd_F = KD_F;
-		Amplifier = 100; // initialized with a safe value
-
 		for (size_t i = 0; i < SGVECT_SIZE; ++i)
 		{
 			velhumVec[i] = 0.000f; velexoVec[i] = 0.000f;
@@ -151,6 +148,7 @@ public:
 
 		if (seconds > 0)
 		{
+			timestamp_begin = std::chrono::steady_clock::now();
 			logging = true;
 			time_t rawtime;
 			struct tm* timeinfo;
@@ -188,7 +186,7 @@ public:
 		}
 
 		//		KALMAN FILTER SETUP		//
-		float Dt = 0.00100f;
+		float Dt = 0.0010f;
 
 		if (control_mode == 's' || control_mode == 'p')
 		{
@@ -275,25 +273,25 @@ public:
 	}
 
 	// Controlling through the EPOS Position control
-	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Controlling through the EPOS motor speed control
-	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Controlling through the EPOS motor speed control assisted by Kalman Filter estimation
-	void OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m, std::chrono::system_clock::time_point &begin);
+	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m);
 
 	float getPu(){ return J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_d; }
 
@@ -312,11 +310,26 @@ public:
 	// Update the 'Control Word' to show info at the console screen
 	void UpdateControlStatus();
 
+	// 'Control Word' to show info at the console screen
+	std::string ctrl_word;
+
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
 
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
+
+	// Set a closer beginning timestamp for the log running under the Controller thread
+	void set_timestamp_begin(std::chrono::system_clock::time_point begin){ timestamp_begin = begin; }
+
+	// Logging logic reproduced at the end of every control method
+	void Run_Logger();
+
+	// Set Current setpoint on EPOS within safe limits
+	void SetEposCurrentLimited(float current_stp);
+
+	// Set Current setpoint on EPOS within safe limits
+	void SetEposVelocityLimited(float speed_stp);
 
 	// Class Destructor
 	~accBasedControl()
@@ -336,8 +349,6 @@ public:
 		}
 	}
 
-	std::string ctrl_word;
-
 private:
 
 	static EPOS_NETWORK* m_epos;
@@ -352,6 +363,7 @@ private:
 	static std::atomic<bool> logging;
 	char logger_filename[40];
 	static float timestamp;
+	static std::chrono::system_clock::time_point timestamp_begin;
 
 	FILE* gains_values;
 
@@ -360,10 +372,8 @@ private:
 	static std::chrono::system_clock::time_point control_t_begin;
 
 	//		GAINS		//
-	// Current Control
-	int Amplifier; float K_ff; float Kp_A; float Ki_A; float Kp_F; float Kd_F;
 
-	// Speed Control
+	// Speed Control / Position Control
 	static float Kff_V; static float Kp_V; 
 	static float Ki_V; static float Kd_V;
 
