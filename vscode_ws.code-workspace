@@ -4,5 +4,9 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"latex-workshop.kpsewhich.enabled": true,
+		"latex-workshop.latex.bibDirs": ["./TCC/"],
+		"latex-workshop.latex.search.rootFiles.include": ["./TCC/USPSC-TCC-modelo.tex"]
+	}
 }
