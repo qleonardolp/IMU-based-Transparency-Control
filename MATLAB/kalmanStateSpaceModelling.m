@@ -5,8 +5,8 @@
 % Constants
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
-Ks  = 104;           % N/rad
-Ka  = Ks/20          % N/rad  (???)
+Ks  = 104;           % Nm/rad
+Ka  = Ks/20          % Nm/rad (???)
 Jh  = 0.05;          % Kg.m^2 (???)
 Je  = 0.47*2;        % Kg.m^2 (???)
 We  = 2.00*9.80665;  % N      (???)

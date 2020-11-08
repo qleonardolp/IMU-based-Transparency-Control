@@ -5,12 +5,11 @@
 % Constants
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
-Ks  = 104;           % N/rad
-Ka  = Ks/20          % N/rad  (???)
-% Jh  = 0.05;          % Kg.m^2 (???)
-Je  = 0.47*2;        % Kg.m^2 (???)
-We  = 2.00*9.80665;  % N      (???)
-Le  = 0.40;          % m      (???)
+Ks  = 104;           % Nm/rad
+Ka  = Ks/50          % Nm/rad (???)
+Je  = 0.47*5;        % Kg.m^2 (???)
+We  = 3.5*9.80665;   % N      (???)
+Le  = 0.626;         % m      (???)
 Beq = 60;            % N.m.s/rad
 Ja  = 0.47;          % Kg.m^2
 
@@ -45,8 +44,16 @@ discreteSys = c2d(Sys,Ts,disOpt)
 % discreteSys = c2d(Sys,Ts)
 
 %% Kalman
-% Process Covariance Matrix, (pegar do codigo)
-Q = []; 
-
 % Measurement noite Covariance Matrix
-R = [];
+Rk = eye(sensor_dim);
+Rk(1,1) = (2*pi/2048)^2;
+Rk(2,2) = (0.002340)^2; % Mtw Noise x sqrt(Bandwidth)
+Rk(3,3) = (2*pi/4096)^2;
+Rk(4,4) = (3*pi/30)^2;
+
+% Process Covariance Matrix, (pegar do codigo)
+Qk = eye(state_dim);
+Qk(1,1) = (2*pi/2048 + 0.001*0.002340)^2;
+Qk(2,2) = (0.914)^2;
+Qk(3,3) = (2*pi/4096 + 0.001*7*pi/30)^2;
+Qk(4,4) = (0.825)^2;
