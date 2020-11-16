@@ -1,0 +1,33 @@
+% Constants
+N   = 150;           % Gear Ratio
+KI  = 0.0603;        % Nm/A
+Ks  = 104;           % Nm/rad
+Ka  = Ks/50;         % Nm/rad (???)
+Je  = 0.47*5;        % Kg.m^2 (???)
+We  = 3.5*9.80665;   % N      (???)
+Le  = 0.626;         % m      (???)
+Beq = 60;            % N.m.s/rad
+Ja  = 0.47;          % Kg.m^2
+
+% State vector is  [x_e \dot{x_e} x_a \dot{x_a}]
+% Sensor vector is [x_e \dot{x_e} x_a \dot{x_a}]
+state_dim  = 4;
+sensor_dim = 4;
+control_dim = 1;
+
+% State Space matrices
+
+A = [0 1 0 0; ...
+     -(Ks + Ka - We*Le)/Je 0 Ks/Je 0; ...
+     0 0 0 1; ...
+     Ks/Ja 0 -Ks/Ja -Beq/Ja];
+
+B = [zeros(3,control_dim); N*KI/Ja];
+
+C = [eye(sensor_dim)]; C(3,3) = N; C(4,4) = N;
+D = zeros(sensor_dim, control_dim);
+
+use lti
+sys = ss(A,B,C,D,0.001);
+
+G = tf(sys);
