@@ -40,6 +40,7 @@ int   accBasedControl::pos0_in;
 atomic<bool> accBasedControl::Run(true);
 atomic<bool> accBasedControl::logging(false);
 system_clock::time_point accBasedControl::control_t_begin;
+system_clock::time_point accBasedControl::timestamp_begin;
 float accBasedControl::control_t_Dt = 0.001;				// [s]
 float accBasedControl::timestamp = 0.0;
 
@@ -185,7 +186,7 @@ void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::conditi
 		// using setpoint_filt as encoder steps:
 		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
 
-		if ((theta_m >= -1.5708) && (theta_m <= 0.5236)) //(caminhando)
+		//if ((theta_m >= -1.5708) && (theta_m <= 0.5236)) //(caminhando)
 			m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
 		m_eixo_in->WritePDO01();
 
@@ -248,10 +249,6 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
 		SetEposVelocityLimited(vel_motor_filt);
-
-		// Precisa ??
-		m_eixo_in->ReadPDO02();
-		actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
@@ -390,8 +387,8 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 
 		SetEposVelocityLimited(vel_motor);
 
-		m_eixo_in->ReadPDO02();
-		actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
+		//m_eixo_in->ReadPDO02();
+		//actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
@@ -630,13 +627,18 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 		// Inner Control (PI)	//
 		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-		// Integration reset:
+		// Integration resets:
 		if (resetInt == 2718281)
 		{
 			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
 			resetInt = 0;
 		}
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea + torque_u;
+    if (resetInt == 2318421) 
+      IntTsea = C_DT*torque_sea;
+    if (resetInt == 1612422)
+      Int2Tsea = C_DT*IntTsea;
+
+		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea; // + torque_u; not working...
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 
 		SetEposCurrentLimited(setpoint_filt);
@@ -677,8 +679,6 @@ void accBasedControl::SetEposCurrentLimited(float current_stp)
 	{
 		if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
 			m_eixo_in->PDOsetCurrentSetpoint((int)(current_stp * 1000));	// esse argumento é em mA !!!
-		//else
-		//	m_eixo_in->PDOsetCurrentSetpoint(0);
 	}
 	else
 	{
@@ -776,21 +776,13 @@ void accBasedControl::Run_Logger()
 		else
 			logging = false;
 	}
-
-	/*
-	timestamp = (float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
-	timestamp = 1e-6*timestamp;
-	while(timestamp < m_seconds)
-	{
-		Recorder();
-	}
-	// faltaria apenas ter logging = false;
-	*/
 }
 
 void accBasedControl::UpdateControlStatus()
 {
 	char numbers_str[20];
+  m_eixo_in->ReadPDO02();
+	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 	switch (m_control_mode)
 	{
 	case 'p':
@@ -800,7 +792,7 @@ void accBasedControl::UpdateControlStatus()
 		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_l);
 		ctrl_word += "Leg Position: " + (std::string) numbers_str + " deg\n";
 		sprintf(numbers_str, "%+5.3f", vel_motor);
-		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
+		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
 		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
 		sprintf(numbers_str, "%5.3f", Kff_V);
@@ -816,7 +808,7 @@ void accBasedControl::UpdateControlStatus()
 	case 's':
 		ctrl_word = " SPEED CONTROLLER\n";
 		sprintf(numbers_str, "%+5.3f", vel_motor);
-		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
+		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
 		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
 		sprintf(numbers_str, "%5.3f", Kff_V);
