@@ -114,6 +114,7 @@ float accBasedControl::setpoint_filt = 0;	// [A]
 int   accBasedControl::actualCurrent = 0;	// [mA] Read from the EPOS
 float accBasedControl::accbased_comp = 0;	// [N.m]
 float accBasedControl::d_accbased_comp = 0;	// [N.m/s]
+float accBasedControl::des_tsea_last = 0;   // [N.m]
 float accBasedControl::torque_sea = 0;		// [N.m]
 float accBasedControl::d_torque_sea = 0;	// [N.m/s]
 float accBasedControl::grav_comp = 0;		// [N.m]
@@ -328,70 +329,69 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 {
 	while (Run.load())
 	{
-		unique_lock<mutex> Lk(m);
+		unique_lock<std::mutex> Lk(m);
 		cv.notify_one();
 
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(1500));
+		this_thread::sleep_for(nanoseconds(15));
 
 		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
 		m_epos->sync();	// CAN Synchronization
 
-		vel_hum = HPF_SMF*vel_hum + HPF_SMF*(velHum - vel_hum_last);	// HPF on gyro
-		vel_hum_last = velHum;
-
-		// SEA Torque:
-		m_eixo_out->ReadPDO01();
-		theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-		m_eixo_in->ReadPDO01();
-		theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
-		d_torque_sea = 13 * (torque_sea - IntAdm_In);
-		IntAdm_In += d_torque_sea*control_t_Dt;
-
-		// Outer Admittance Control loop: the discrete realization relies on the derivative of tau_e (check my own red notebook)
-		// Here, the reference torque is zero!
-		vel_adm = damping_d / (damping_d + stiffness_d*C_DT) * vel_adm +
-			(1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT) * (-d_torque_sea);
-		// testar sem as duas linhas abaixo
-		vel_adm += LPF_SMF*(vel_adm - vel_adm_last);
-		vel_adm_last = vel_adm;
-
+		// Positions
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		// Motor Velocity
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
-		// Integration for the Inner Control (PI)
-		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-		// Integration reset:
-		if (resetInt == 1700000)
-			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
+		// Assigning the measured states to the Sensor reading Vector
+		CAC_zk << velHum, vel_motor, theta_c, theta_l;
 
-		// Inner Control Loop (PI):
-		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC;
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+		CAC_uk << (float)(0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l)) / J_EQ;
+		// Predicting (test without the Control Mtx)	//
+		CAC_xk = CAC_Fk * CAC_xk + CAC_Bk * CAC_uk;
+		CAC_Pk = CAC_Fk * CAC_Pk * CAC_Fk.transpose() + CAC_Qk;
 
-		// Motor Dynamics:
-		torque_ref += LPF_SMF*(L_CG*LOWERLEGMASS*GRAVITY*sinf(theta_l) - torque_ref);
-		torque_m = torque_m - torque_sea;
-		// torque_m -> 1/(J_EQ*s) -> vel_motor:
-		IntTorqueM += (torque_m / J_EQ)*control_t_Dt;
-		// Integration reset:
-		if (resetInt == 2000000)
-		{
-			IntTorqueM = (torque_m / J_EQ)*control_t_Dt;
-			resetInt = 0;
-		}
+		// Kalman Gain	//
 
-		vel_motor = RADS2RPM*GEAR_RATIO*IntTorqueM;
+		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
+		static FullPivLU<Matrix4f> TotalCovariance(CAC_Hk * CAC_Pk * CAC_Hk.transpose() + CAC_Rk);
+		if (TotalCovariance.isInvertible())
+			CAC_KG = CAC_Pk * CAC_Hk.transpose() * TotalCovariance.inverse();
+
+		// Updating		//
+		CAC_xk = CAC_xk + CAC_KG * (CAC_zk - CAC_Hk*CAC_xk);
+		CAC_Pk = CAC_Pk - CAC_KG * CAC_Hk*CAC_Pk;
+
+		// Controlling using the state estimations
+		vel_motor = CAC_xk(1, 0);
+		theta_c = CAC_xk(2, 0);
+		theta_l = CAC_xk(3, 0);
+
+		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
+		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
+		static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
+		static float C1 = damping_d / (damping_d + stiffness_d*C_DT);
+		grav_comp = -LOWERLEGMASS*GRAVITY*L_CG*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		accbased_comp = J_EQ*(CAC_xk(0, 0) - vel_hum)/C_DT;		// human disturbance input
+
+		vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (CAC_xk(4, 0) - torque_sea));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+
+		des_tsea_last = grav_comp + accbased_comp;
+		torque_sea = CAC_xk(4, 0); 	// Tsea_k-1 <- Tsea_k
+		vel_hum = CAC_xk(0, 0);		// VelHum_k-1 <- VelHum_k
+
+		vel_motor = RADS2RPM*GEAR_RATIO*vel_adm;
 
 		SetEposVelocityLimited(vel_motor);
 
-		//m_eixo_in->ReadPDO02();
-		//actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
-
 		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
 		Run_Logger();

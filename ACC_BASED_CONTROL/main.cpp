@@ -87,7 +87,7 @@ int main(int argc, char** argv)
   QueryPerformanceFrequency(&TICKS_PER_SECOND);
   ticksSampleTime = TICKS_PER_SECOND.QuadPart * SAMPLE_TIME;
 
-  //START DE TRANSMISSÃO DA REDE CAN
+  //START DE TRANSMISSï¿½O DA REDE CAN
   epos.StartPDOS(1);
   epos.StartPDOS(2);
   epos.StartPDOS(3);
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
 
   std::cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << std::endl;
 
-  //Inicializando a comunicação com os eixos
+  //Inicializando a comunicaï¿½ï¿½o com os eixos
   for (int i = 0; i < 10; i++)
   {
     //Aguarda tempo
@@ -420,7 +420,6 @@ int main(int argc, char** argv)
     int scan_file = 0;
 
     std::chrono::system_clock::time_point mtw_data_stamp;
-    //std::chrono::system_clock::time_point log_begin;
     clock_t beginning = 0;
     clock_t loop_duration;
     float freq;
@@ -431,8 +430,6 @@ int main(int argc, char** argv)
     std::thread controller_t;
     std::condition_variable Cv;
     std::mutex Mtx;
-
-	// xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
     if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
@@ -557,7 +554,7 @@ int main(int argc, char** argv)
     delete (*i);
   }
 
-  //FINALIZA A COMUNICAÇÃO COM AS EPOS
+  //FINALIZA A COMUNICAï¿½ï¿½O COM AS EPOS
   epos.StopPDOS(1);
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;

@@ -44,9 +44,9 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 // CONSTANTS
 
-#define		GEAR_RATIO		150.0f		    // Redução do Sistema
-#define		ENCODER_IN		4096		    // Resolução do encoder do motor
-#define		ENCODER_OUT		2048		    // Resolução do encoder de saída
+#define		GEAR_RATIO		150.0f		    // Reduï¿½ï¿½o do Sistema
+#define		ENCODER_IN		4096		    // Resoluï¿½ï¿½o do encoder do motor
+#define		ENCODER_OUT		2048		    // Resoluï¿½ï¿½o do encoder de saï¿½da
 #define		STIFFNESS		104.0f			// Constante da mola SEA [N.m/rad]
 #define		MY_PI			3.141592653f	// Pi value
 #define		RADS2RPM		(30/MY_PI)		// rad/s to rpm 
@@ -58,7 +58,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1400f		// Max corrente nominal no motor Maxon RE40 [A]
-#define		VOLTAGE_MAX		21.600f		// Max tensão de saída Vcc = 0.9*24V fornecida pela EPOS 24/5
+#define		VOLTAGE_MAX		21.600f		// Max tensï¿½o de saï¿½da Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	0.0603f		// Constante de torque do motor RE40	[N.m/A]
 #define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]
 
@@ -429,6 +429,7 @@ private:
 	static float accbased_comp;		// [N.m]
 	static float d_accbased_comp;	// [N.m/s]
 	static float grav_comp;			// [N.m]
+	static float des_tsea_last;		// [N.m]
 
 	static float vel_leg;			// [rpm ?]
 	static float acc_motor;			// [rad/s^2]
