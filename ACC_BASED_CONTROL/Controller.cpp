@@ -820,6 +820,8 @@ void accBasedControl::UpdateControlStatus()
 		sprintf(numbers_str, "%5.3f", Kd_V);
 		ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
 		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+		ctrl_word += " InvDyn: " + std::to_string(grav_comp) + " N.m ";
+		ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
 		break;
 	case 'a':
 	case 'u':
