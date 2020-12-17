@@ -154,32 +154,26 @@ public:
 			struct tm* timeinfo;
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
-
-			strftime(logger_filename, 40, "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
+			strftime(header_timestamp, sizeof(header_timestamp), "%Y-%m-%d-%H-%M-%S", timeinfo);
+			strftime(logger_filename, sizeof(logger_filename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
 			logger = fopen(logger_filename, "wt");
 			if (logger != NULL)
 			{
 				// printing the header into the file first line
-
-				if (control_mode == 'p')
-				{
-					fprintf(logger, "accBasedPosition\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n");
+				if (control_mode == 'p'){
+					fprintf(logger, "accBasedPosition [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
 				}
-				else if (control_mode == 's')
-				{
-					fprintf(logger, "OmegaControlKF\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  vel_motor[rad / s]\n");
+				else if (control_mode == 's'){
+					fprintf(logger, "OmegaControlKF [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  vel_motor[rad / s]\n", header_timestamp);
 				}
-				else if (control_mode == 'a')
-				{
-					fprintf(logger, "CAC\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n");
+				else if (control_mode == 'a'){
+					fprintf(logger, "CAC [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
 				}
-				else if (control_mode == 'u')
-				{
-					fprintf(logger, "CACurrent\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n");
+				else if (control_mode == 'u'){
+					fprintf(logger, "CACurrent [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n", header_timestamp);
 				}
-				else if (control_mode == 'k')
-				{
-					fprintf(logger, "CACu_KF\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n");
+				else if (control_mode == 'k'){
+					fprintf(logger, "CACu_KF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n", header_timestamp);
 				}
 				fclose(logger);
 			}
@@ -362,6 +356,7 @@ private:
 	FILE* logger;
 	static std::atomic<bool> logging;
 	char logger_filename[40];
+	char header_timestamp[30];
 	static float timestamp;
 	static std::chrono::system_clock::time_point timestamp_begin;
 
