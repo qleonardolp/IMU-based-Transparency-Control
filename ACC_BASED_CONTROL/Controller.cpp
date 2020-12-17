@@ -739,24 +739,27 @@ void accBasedControl::GainScan()
 
 void accBasedControl::Recorder()
 {
-	logger = fopen(logger_filename, "a");
+	logger = fopen(getLogfilename(), "a");
 	if (logger != NULL)
 	{
 		switch (m_control_mode)
 		{
 		case 'a':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
 			break;
 		case 'p':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
 			break;
 		case 's':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n", timestamp, acc_hum, vel_hum, vel_exo, torque_sea, RPM2RADS*vel_motor);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, acc_hum, vel_hum, vel_exo, torque_sea, grav_comp, accbased_comp, RPM2RADS*vel_motor);
 			break;
 		case 'k':
 		case 'u':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n", timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea);
-			// currents in mA
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n",\
+			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea); // currents in mA
 			break;
 		default:
 			break;

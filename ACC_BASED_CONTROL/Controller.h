@@ -155,8 +155,11 @@ public:
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
 			strftime(header_timestamp, sizeof(header_timestamp), "%Y-%m-%d-%H-%M-%S", timeinfo);
-			strftime(logger_filename, sizeof(logger_filename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-			logger = fopen(logger_filename, "wt");
+			char logfilename[40];
+			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
+			setLogfilename(logfilename);
+
+			logger = fopen(getLogfilename(), "wt");
 			if (logger != NULL)
 			{
 				// printing the header into the file first line
@@ -164,7 +167,7 @@ public:
 					fprintf(logger, "accBasedPosition [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
 				}
 				else if (control_mode == 's'){
-					fprintf(logger, "OmegaControlKF [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  vel_motor[rad / s]\n", header_timestamp);
+					fprintf(logger, "OmegaControlKF [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad / s]\n", header_timestamp);
 				}
 				else if (control_mode == 'a'){
 					fprintf(logger, "CAC [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
@@ -312,6 +315,12 @@ public:
 
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
+
+	// Sets the log file name string
+	void setLogfilename(char *filename){logger_filename = filename;}
+
+	// Get the log file name string
+	char* getLogfilename(){return logger_filename;}
 
 	// Set a closer beginning timestamp for the log running under the Controller thread
 	void set_timestamp_begin(std::chrono::system_clock::time_point begin){ timestamp_begin = begin; }
