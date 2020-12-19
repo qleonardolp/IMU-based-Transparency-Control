@@ -434,7 +434,7 @@ int main(int argc, char** argv)
     if(control_mode == 'k')
       controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 's')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
+      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if (control_mode == 'p')
       controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'a')
