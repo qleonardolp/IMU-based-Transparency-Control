@@ -116,6 +116,7 @@ float accBasedControl::accbased_comp = 0;	// [N.m]
 float accBasedControl::d_accbased_comp = 0;	// [N.m/s]
 float accBasedControl::des_tsea_last = 0;   // [N.m]
 float accBasedControl::torque_sea = 0;		// [N.m]
+float accBasedControl::torque_sea_last = 0;		// [N.m]
 float accBasedControl::d_torque_sea = 0;	// [N.m/s]
 float accBasedControl::grav_comp = 0;		// [N.m]
 float accBasedControl::vel_leg = 0;			// [rpm ?]
@@ -325,7 +326,7 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 	}
 }
 
-void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m)
+void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
 	{
@@ -335,9 +336,8 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(15));
+		this_thread::sleep_for(nanoseconds(1500));
 
-		resetInt++;	// counter to periodically reset the Inner Loop Integrator 
 		m_epos->sync();	// CAN Synchronization
 
 		// Positions
@@ -347,46 +347,27 @@ void accBasedControl::CAdmittanceControl(float &velHum, std::condition_variable 
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
-		// Assigning the measured states to the Sensor reading Vector
-		CAC_zk << velHum, vel_motor, theta_c, theta_l;
-
-		m_eixo_in->ReadPDO01();
-		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-		CAC_uk << (float)(0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l)) / J_EQ;
-		// Predicting (test without the Control Mtx)	//
-		CAC_xk = CAC_Fk * CAC_xk + CAC_Bk * CAC_uk;
-		CAC_Pk = CAC_Fk * CAC_Pk * CAC_Fk.transpose() + CAC_Qk;
-
-		// Kalman Gain	//
-
-		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
-		static FullPivLU<Matrix4f> TotalCovariance(CAC_Hk * CAC_Pk * CAC_Hk.transpose() + CAC_Rk);
-		if (TotalCovariance.isInvertible())
-			CAC_KG = CAC_Pk * CAC_Hk.transpose() * TotalCovariance.inverse();
-
-		// Updating		//
-		CAC_xk = CAC_xk + CAC_KG * (CAC_zk - CAC_Hk*CAC_xk);
-		CAC_Pk = CAC_Pk - CAC_KG * CAC_Hk*CAC_Pk;
-
-		// Controlling using the state estimations
-		vel_motor = CAC_xk(1, 0);
-		theta_c = CAC_xk(2, 0);
-		theta_l = CAC_xk(3, 0);
-
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
 		static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
 		static float C1 = damping_d / (damping_d + stiffness_d*C_DT);
-		grav_comp = -LOWERLEGMASS*GRAVITY*L_CG*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
-		accbased_comp = J_EQ*(CAC_xk(0, 0) - vel_hum)/C_DT;		// human disturbance input
 
-		vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (CAC_xk(4, 0) - torque_sea));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+    vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+    acc_hum = (vel_hum - vel_hum_last)/C_DT;
+		accbased_comp = J_EQ*acc_hum;		// human disturbance input
+
+		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+    torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
+
+		//vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+    vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
 
 		des_tsea_last = grav_comp + accbased_comp;
-		torque_sea = CAC_xk(4, 0); 	// Tsea_k-1 <- Tsea_k
-		vel_hum = CAC_xk(0, 0);		// VelHum_k-1 <- VelHum_k
+		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
+		vel_hum_last = vel_hum;		// VelHum_k-1 <- VelHum_k
+    vel_exo = ang_vel[1];
 
-		vel_motor = RADS2RPM*GEAR_RATIO*vel_adm;
+		vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm+vel_hum);
 
 		SetEposVelocityLimited(vel_motor);
 
@@ -709,7 +690,8 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
+			//fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
+      fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
 			fclose(gains_values);
 		}
 		break;
@@ -814,15 +796,12 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
 		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
 		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
-		sprintf(numbers_str, "%5.3f", Kff_V);
-		ctrl_word += " Kff_V: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Kp_V);
-		ctrl_word += " Kp_V: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Ki_V);
-		ctrl_word += " Ki_V: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Kd_V);
-		ctrl_word += " Kd_V: " + (std::string) numbers_str + "\n";
-		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+		sprintf(numbers_str, "%5.3f", stiffness_d);
+		ctrl_word += " STF: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", damping_d);
+		ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
+    ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m " +\
+    std::to_string(180 / MY_PI*theta_l) + " " + std::to_string(180 / MY_PI*theta_c) + "\n";
 		ctrl_word += " InvDyn: " + std::to_string(grav_comp) + " N.m ";
 		ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
 		break;

@@ -157,7 +157,7 @@ public:
 			strftime(header_timestamp, sizeof(header_timestamp), "%Y-%m-%d-%H-%M-%S", timeinfo);
 			char logfilename[40];
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-			setLogfilename(logfilename);
+      strcpy(logger_filename, logfilename);
 
 			logger = fopen(getLogfilename(), "wt");
 			if (logger != NULL)
@@ -167,16 +167,16 @@ public:
 					fprintf(logger, "accBasedPosition [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
 				}
 				else if (control_mode == 's'){
-					fprintf(logger, "OmegaControlKF [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad / s]\n", header_timestamp);
+					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad / s]\n", header_timestamp);
 				}
 				else if (control_mode == 'a'){
-					fprintf(logger, "CAC [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
+					fprintf(logger, "CAdmittanceControlKF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
 				}
 				else if (control_mode == 'u'){
 					fprintf(logger, "CACurrent [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n", header_timestamp);
 				}
 				else if (control_mode == 'k'){
-					fprintf(logger, "CACu_KF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n", header_timestamp);
+					fprintf(logger, "CACurrentKF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n", header_timestamp);
 				}
 				fclose(logger);
 			}
@@ -185,7 +185,7 @@ public:
 		//		KALMAN FILTER SETUP		//
 		float Dt = 0.0010f;
 
-		if (control_mode == 's' || control_mode == 'p')
+		if (control_mode == 'p')
 		{
 			xk_omg.setZero();	zk_omg.setZero(); KG_omg.setZero();
 
@@ -222,7 +222,7 @@ public:
 			Qk_omg(3, 3) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
 			Qk_omg(4, 4) = pow(0.0000468, 2);
 		}
-		else if (control_mode == 'k' || control_mode == 'a')
+		else if (control_mode == 'k' || control_mode == 'a' || control_mode == 's')
 		{	
 			CAC_xk.setZero();	CAC_zk.setZero(); CAC_KG.setZero();
 
@@ -279,7 +279,7 @@ public:
 	void OmegaControlKF(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControl(float &velHum, std::condition_variable &cv, std::mutex &m);
+	void CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m);
@@ -316,10 +316,10 @@ public:
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
 
-	// Sets the log file name string
-	void setLogfilename(char *filename){logger_filename = filename;}
+	// Sets the log file name
+	//void setLogfilename(char *filename){logger_filename = filename;}
 
-	// Get the log file name string
+	// Get the log file name
 	char* getLogfilename(){return logger_filename;}
 
 	// Set a closer beginning timestamp for the log running under the Controller thread
@@ -429,6 +429,7 @@ private:
 	static int   actualCurrent;		// [mA]
 
 	static float torque_sea;		// [N.m]
+  static float torque_sea_last;		// [N.m]
 	static float d_torque_sea;		// [N.m/s]
 	static float accbased_comp;		// [N.m]
 	static float d_accbased_comp;	// [N.m/s]
