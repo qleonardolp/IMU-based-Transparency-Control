@@ -440,6 +440,24 @@ private:
 	static Matrix<float, 4, 4> CAC_Rk;	// Sensor noise Covariance
 	static Matrix<float, 4, 5> CAC_Hk;	// Sensor Expectations Matrix
 	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
+
+//		Extended Kalman Filter		//
+
+#define EKF_STATE_DIM  5
+#define EKF_SENSOR_DIM 5
+#define EKF_CTRL_DIM   2
+
+	static Matrix<float, EKF_STATE_DIM, 1> ekf_xk;	// State Vector				[x_h x_e \dot{x_e} x_a \dot{x_a}]
+	static Matrix<float, EKF_SENSOR_DIM, 1> ekf_zk;	// Sensor reading Vector	[\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
+	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> 	ekf_Pk;		// State Covariance Matrix
+	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> 	ekf_Gk;		// Jacobian
+	static Matrix<float, EKF_STATE_DIM, EKF_CTRL_DIM> 	ekf_Bk;		// Control Matrix
+	static Matrix<float, EKF_CTRL_DIM, 1> ekf_uk; 				 	// Control Vector
+	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> ekf_Qk;	 	// Process noise Covariance
+	static Matrix<float, EKF_SENSOR_DIM, EKF_SENSOR_DIM> ekf_Rk; 	// Sensor noise Covariance
+	static Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM> ekf_Hk;		// Sensor Expectations Matrix
+	static Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> ekf_KG;		// Kalman Gain Matrix
+
 };
 
 #endif // !CURRENT_CONTROL_H
