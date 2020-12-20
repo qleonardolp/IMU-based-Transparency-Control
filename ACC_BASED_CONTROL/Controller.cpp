@@ -62,18 +62,6 @@ Matrix<float, 4, 4> accBasedControl::CAC_Rk;	// Sensor noise Covariance
 Matrix<float, 4, 5> accBasedControl::CAC_Hk;	// Sensor Expectations Matrix
 Matrix<float, 5, 4> accBasedControl::CAC_KG;	// Kalman Gain Matrix
 
-//accBasedPostion & OmegaControl Kalman Filter	//
-Matrix<float, 5, 1> accBasedControl::xk_omg;	// State Vector				[vel_h vel_e theta_l theta_c pid_e]
-Matrix<float, 5, 1> accBasedControl::zk_omg;	// Sensor reading Vector	[vel_h vel_e theta_l theta_c pid_e]
-Matrix<float, 5, 5> accBasedControl::Pk_omg;	// State Covariance Matrix
-Matrix<float, 5, 5> accBasedControl::Fk_omg;	// Prediction Matrix
-Matrix<float, 5, 1> accBasedControl::Bk_omg;	// Control Matrix (is a vector but called matrix)
-Matrix<float, 5, 5> accBasedControl::Qk_omg;	// Process noise Covariance
-Matrix<float, 5, 5> accBasedControl::Rk_omg;	// Sensor noise Covariance
-Matrix<float, 5, 5> accBasedControl::Hk_omg;	// Sensor Expectations Matrix
-Matrix<float, 5, 5> accBasedControl::KG_omg;	// Kalman Gain Matrix
-
-
 // Adimittance Control [a,u] Variables
 float accBasedControl::Ki_adm = 0;
 float accBasedControl::Kp_adm = 0;
@@ -148,49 +136,23 @@ void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::conditi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(150));
+		this_thread::sleep_for(nanoseconds(1500));
 
 		m_epos->sync();	// CAN Synchronization
 
 		// Positions Measurement:
 		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-
-		// Assigning the measured states to the Sensor reading Vector
-		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
-
-		// Predicting	//
-		xk_omg = Fk_omg * xk_omg;
-		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
-
-		// Kalman Gain	//
-
-		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
-		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
-		if (TotalCovariance.isInvertible())
-			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
-
-		// Updating		//
-		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
-		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
-
-		// Controlling using the state estimations:
-		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
-		vel_hum = xk_omg(0, 0);
-		vel_exo = xk_omg(1, 0);
-		theta_l = xk_omg(2, 0);
-		theta_c = xk_omg(3, 0);
 		torque_sea = STIFFNESS*(theta_c - theta_l);
 
 		// Position Set	//
 		// Using the same gains variables from Speed controller, but loading then from the gains file of the Position controller
-		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
+		//theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
+		
 		// using setpoint_filt as encoder steps:
-		setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
-
-		//if ((theta_m >= -1.5708) && (theta_m <= 0.5236)) //(caminhando)
-			m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
-		m_eixo_in->WritePDO01();
+		//setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
+		//m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
+		//m_eixo_in->WritePDO01();
 
 		// Motor Velocity to log
 		m_eixo_in->ReadPDO02();
@@ -218,23 +180,6 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 
 		m_epos->sync();	// CAN Synchronization
 
-    vel_hum = HPF_SMF*vel_hum + HPF_SMF*(ang_vel[0] - vel_hum_last);	// HPF on gyroscopes
-		vel_hum_last = ang_vel[0];
-		vel_exo = HPF_SMF*vel_exo + HPF_SMF*(ang_vel[1] - vel_exo_last);	// HPF on gyroscopes
-		vel_exo_last = ang_vel[1];
-
-		// velocities derivative using a Gain and a Discrete Integrator in loop
-		acc_exo = 24 * (vel_exo - IntegratorExo);
-		IntegratorExo += acc_exo*C_DT;
-		acc_hum = 24 * (vel_hum - IntegratorHum);
-		IntegratorHum += acc_hum*C_DT;
-
-		// accelerations derivative using a Gain and a Discrete Integrator in loop
-		jerk_hum = 15 * (acc_hum - IntAccHum);
-		IntAccHum += jerk_hum*C_DT;
-		jerk_exo = 15 * (acc_exo - IntAccExo);
-		IntAccExo += jerk_exo*C_DT;
-
 		// SEA Torque:
 
 		m_eixo_out->ReadPDO01();
@@ -244,13 +189,13 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
 
 		// Jerk Feedforward:
-		m_eixo_out->ReadPDO02();
-		vel_motor = vel_exo + (Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo)) / STIFFNESS;
+		//m_eixo_out->ReadPDO02();
+		//vel_motor = vel_exo + (Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo)) / STIFFNESS;
 
-		vel_motor = RADS2RPM * GEAR_RATIO * vel_motor;
-		vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
+		//vel_motor = RADS2RPM * GEAR_RATIO * vel_motor;
+		//vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
 
-		SetEposVelocityLimited(vel_motor_filt);
+		//SetEposVelocityLimited(vel_motor_filt);
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
@@ -270,53 +215,24 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(150));
+		this_thread::sleep_for(nanoseconds(1500));
 
 		m_epos->sync();	// CAN Synchronization
 
 		// Positions Measurement:
 		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-
-		// Assigning the measured states to the Sensor reading Vector
-		zk_omg << ang_vel[0], ang_vel[1], theta_l, theta_c, (ang_vel[0] - ang_vel[1]);
-
-		// Motor Velocity
-		m_eixo_in->ReadPDO02();
-		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-
-		// Predicting	//
-		xk_omg = Fk_omg * xk_omg + Bk_omg * vel_motor;
-		Pk_omg = Fk_omg * Pk_omg * Fk_omg.transpose() + Qk_omg;
-
-		// Kalman Gain	//
-
-		// !!! WARNING: DECLARATION MUST MATCH THE SENSOR DIM !!!
-		static FullPivLU< Matrix<float, 5, 5> > TotalCovariance(Hk_omg * Pk_omg * Hk_omg.transpose() + Rk_omg);
-		if (TotalCovariance.isInvertible())
-			KG_omg = Pk_omg * Hk_omg.transpose() * TotalCovariance.inverse();
-
-		// Updating		//
-		xk_omg = xk_omg + KG_omg * (zk_omg - Hk_omg*xk_omg);
-		Pk_omg = Pk_omg - KG_omg * Hk_omg*Pk_omg;
-
-		// Controlling using the state estimations:
-		acc_hum = (xk_omg(0, 0) - vel_hum) / control_t_Dt;
-		vel_hum = xk_omg(0, 0);
-		vel_exo = xk_omg(1, 0);
-		theta_l = xk_omg(2, 0);
-		theta_c = xk_omg(3, 0);
 		torque_sea = STIFFNESS*(theta_c - theta_l);
 
 		// Position Set	//
-		theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
+		//theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
 
-		vel_motor = (theta_m - theta_m_last) / C_DT;
-		theta_m_last = theta_m;
+		//vel_motor = (theta_m - theta_m_last) / C_DT;
+		//theta_m_last = theta_m;
 
-		vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
+		//vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
 
-		SetEposVelocityLimited(vel_motor);
+		//SetEposVelocityLimited(vel_motor);
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();

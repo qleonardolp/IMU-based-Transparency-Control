@@ -184,89 +184,54 @@ public:
 
 		//		KALMAN FILTER SETUP		//
 		float Dt = 0.0010f;
+		CAC_xk.setZero();
+		CAC_zk.setZero();
+		CAC_KG.setZero();
 
-		if (control_mode == 'p')
-		{
-			xk_omg.setZero();	zk_omg.setZero(); KG_omg.setZero();
+		CAC_Fk.setZero();
+		// Row 1
+		CAC_Fk(0, 0) = 1;
+		// Row 2
+		CAC_Fk(1, 1) = 1;
+		// Row 3
+		CAC_Fk(2, 1) = Dt;
+		CAC_Fk(2, 2) = 1;
+		// Row 4
+		CAC_Fk(3, 3) = 1;
+		// Row 5
+		CAC_Fk(4, 2) = STIFFNESS;
+		CAC_Fk(4, 3) = -STIFFNESS;
 
-			Fk_omg.setIdentity();
-			// Row 3
-			Fk_omg(2, 1) = Dt;	//or use DELTA_T?
+		CAC_Bk.setZero();
+		CAC_Bk(1, 0) = Dt;
+		CAC_Bk(2, 0) = 0.500f * Dt * Dt;
 
-			Bk_omg.setZero(); Bk_omg(3, 0) = Dt;
+		CAC_Hk.setZero();
+		CAC_Hk(0, 0) = 1;
+		CAC_Hk(1, 1) = 1;
+		CAC_Hk(2, 2) = 1;
+		CAC_Hk(3, 3) = 1;
 
-			Hk_omg.setZero();
-			Hk_omg(0, 0) = 1;	Hk_omg(1, 1) = 1;	Hk_omg(2, 2) = 1;	Hk_omg(3, 3) = 1;
-			Hk_omg(4, 0) = 1;	Hk_omg(4, 1) = -1;
+		CAC_Pk.setZero();
+		CAC_Pk(0, 0) = pow(0.0023400, 2); // devpad = devpad(vel_hum measured*)
+		CAC_Pk(1, 1) = pow(0.0059438, 2); // devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
+		CAC_Pk(2, 2) = pow(0.0000154, 2); // devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+		CAC_Pk(3, 3) = pow(0.0030700, 2); // 2*pi/2048
+		CAC_Pk(4, 4) = pow(0.3203400, 2); // devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
 
-			Pk_omg.setZero();
-			Pk_omg(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
-			Pk_omg(1, 1) = pow(0.0023400, 2);	// Idem
-			Pk_omg(2, 2) = pow(0.0030700, 2);	// 2*pi/2048
-			Pk_omg(3, 3) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			Pk_omg(4, 4) = pow(0.0046800, 2);	// 2*devpad(MTw)
+		CAC_Rk.setZero();
+		CAC_Rk(0, 0) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+		CAC_Rk(1, 1) = pow(0.0048800, 2); // Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
+		CAC_Rk(2, 2) = pow(0.0000100, 2); // 2*pi/(4096*GEAR_RATIO)
+		CAC_Rk(3, 3) = pow(0.0030700, 2); // 2*pi/2048
 
-
-			Rk_omg.setZero();
-			Rk_omg(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
-			Rk_omg(1, 1) = pow(0.0023400, 2);	// Idem
-			Rk_omg(2, 2) = pow(0.0030700, 2);	// 2*pi/2048
-			Rk_omg(3, 3) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
-			Rk_omg(4, 4) = pow(0.0046800, 2);	// 2*devpad(MTw)
-
-			// additional uncertainty from the environment
-			Qk_omg.setZero();
-			Qk_omg(0, 0) = pow(0.0000234, 2);
-			Qk_omg(1, 1) = pow(0.0000234, 2);
-			Qk_omg(2, 2) = pow(0.0000307, 2);
-			Qk_omg(3, 3) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			Qk_omg(4, 4) = pow(0.0000468, 2);
-		}
-		else if (control_mode == 'k' || control_mode == 'a' || control_mode == 's')
-		{	
-			CAC_xk.setZero();	CAC_zk.setZero(); CAC_KG.setZero();
-
-			CAC_Fk.setZero();
-			// Row 1
-			CAC_Fk(0, 0) = 1; 
-			// Row 2
-			CAC_Fk(1, 1) = 1;
-			// Row 3
-			CAC_Fk(2, 1) = Dt; CAC_Fk(2, 2) = 1;
-			// Row 4
-			CAC_Fk(3, 3) = 1;
-			// Row 5
-			CAC_Fk(4, 2) = STIFFNESS; CAC_Fk(4, 3) = -STIFFNESS;
-
-			CAC_Bk.setZero();
-			CAC_Bk(1, 0) = Dt; CAC_Bk(2, 0) = 0.500f*Dt*Dt;
-
-			CAC_Hk.setZero();
-			CAC_Hk(0, 0) = 1;	CAC_Hk(1, 1) = 1;	CAC_Hk(2, 2) = 1;	CAC_Hk(3, 3) = 1;
-
-			CAC_Pk.setZero();
-			CAC_Pk(0, 0) = pow(0.0023400, 2);	// devpad = devpad(vel_hum measured*)
-			CAC_Pk(1, 1) = pow(0.0059438, 2);	// devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
-			CAC_Pk(2, 2) = pow(0.0000154, 2);	// devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CAC_Pk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
-			CAC_Pk(4, 4) = pow(0.3203400, 2);	// devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
-
-
-			CAC_Rk.setZero();
-			CAC_Rk(0, 0) = pow(0.0023400, 2);	// MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
-			CAC_Rk(1, 1) = pow(0.0048800, 2);	// Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
-			CAC_Rk(2, 2) = pow(0.0000100, 2);	// 2*pi/(4096*GEAR_RATIO)
-			CAC_Rk(3, 3) = pow(0.0030700, 2);	// 2*pi/2048
-
-			// additional uncertainty from the environment
-			CAC_Qk.setZero();
-			CAC_Qk(0, 0) = pow(0.0000234, 2);
-			CAC_Qk(1, 1) = pow(0.0010638, 2);	// Dt*devpad(torque_m/J_EQ)
-			CAC_Qk(2, 2) = pow(0.0000054, 2);	// Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
-			CAC_Qk(3, 3) = pow(0.0000307, 2);
-			CAC_Qk(4, 4) = pow(0.0032034, 2);
-
-		}
+		// additional uncertainty from the environment
+		CAC_Qk.setZero();
+		CAC_Qk(0, 0) = pow(0.0000234, 2);
+		CAC_Qk(1, 1) = pow(0.0010638, 2); // Dt*devpad(torque_m/J_EQ)
+		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+		CAC_Qk(3, 3) = pow(0.0000307, 2);
+		CAC_Qk(4, 4) = pow(0.0032034, 2);
 	}
 
 	// Controlling through the EPOS Position control
@@ -463,19 +428,7 @@ private:
 	float theta_l_vec[SGVECT_SIZE];		// [rad]
 	float theta_c_vec[SGVECT_SIZE];		// [rad]
 
-	//	accBasedPostion & OmegaControl KF	//
-
-	static Matrix<float, 5, 1> xk_omg;	// State Vector				[vel_h vel_e theta_l theta_c pid_e]
-	static Matrix<float, 5, 1> zk_omg;	// Sensor reading Vector	[vel_h vel_e theta_l theta_c pid_e]
-	static Matrix<float, 5, 5> Pk_omg;	// State Covariance Matrix
-	static Matrix<float, 5, 5> Fk_omg;	// Prediction Matrix
-	static Matrix<float, 5, 1> Bk_omg;	// Control Matrix (is a vector but called matrix)
-	static Matrix<float, 5, 5> Qk_omg;	// Process noise Covariance
-	static Matrix<float, 5, 5> Rk_omg;	// Sensor noise Covariance
-	static Matrix<float, 5, 5> Hk_omg;	// Sensor Expectations Matrix
-	static Matrix<float, 5, 5> KG_omg;	// Kalman Gain Matrix
-
-	//		CAC & CACu Kalman Filter		//
+	//		Kalman Filter		//
 
 	static Matrix<float, 5, 1> CAC_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
 	static Matrix<float, 4, 1> CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
