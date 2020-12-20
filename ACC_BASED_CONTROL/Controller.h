@@ -64,10 +64,10 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #define     GRAVITY         9.8066f		// [m/s^2]
 #define     INERTIA_EXO     0.2620f		// [Kg.m^2], 0.0655 +- 0.0006, estimado em 2019-08-21, estou superdimensionando para 4x
-#define		LOWERLEGMASS	3.6480f		// [Kg] Pesar no labDim para saber valor real!
+#define		LOWERLEGMASS	4.7421f		// [Kg] Definido pelo fit usando o torque SEA em 2020-12-19, ver exo_mass_measurement.m para mais detalhes
 #define		MTW_DIST_LIMB	0.2500f		// [m]
 #define		MTW_DIST_EXO	0.0700f		// [m]
-#define		L_CG			0.4500f		// [m]
+#define		L_CG			0.4320f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
 #define		J_EQ			0.4700f		// [Kg.m^2]
