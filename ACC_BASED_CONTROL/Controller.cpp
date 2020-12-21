@@ -122,6 +122,7 @@ float accBasedControl::IntegratorExo = 0;
 float accBasedControl::IntAccMotor = 0;
 float accBasedControl::IntAccHum = 0;
 float accBasedControl::IntAccExo = 0;
+float accBasedControl::int_stiffness = STIFFNESS/50;
 
 
 // Control Functions //

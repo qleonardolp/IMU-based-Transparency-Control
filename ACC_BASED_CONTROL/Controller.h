@@ -101,11 +101,16 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		HPF_FC			0.7f	// [Hz]
 #define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
-// Kalman Filter Dimensions (Deprecated)
-#define		STATE_DIM		5
-#define		SENSOR_DIM		3
+// EKF dimensions
+#define EKF_STATE_DIM  5
+#define EKF_SENSOR_DIM 5
+#define EKF_CTRL_DIM   2
 
 using namespace Eigen;
+
+typedef Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> StateSzMtx;
+typedef Matrix<float, EKF_SENSOR_DIM, EKF_SENSOR_DIM> SensorSzMtx;
+
 
 class accBasedControl
 {
@@ -157,7 +162,7 @@ public:
 			strftime(header_timestamp, sizeof(header_timestamp), "%Y-%m-%d-%H-%M-%S", timeinfo);
 			char logfilename[40];
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-      strcpy(logger_filename, logfilename);
+      		strcpy(logger_filename, logfilename);
 
 			logger = fopen(getLogfilename(), "wt");
 			if (logger != NULL)
@@ -232,7 +237,57 @@ public:
 		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
 		CAC_Qk(3, 3) = pow(0.0000307, 2);
 		CAC_Qk(4, 4) = pow(0.0032034, 2);
+
+		//		EKF SETUP		//
+		int_stiffness = STIFFNESS/50;
+		theta_l = 0;
+
+		ekf_xk.setZero();
+		ekf_uk.setZero();
+		ekf_zk.setZero();
+		ekf_KG.setZero();
+
+		ekf_Gk.setZero();
+		ekf_Gk(1, 2) = 1;
+		ekf_Gk(2, 1) = -(int_stiffness + STIFFNESS - LOWERLEGMASS*GRAVITY*L_CG*cos(theta_l))/INERTIA_EXO;
+		ekf_Gk(2, 3) = STIFFNESS/INERTIA_EXO;
+		ekf_Gk(3, EKF_STATE_DIM-1) = 1;
+		ekf_Gk(EKF_STATE_DIM-1, 1)  = STIFFNESS/J_EQ;
+		ekf_Gk(EKF_STATE_DIM-1, 3)  = -STIFFNESS/J_EQ;
+		ekf_Gk(EKF_STATE_DIM-1, EKF_STATE_DIM-1)  = -B_EQ/J_EQ;
+
+		ekf_Bk.setZero();
+		ekf_Bk(0, 0) = 1;
+		ekf_Bk(EKF_STATE_DIM-1, EKF_CTRL_DIM-1) = GEAR_RATIO*TORQUE_CONST/J_EQ;
+
+		ekf_Hk.setZero();
+		ekf_Hk(1, 1) = 1;
+		ekf_Hk(2, 2) = 1;
+		ekf_Hk(3, 3) = GEAR_RATIO;
+		ekf_Hk(EKF_SENSOR_DIM-1, EKF_STATE_DIM-1) = GEAR_RATIO;
+		
+		ekf_Dk.setZero();
+		ekf_Dk(0, 0) = 1;
+
+		ekf_Pk = 0.01 * Matrix<float,EKF_STATE_DIM,EKF_STATE_DIM>::Identity();
+
+		ekf_Rk.setZero();
+		ekf_Rk(0, 0) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+		ekf_Rk(1, 1) = pow(0.0030700, 2); // 2*pi/2048
+		ekf_Rk(2, 2) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
+		ekf_Rk(3, 3) = pow(0.0015339, 2); // 2*pi/4096
+		ekf_Rk(EKF_SENSOR_DIM-1, EKF_SENSOR_DIM-1) = pow(0.1047197, 2); // Considering 1 rpm devpad: 1 * RPM2RADS
+
+		ekf_Qk.setZero();
+		ekf_Qk(0, 0) = pow(0.0000234, 2);
+		ekf_Qk(1, 1) = pow(0.0000234, 2);
+		ekf_Qk(2, 2) = pow(0.0032000, 2); // ????
+		ekf_Qk(3, 3) = pow(0.0000766, 2); // 2*pi/4096 (5%)
+		ekf_Qk(EKF_STATE_DIM-1, EKF_STATE_DIM-1) = pow(0.0032034, 2); // ???
 	}
+
+	// EKF main loop
+	void ekfUpdate();
 
 	// Controlling through the EPOS Position control
 	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
@@ -280,9 +335,6 @@ public:
 
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
-
-	// Sets the log file name
-	//void setLogfilename(char *filename){logger_filename = filename;}
 
 	// Get the log file name
 	char* getLogfilename(){return logger_filename;}
@@ -394,12 +446,13 @@ private:
 	static int   actualCurrent;		// [mA]
 
 	static float torque_sea;		// [N.m]
-  static float torque_sea_last;		// [N.m]
+  	static float torque_sea_last;	// [N.m]
 	static float d_torque_sea;		// [N.m/s]
 	static float accbased_comp;		// [N.m]
 	static float d_accbased_comp;	// [N.m/s]
 	static float grav_comp;			// [N.m]
 	static float des_tsea_last;		// [N.m]
+	static float int_stiffness;		// [N.m/rad]
 
 	static float vel_leg;			// [rpm ?]
 	static float acc_motor;			// [rad/s^2]
@@ -443,20 +496,17 @@ private:
 
 //		Extended Kalman Filter		//
 
-#define EKF_STATE_DIM  5
-#define EKF_SENSOR_DIM 5
-#define EKF_CTRL_DIM   2
-
-	static Matrix<float, EKF_STATE_DIM, 1> ekf_xk;	// State Vector				[x_h x_e \dot{x_e} x_a \dot{x_a}]
-	static Matrix<float, EKF_SENSOR_DIM, 1> ekf_zk;	// Sensor reading Vector	[\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
-	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> 	ekf_Pk;		// State Covariance Matrix
-	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> 	ekf_Gk;		// Jacobian
-	static Matrix<float, EKF_STATE_DIM, EKF_CTRL_DIM> 	ekf_Bk;		// Control Matrix
+	static StateSzMtx ekf_Gk;										// State transition Jacobian
+	static StateSzMtx ekf_Pk;										// State Covariance Matrix
+	static StateSzMtx ekf_Qk;	 									// Process noise Covariance
+	static SensorSzMtx ekf_Rk; 										// Sensor noise Covariance
+	static Matrix<float, EKF_STATE_DIM, 1> ekf_xk;					// State Vector				[x_h x_e \dot{x_e} x_a \dot{x_a}]
+	static Matrix<float, EKF_SENSOR_DIM, 1> ekf_zk;					// Sensor reading Vector	[\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
 	static Matrix<float, EKF_CTRL_DIM, 1> ekf_uk; 				 	// Control Vector
-	static Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> ekf_Qk;	 	// Process noise Covariance
-	static Matrix<float, EKF_SENSOR_DIM, EKF_SENSOR_DIM> ekf_Rk; 	// Sensor noise Covariance
-	static Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM> ekf_Hk;		// Sensor Expectations Matrix
+	static Matrix<float, EKF_STATE_DIM, EKF_CTRL_DIM> 	ekf_Bk;		// Control Matrix
+	static Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM> ekf_Hk;		// Sensor expectations Jacobian
 	static Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> ekf_KG;		// Kalman Gain Matrix
+	static Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	ekf_Dk;		// Feedforward Matrix
 
 };
 
