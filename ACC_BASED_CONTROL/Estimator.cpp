@@ -43,27 +43,53 @@ Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> accBasedControl::ekf_KG;	// Kalman 
 Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	accBasedControl::ekf_Dk;	// Feedforward Matrix
 
 float accBasedControl::int_stiffness = STIFFNESS/50;
+uint8_t	accBasedControl::downsample = 1;
 
 void accBasedControl::ekfUpdate()
 {
 
     // Assigning measurements and control
-	ekf_zk << vel_hum, theta_l, vel_exo, theta_c, vel_motor; // !!! NOTE: WITHOUT GEAR_RATIO !!!
-	ekf_uk << vel_hum, 0.001*actualCurrent;
-
-	// Prediction      //
-	//ekf_xk(0,1) = ekf_Fk * ekf_xk + (ekf_Bk * ekf_uk)(0,1);
-	//ekf_Pk = ekf_Fk * ekf_Pk * ekf_Fk.transpose() + ekf_Qk;
+	downsample++;
+	if(downsample < IMU_DELAY){
+		ekf_zk(0,1) = theta_l;
+		ekf_zk(0,3) = theta_c;
+		ekf_zk(0,4) = vel_motor;
+		ekf_uk(0,1) = 0.001*actualCurrent;
+	}
+	else{
+		ekf_zk << vel_hum, theta_l, vel_exo, theta_c, vel_motor; // !!! NOTE: WITHOUT GEAR_RATIO !!!
+		ekf_uk << vel_hum, 0.001*actualCurrent;
+		downsample = 1;
+	}
+	// Prediction, g(x_k-1,u_k)      //
+	ekf_xk(0,0) = (ekf_Bk * ekf_uk)(0,0);
+	ekf_xk(0,1) = ekf_xk(0,2);
+	ekf_xk(0,2) = (-(int_stiffness + STIFFNESS)*ekf_xk(0,1) + STIFFNESS*ekf_xk(0,3) + LOWERLEGMASS*GRAVITY*L_CG*sin(ekf_xk(0,1)))/INERTIA_EXO;
+	ekf_xk(0,3) = ekf_xk(0,4);
+	ekf_xk(0,4) = (STIFFNESS*(ekf_xk(0,1) - ekf_xk(0,3)) - B_EQ*ekf_xk(0,4))/J_EQ + (ekf_Bk * ekf_uk)(0,4);
+	// Predict process covariance
+	ekf_Pk = ekf_Gk * ekf_Pk * ekf_Gk.transpose() + ekf_Qk;
 
 	// Kalman Gain	//
 	static FullPivLU<SensorSzMtx> TotalCovariance(ekf_Hk * ekf_Pk * ekf_Hk.transpose() + ekf_Rk);
-	if (TotalCovariance.isInvertible())
+	if (TotalCovariance.isInvertible()){
 		ekf_KG = ekf_Pk * ekf_Hk.transpose() * TotalCovariance.inverse();
-    
+	}
 	// Updating		//
 	ekf_xk = ekf_xk + ekf_KG * (ekf_zk - ekf_Hk*ekf_xk);
 	ekf_Pk = (StateSzMtx::Identity() - ekf_KG * ekf_Hk)*ekf_Pk;
 
+	// Update the transition Jacobian
     theta_l = ekf_xk(0,1);
     ekf_Gk(2, 1) = -(int_stiffness + STIFFNESS - LOWERLEGMASS*GRAVITY*L_CG*cos(theta_l))/INERTIA_EXO;
+
+	// Put the state on class variables
+	vel_hum = (ekf_xk(0,0) - vel_hum_last)*C_RATE; //????
+	vel_hum_last = vel_hum;
+	theta_l = ekf_xk(0,1);
+	vel_exo = ekf_xk(0,2);
+	theta_c = ekf_xk(0,3);
+	vel_motor = ekf_xk(0,4);
+
+	torque_sea = STIFFNESS*(theta_c - theta_l);
 }

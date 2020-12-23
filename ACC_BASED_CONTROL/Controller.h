@@ -105,6 +105,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define EKF_STATE_DIM  5
 #define EKF_SENSOR_DIM 5
 #define EKF_CTRL_DIM   2
+#define IMU_DELAY 	   8				// N Samples of Ts=0.001s
 
 using namespace Eigen;
 
@@ -471,6 +472,7 @@ private:
 	static float IntAccMotor;
 	static float IntAccHum;
 	static float IntAccExo;
+	static uint8_t downsample;
 
 	//		STATE MEMORY VECTORS        //
 
