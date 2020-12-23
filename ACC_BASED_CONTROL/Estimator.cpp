@@ -30,29 +30,29 @@ using namespace chrono;
 using namespace Eigen;
 
 //		Extended Kalman Filter				    //
-Matrix<float, EKF_STATE_DIM, 1>                 accBasedControl::ekf_xk;    // State Vector				[x_h x_e \dot{x_e} x_a \dot{x_a}]
-Matrix<float, EKF_SENSOR_DIM, 1>                accBasedControl::ekf_zk;	// Sensor reading Vector	[\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
-Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM>     accBasedControl::ekf_Pk;	// State Covariance Matrix
-Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM>     accBasedControl::ekf_Gk;	// State transition Jacobian
-Matrix<float, EKF_STATE_DIM, EKF_CTRL_DIM>      accBasedControl::ekf_Bk;	// Control Matrix
-Matrix<float, EKF_CTRL_DIM, 1>                  accBasedControl::ekf_uk; 	// Control Vector
-Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM>     accBasedControl::ekf_Qk;	// Process noise Covariance
-Matrix<float, EKF_SENSOR_DIM, EKF_SENSOR_DIM>   accBasedControl::ekf_Rk; 	// Sensor noise Covariance
-Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM>    accBasedControl::ekf_Hk;	// Sensor expectations Jacobian
-Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM>    accBasedControl::ekf_KG;	// Kalman Gain Matrix
-Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	    accBasedControl::ekf_Dk;	// Feedforward Matrix
+StateSzMtx accBasedControl::ekf_Gk;										// State transition Jacobian
+StateSzMtx accBasedControl::ekf_Pk;										// State Covariance Matrix
+StateSzMtx accBasedControl::ekf_Qk;	 									// Process noise Covariance
+SensorSzMtx accBasedControl::ekf_Rk; 									// Sensor noise Covariance
+Matrix<float, EKF_STATE_DIM, 1> accBasedControl::ekf_xk;				// State Vector				[x_h x_e \dot{x_e} x_a \dot{x_a}]
+Matrix<float, EKF_SENSOR_DIM, 1> accBasedControl::ekf_zk;				// Sensor reading Vector	[\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
+Matrix<float, EKF_CTRL_DIM, 1> accBasedControl::ekf_uk; 			 	// Control Vector
+Matrix<float, EKF_STATE_DIM, EKF_CTRL_DIM> 	accBasedControl::ekf_Bk;	// Control Matrix
+Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM> accBasedControl::ekf_Hk;	// Sensor expectations Jacobian
+Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> accBasedControl::ekf_KG;	// Kalman Gain Matrix
+Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	accBasedControl::ekf_Dk;	// Feedforward Matrix
+
+float accBasedControl::int_stiffness = STIFFNESS/50;
 
 void accBasedControl::ekfUpdate()
 {
-    // revisar tudo...
-    // Assigning the measured states to the Sensor reading Vector
-	ekf_zk << vel_hum, vel_motor, theta_c, theta_l;
-	m_eixo_in->ReadPDO01();
-	actualCurrent = m_eixo_in->PDOgetActualCurrent();
-	ekf_uk << (float)(0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l)) / J_EQ;
 
-	// Predict      //
-	//ekf_xk = ekf_Fk * ekf_xk + ekf_Bk * ekf_uk;
+    // Assigning measurements and control
+	ekf_zk << vel_hum, theta_l, vel_exo, theta_c, vel_motor; // !!! NOTE: WITHOUT GEAR_RATIO !!!
+	ekf_uk << vel_hum, 0.001*actualCurrent;
+
+	// Prediction      //
+	//ekf_xk(0,1) = ekf_Fk * ekf_xk + (ekf_Bk * ekf_uk)(0,1);
 	//ekf_Pk = ekf_Fk * ekf_Pk * ekf_Fk.transpose() + ekf_Qk;
 
 	// Kalman Gain	//
