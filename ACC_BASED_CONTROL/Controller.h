@@ -173,7 +173,7 @@ public:
 					fprintf(logger, "accBasedPosition [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
 				}
 				else if (control_mode == 's'){
-					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad / s]\n", header_timestamp);
+					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  theta_c[rad]  theta_l[rad]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad/s]\n", header_timestamp);
 				}
 				else if (control_mode == 'a'){
 					fprintf(logger, "CAdmittanceControlKF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
@@ -289,6 +289,9 @@ public:
 
 	// EKF main loop
 	void ekfUpdate(float velHum, float posExo, float velExo, float posAct, float velAct, float mCurrent);
+
+	// EKF Log
+	void ekfLogger();
 
 	// Controlling through the EPOS Position control
 	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
@@ -517,7 +520,7 @@ private:
 	static float ekfVelAct;
 	static uint8_t ekf_skip;
 
-
+	FILE *ekfLogFile;
 };
 
 #endif // !CURRENT_CONTROL_H

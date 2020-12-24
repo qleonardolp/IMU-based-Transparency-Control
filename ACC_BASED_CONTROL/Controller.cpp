@@ -254,7 +254,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(1500));
+		this_thread::sleep_for(nanoseconds(15));
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -264,13 +264,22 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		// Motor Velocity
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+		// Motor Current
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-		// use downsample..
-    	vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
-    	acc_hum = (vel_hum - vel_hum_last)/C_DT;
-		accbased_comp = J_EQ*acc_hum;		// human disturbance input
-		vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
-    	vel_exo = ang_vel[1];
+		// EKF main loop
+		ekfUpdate(ang_vel[0], theta_l, ang_vel[1], GEAR_RATIO*theta_c, GEAR_RATIO*vel_motor, 0.001*actualCurrent);
+
+		downsample++;
+		if (downsample >= IMU_DELAY){
+			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+			acc_hum = (vel_hum - vel_hum_last)/C_DT;
+			accbased_comp = J_EQ*acc_hum;		// human disturbance input
+			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+			vel_exo = ang_vel[1];
+			downsample = 1;
+		}
 
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
@@ -654,8 +663,8 @@ void accBasedControl::Recorder()
 			timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
 			break;
 		case 's':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, acc_hum, vel_hum, vel_exo, torque_sea, grav_comp, accbased_comp, RPM2RADS*vel_motor);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, acc_hum, vel_hum, vel_exo, vel_adm, theta_c, theta_l, grav_comp, accbased_comp, RPM2RADS*vel_motor);
 			break;
 		case 'k':
 		case 'u':
