@@ -122,6 +122,8 @@ float accBasedControl::IntegratorExo = 0;
 float accBasedControl::IntAccMotor = 0;
 float accBasedControl::IntAccHum = 0;
 float accBasedControl::IntAccExo = 0;
+uint8_t	accBasedControl::downsample = 1;
+
 
 
 // Control Functions //
@@ -263,25 +265,26 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO02();
 		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
+		// use downsample..
+    	vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+    	acc_hum = (vel_hum - vel_hum_last)/C_DT;
+		accbased_comp = J_EQ*acc_hum;		// human disturbance input
+		vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+    	vel_exo = ang_vel[1];
+
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
 		static float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
 		static float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
-    vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
-    acc_hum = (vel_hum - vel_hum_last)/C_DT;
-		accbased_comp = J_EQ*acc_hum;		// human disturbance input
-
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
-    torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
+    	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
 
 		//vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
-    vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
+    	vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
 
 		des_tsea_last = grav_comp + accbased_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
-		vel_hum_last = vel_hum;		// VelHum_k-1 <- VelHum_k
-    vel_exo = ang_vel[1];
 
 		vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm+vel_hum);
 

@@ -43,23 +43,27 @@ Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> accBasedControl::ekf_KG;	// Kalman 
 Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	accBasedControl::ekf_Dk;	// Feedforward Matrix
 
 float accBasedControl::int_stiffness = STIFFNESS/50;
-uint8_t	accBasedControl::downsample = 1;
+uint8_t	accBasedControl::ekf_skip = 1;
+float accBasedControl::ekfPosHum;
+float accBasedControl::ekfPosExo;
+float accBasedControl::ekfVelExo;
+float accBasedControl::ekfPosAct;
+float accBasedControl::ekfVelAct;
 
-void accBasedControl::ekfUpdate()
+void accBasedControl::ekfUpdate(float velHum, float posExo, float velExo, float posAct, float velAct, float mCurrent)
 {
-
     // Assigning measurements and control
-	downsample++;
-	if(downsample < IMU_DELAY){
-		ekf_zk(0,1) = theta_l;
-		ekf_zk(0,3) = theta_c;
-		ekf_zk(0,4) = vel_motor;
-		ekf_uk(0,1) = 0.001*actualCurrent;
+	ekf_skip++;
+	if(ekf_skip < IMU_DELAY){
+		ekf_zk(0,1) = posExo;
+		ekf_zk(0,3) = posAct;
+		ekf_zk(0,4) = velAct;
+		ekf_uk(0,1) = mCurrent;
 	}
 	else{
-		ekf_zk << vel_hum, theta_l, vel_exo, theta_c, vel_motor; // !!! NOTE: WITHOUT GEAR_RATIO !!!
-		ekf_uk << vel_hum, 0.001*actualCurrent;
-		downsample = 1;
+		ekf_zk << velHum, posExo, velExo, posAct, velAct; // !!! NOTE: WITHOUT GEAR_RATIO !!!
+		ekf_uk << velHum, mCurrent;
+		ekf_skip = 1;
 	}
 	// Prediction, g(x_k-1,u_k)      //
 	ekf_xk(0,0) = (ekf_Bk * ekf_uk)(0,0);
@@ -80,16 +84,13 @@ void accBasedControl::ekfUpdate()
 	ekf_Pk = (StateSzMtx::Identity() - ekf_KG * ekf_Hk)*ekf_Pk;
 
 	// Update the transition Jacobian
-    theta_l = ekf_xk(0,1);
-    ekf_Gk(2, 1) = -(int_stiffness + STIFFNESS - LOWERLEGMASS*GRAVITY*L_CG*cos(theta_l))/INERTIA_EXO;
+    static float theta_e = ekf_xk(0,1);
+    ekf_Gk(2, 1) = -(int_stiffness + STIFFNESS - LOWERLEGMASS*GRAVITY*L_CG*cos(theta_e))/INERTIA_EXO;
 
 	// Put the state on class variables
-	vel_hum = (ekf_xk(0,0) - vel_hum_last)*C_RATE; //????
-	vel_hum_last = vel_hum;
-	theta_l = ekf_xk(0,1);
-	vel_exo = ekf_xk(0,2);
-	theta_c = ekf_xk(0,3);
-	vel_motor = ekf_xk(0,4);
-
-	torque_sea = STIFFNESS*(theta_c - theta_l);
+	ekfPosHum = ekf_xk(0,0);
+	ekfPosExo = ekf_xk(0,1);
+	ekfVelExo = ekf_xk(0,2);
+	ekfPosAct = ekf_xk(0,3);
+	ekfVelAct = ekf_xk(0,4);
 }

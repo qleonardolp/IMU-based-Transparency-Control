@@ -288,7 +288,7 @@ public:
 	}
 
 	// EKF main loop
-	void ekfUpdate();
+	void ekfUpdate(float velHum, float posExo, float velExo, float posAct, float velAct, float mCurrent);
 
 	// Controlling through the EPOS Position control
 	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
@@ -509,6 +509,14 @@ private:
 	static Matrix<float, EKF_SENSOR_DIM, EKF_STATE_DIM> ekf_Hk;		// Sensor expectations Jacobian
 	static Matrix<float, EKF_STATE_DIM, EKF_SENSOR_DIM> ekf_KG;		// Kalman Gain Matrix
 	static Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	ekf_Dk;		// Feedforward Matrix
+
+	static float ekfPosHum;
+	static float ekfPosExo;
+	static float ekfVelExo;
+	static float ekfPosAct;
+	static float ekfVelAct;
+	static uint8_t ekf_skip;
+
 
 };
 
