@@ -70,5 +70,5 @@ s = tf('s')
 
 CAC = (1 - stiffness_d/Ks)*s / (stiffness_d + s*damping_d);
 CAC = c2d(CAC,0.001);
-
-stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks)) - epos_Kp/Ja);
+%%
+stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks)) - epos_Kp/Ja)
