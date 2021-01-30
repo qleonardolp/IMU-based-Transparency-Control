@@ -391,10 +391,44 @@ int main(int argc, char** argv)
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    std::vector<XsVector> accData(mtwCallbacks.size());
-    std::vector<XsVector> gyroData(mtwCallbacks.size());
+    std::vector<XsUShortVector> accData(mtwCallbacks.size());
+    std::vector<XsUShortVector> gyroData(mtwCallbacks.size());
 
     wirelessMasterCallback.mtw_event.clear();
+
+    // Gyroscopes Bias Calibration (Trapezoial Integration)
+    std::cout << "Calculating Gyroscope Bias, do not move the IMUs!";
+
+    float integration_time = 0;
+    float imus_ybias[2] = {0,0};
+    float gyro_y_last[2] = {0,0};
+    clock_t integration_dt = CLOCKS_PER_SEC*clock();
+    clock_t bias_startpoint = CLOCKS_PER_SEC*clock();
+    while (integration_time <= 40.000f)
+    {
+      XsTime::msleep(4);
+
+      for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+      {
+        if (mtwCallbacks[i]->dataAvailable())
+        {
+          XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+
+          gyroData[i] = packet->rawGyroscopeData();
+
+          mtwCallbacks[i]->deleteOldestPacket();
+
+          imus_ybias[i] += 0.5*(gyro_y_last[i] + gyroData[i].at(2))*integration_dt;
+          gyro_y_last[i] = gyroData[i].at(2);
+        }
+      }
+      auto sys_clk = clock();
+      integration_dt = CLOCKS_PER_SEC*(sys_clk - integration_dt);
+      integration_time = (float) CLOCKS_PER_SEC*(sys_clk - bias_startpoint);
+      // debug:
+      std::cout << "dt " << integration_dt << " t_int " << integration_time;
+    }
+    std::cout << std::endl;
 
     //Sincroniza as epos
     epos.sync();
@@ -458,8 +492,8 @@ int main(int argc, char** argv)
           newDataAvailable = true;
           XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
 
-          accData[i] = packet->calibratedAcceleration();
-          gyroData[i] = packet->calibratedGyroscopeData();
+          accData[i] = packet->rawAcceleration();
+          gyroData[i] = packet->rawGyroscopeData();
 
           mtwCallbacks[i]->deleteOldestPacket();
         }
@@ -468,11 +502,11 @@ int main(int argc, char** argv)
       if (newDataAvailable)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
-        gyros[0] = mtw_hum = -(float)gyroData[0].value(2);
+        gyros[0] = mtw_hum = -(float) (gyroData[0].at(2) - imus_ybias[0]);
 
 		// For accBasedPosition and OmegaControlKF
 		if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's'))
-			gyros[1] = mtw_exo =  (float)gyroData[1].value(2);
+			gyros[1] = mtw_exo =  (float) (gyroData[1].at(2) - imus_ybias[1]);
 
         Cv.notify_one();
         Cv.wait(Lck);
