@@ -85,11 +85,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     C_RATE    1000.0f
 #define     C_DT      (float) 1/C_RATE
 
-#define     RATE            125.0f		// [Hz]	Use the control loop rate running
-#define		DELTA_T			(float) 1/RATE  // [s]
+#define     RATE            125.0f		// [Hz]	IMUs update rate
+#define		DELTA_T			(float) 1/RATE  	// [s]
 
 // -> Low Pass Filtering <- //
-#define     LPF_FC          3.000f		// [Hz] Low Pass Filter Frequency Cutoff
+#define     LPF_FC          5.000f		// [Hz] Low Pass Filter Frequency Cutoff
 // Low Pass Filter Smoothing Factor
 #define		LPF_SMF         (float) ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )
 // ------------------------ //
@@ -292,6 +292,9 @@ public:
 
 	// EKF Log
 	void ekfLogger();
+
+	// Controlling tau_m using the Human acceleration feedforward
+	void accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Controlling through the EPOS Position control
 	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);

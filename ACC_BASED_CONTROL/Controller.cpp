@@ -128,6 +128,53 @@ uint8_t	accBasedControl::downsample = 1;
 
 // Control Functions //
 
+void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
+{
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+		// try with low values until get confident 1000 Hz
+		this_thread::sleep_for(nanoseconds(1500));
+
+		m_epos->sync();	// CAN Synchronization
+
+		// Positions Measurement:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		torque_sea = STIFFNESS*(theta_c - theta_l);
+
+		downsample++;
+		if (downsample >= IMU_DELAY){
+			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+			acc_hum = (vel_hum - vel_hum_last)*RATE;
+			accbased_comp = J_EQ*acc_hum;		// human disturbance input
+			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+			vel_exo = ang_vel[1];
+			downsample = 1;
+		}
+
+		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		torque_m = grav_comp + accbased_comp;
+
+		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		SetEposCurrentLimited(setpoint_filt);
+
+		// Motor Velocity to log
+		m_eixo_in->ReadPDO02();
+		vel_motor = 1 / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		Run_Logger();
+	}
+}
+
 void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
@@ -274,7 +321,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		downsample++;
 		if (downsample >= IMU_DELAY){
 			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
-			acc_hum = (vel_hum - vel_hum_last)/C_DT;
+			acc_hum = (vel_hum - vel_hum_last)*RATE;
 			accbased_comp = J_EQ*acc_hum;		// human disturbance input
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
 			vel_exo = ang_vel[1];
