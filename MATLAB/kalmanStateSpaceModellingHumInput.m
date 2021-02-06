@@ -6,12 +6,12 @@
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
-Ka  = Ks/20          % Nm/rad (???)
+Ka  = Ks/20;          % Nm/rad (???)
 Jh  = 0.05;          % Kg.m^2 (???)
 Je  = 0.47*2;        % Kg.m^2 (???)
 We  = 2.00*9.80665;  % N      (???)
 Le  = 0.40;          % m      (???)
-Beq = 60;            % N.m.s/rad
+Beq = 60;            % N.m.s/rad (maybe is 30, I.O.)
 Ja  = 0.47;          % Kg.m^2
 
 % State vector is  [x_h x_e \dot{x_e} x_a \dot{x_a}]
