@@ -470,7 +470,7 @@ int main(int argc, char** argv)
     else if(control_mode == 's')
       controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if (control_mode == 'p')
-      controller_t = std::thread(&accBasedControl::accBasedPosition, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+      controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'a')
       controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'u')
@@ -503,6 +503,8 @@ int main(int argc, char** argv)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
         gyros[0] = mtw_hum = -(float) (gyroData[0].at(2) - imus_ybias[0]);
+
+        // Put a LowPassFilter2p here...
 
 		// For accBasedPosition and OmegaControlKF
 		if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's'))

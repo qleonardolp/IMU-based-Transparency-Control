@@ -328,7 +328,7 @@ public:
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
 
-	// The method to log the desired variables in a .txt file
+	// The method to log the desired variables in a text file
 	void Recorder();
 
 	// Update the 'Control Word' to show info at the console screen
@@ -357,6 +357,12 @@ public:
 
 	// Set Current setpoint on EPOS within safe limits
 	void SetEposVelocityLimited(float speed_stp);
+
+	// Integrator update method with anti-windup and saturation
+	float update_i(float error, float Ki, bool limit, float* integrator);
+
+	// Saturation method
+	float constrain_float(float val, float min, float max);
 
 	// Class Destructor
 	~accBasedControl()

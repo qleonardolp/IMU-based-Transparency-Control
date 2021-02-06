@@ -150,15 +150,19 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		downsample++;
 		if (downsample >= IMU_DELAY){
 			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+			vel_exo += LPF_SMF*(ang_vel[1] - vel_exo);
 			acc_hum = (vel_hum - vel_hum_last)*RATE;
-			accbased_comp = J_EQ*acc_hum;		// human disturbance input
+			acc_exo = (vel_exo - vel_exo_last)*RATE;
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
-			vel_exo = ang_vel[1];
+			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
 		}
 
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
-		torque_m = grav_comp + accbased_comp;
+		accbased_comp = J_EQ*acc_hum;		// human disturbance input
+		static float Kp = 13.78400f;
+		static float Ki = 201.7182f;		// Simulink tunning [13.7840 201.7182 1.0]
+		torque_m = grav_comp + accbased_comp + Kp*(acc_hum - acc_exo) + Ki*(vel_hum - vel_exo);
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -582,13 +586,10 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
     vel_adm = C1*vel_adm + C2*(0 - d_torque_sea);   // 
 
 		// Inner Control (PI)	//
-		IntInnerC += (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-		// Integration resets:
-		if (resetInt == 2718281)
-		{
-			IntInnerC = (vel_hum + vel_adm - vel_motor)*control_t_Dt;
-			resetInt = 0;
-		}
+		static float error_i = vel_hum + vel_adm - vel_motor;
+		static bool limit_i = (setpoint_filt > CURRENT_MAX);
+		update_i(error_i, Ki_adm, limit_i, &IntInnerC);
+
     if (resetInt == 2318421) 
       IntTsea = C_DT*torque_sea;
     if (resetInt == 1612422)
@@ -609,40 +610,15 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 void accBasedControl::SetEposVelocityLimited(float speed_stp)
 {
-	voltage = abs(speed_stp / SPEED_CONST);
-
-	if ((voltage > 0.060) && (voltage <= VOLTAGE_MAX))
-	{
-		m_eixo_in->PDOsetVelocitySetpoint((int)speed_stp); // speed in RPM
-	}
-	else if (voltage > VOLTAGE_MAX)	// upper saturation
-	{
-		if (speed_stp < 0)
-			m_eixo_in->PDOsetVelocitySetpoint(-(int)(SPEED_CONST * VOLTAGE_MAX));
-		else
-			m_eixo_in->PDOsetVelocitySetpoint((int)(SPEED_CONST * VOLTAGE_MAX));
-	}
-	else                            // lower saturation
-	{
-		m_eixo_in->PDOsetVelocitySetpoint(0);
-	}
+	int speed_limited = (int) constrain_float(speed_stp, -SPEED_CONST*VOLTAGE_MAX, SPEED_CONST*VOLTAGE_MAX);
+	m_eixo_in->PDOsetVelocitySetpoint(speed_limited); // speed in RPM
 	m_eixo_in->WritePDO02();
 }
 
 void accBasedControl::SetEposCurrentLimited(float current_stp)
 {
-	if (abs(current_stp) < CURRENT_MAX)
-	{
-		if ((theta_l >= -1.5708) && (theta_l <= 0.5236)) //(caminhando)
-			m_eixo_in->PDOsetCurrentSetpoint((int)(current_stp * 1000));	// esse argumento é em mA !!!
-	}
-	else
-	{
-		if (current_stp < 0)
-			m_eixo_in->PDOsetCurrentSetpoint(-(int)(CURRENT_MAX * 1000));
-		else
-			m_eixo_in->PDOsetCurrentSetpoint((int)(CURRENT_MAX * 1000));
-	}
+	int current_limited = (int) 1000*constrain_float(current_stp, -CURRENT_MAX, CURRENT_MAX);
+	m_eixo_in->PDOsetCurrentSetpoint(current_limited);	// esse argumento é em mA !!!
 	m_eixo_in->WritePDO01();
 }
 
@@ -845,4 +821,29 @@ void accBasedControl::SavitskyGolay(float window[], float newest_value, float* f
 		1 * window[4] + 0 * window[5] - 1 * window[6] - 2 * window[7] -
 		3 * window[8] - 4 * window[9] - 5 * window[10]) / (110) * RATE;
 
+}
+
+float accBasedControl::constrain_float(float val, float min, float max)
+{
+	if (isnanf(val)) return (min + max)/2;
+
+	if (val < min) return min;
+
+	if(val > max) return max;
+	
+	return val;
+}
+
+float accBasedControl::update_i(float error, float Ki, bool limit, float *integrator)
+{
+	if (Ki > 0.0f){
+		if(!limit || ((*integrator > 0.0f && error < 0.0f) || (*integrator < 0.0f && error > 0.0f)) ) {
+			*integrator += error * Ki * C_DT;
+			*integrator = constrain_float(*integrator,-1e6f,1e6f);
+			return *integrator;
+		}
+	}
+	else {
+		return 0.0f;
+	}
 }
