@@ -50,6 +50,10 @@ float accBasedControl::Ki_V = 0;
 float accBasedControl::Kd_V = 0;
 float accBasedControl::Kff_V = 0;
 
+// acc-based Controller
+float accBasedControl::Kp_acc = 0;
+float accBasedControl::Ki_acc = 0;
+
 //		CACu Kalman Filter						//
 Matrix<float, 5, 1> accBasedControl::CAC_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
 Matrix<float, 4, 1> accBasedControl::CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
@@ -160,9 +164,9 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 		accbased_comp = J_EQ*acc_hum;		// human disturbance input
-		static float Kp = 13.78400f;
-		static float Ki = 201.7182f;		// Simulink tunning [13.7840 201.7182 1.0]
-		torque_m = grav_comp + accbased_comp + Kp*(acc_hum - acc_exo) + Ki*(vel_hum - vel_exo);
+		
+		// Simulink tunning [13.7840 201.7182 1.0]
+		torque_m = grav_comp + accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -632,7 +636,7 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_V, &Ki_V, &Kd_V);
+			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_acc, &Ki_acc, &Kd_V); // accBasedController
 			fclose(gains_values);
 		}
 		break;

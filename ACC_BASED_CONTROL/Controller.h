@@ -410,6 +410,7 @@ private:
 	// Speed Control / Position Control
 	static float Kff_V; static float Kp_V; 
 	static float Ki_V; static float Kd_V;
+	static float Kp_acc, Ki_acc;
 
 	// |-> Admittance Control <---
 	// |
