@@ -621,7 +621,7 @@ void accBasedControl::SetEposVelocityLimited(float speed_stp)
 
 void accBasedControl::SetEposCurrentLimited(float current_stp)
 {
-	int current_limited = (int) 1000*constrain_float(current_stp, -CURRENT_MAX, CURRENT_MAX);
+	int current_limited = (int) 1000*constrain_float(current_stp, CURRENT_MAX);
 	m_eixo_in->PDOsetCurrentSetpoint(current_limited);	// esse argumento é em mA !!!
 	m_eixo_in->WritePDO01();
 }
@@ -838,12 +838,25 @@ float accBasedControl::constrain_float(float val, float min, float max)
 	return val;
 }
 
+float accBasedControl::constrain_float(float val, float constrain)
+{
+	if (isnanf(val)) return 0.0f;
+
+	float lmt = abs(constrain);
+
+	if (val < -lmt) return -lmt;
+
+	if(val > lmt) return lmt;
+	
+	return val;
+}
+
 float accBasedControl::update_i(float error, float Ki, bool limit, float *integrator)
 {
 	if (Ki > 0.0f){
 		if(!limit || ((*integrator > 0.0f && error < 0.0f) || (*integrator < 0.0f && error > 0.0f)) ) {
 			*integrator += error * Ki * C_DT;
-			*integrator = constrain_float(*integrator,-1e6f,1e6f);
+			*integrator = constrain_float(*integrator, 1e6f);
 			return *integrator;
 		}
 	}
