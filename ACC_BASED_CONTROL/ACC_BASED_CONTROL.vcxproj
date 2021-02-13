@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Controller.cpp" />
+    <ClCompile Include="Estimator.cpp" />
     <ClCompile Include="findClosestUpdateRate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mastercallback.cpp" />

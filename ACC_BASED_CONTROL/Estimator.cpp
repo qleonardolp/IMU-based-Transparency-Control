@@ -101,7 +101,7 @@ void accBasedControl::ekfLogger()
 {
 	static float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());
 
-	if (ekf_time < 60.0000f){
+	if (ekf_time < 20.0000f){
 		ekfLogFile = fopen(strcat("./data/ekf-",header_timestamp), "a");
 
 		if(ekfLogFile != NULL){

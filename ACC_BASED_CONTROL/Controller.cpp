@@ -829,7 +829,7 @@ void accBasedControl::SavitskyGolay(float window[], float newest_value, float* f
 
 float accBasedControl::constrain_float(float val, float min, float max)
 {
-	if (isnanf(val)) return (min + max)/2;
+  if (_isnan(val)) return (min + max)/2;
 
 	if (val < min) return min;
 
