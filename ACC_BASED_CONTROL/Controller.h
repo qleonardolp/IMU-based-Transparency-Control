@@ -26,9 +26,9 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
-#define	UDP_ENABLE		(true)
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#define	 UDP_ENABLE		(true)
+#include <WinSock2.h>
+#include <WS2tcpip.h>
 #include <stdio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -48,7 +48,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <Eigen/Core>
 
 
-#if UDP_ENABLE
+#ifdef UDP_ENABLE
 #define 	UDP_PORT 		"2324"
 #endif
 
@@ -137,7 +137,7 @@ public:
 		m_eixo_out = eixo_out;
 		m_seconds = seconds;
 
-#if UDP_ENABLE
+#ifdef UDP_ENABLE
 		// Initialize Winsock
 		ListenSocket = INVALID_SOCKET;
 		int iResult;
@@ -203,10 +203,9 @@ public:
 		switch (control_mode)
 		{
 		case 'p':
-			m_eixo_in->VCS_SetOperationMode(POSITION_MODE);	// For accBasedPosition
 		case 'k':
 		case 'u':
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF, accBasedController
 			break;
 		case 's':
 		case 'a':
@@ -456,7 +455,7 @@ public:
 
 private:
 
-#if UDP_ENABLE
+#ifdef UDP_ENABLE
 	WSADATA wsaData;
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;

@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Adapted by Leonardo Felipe L. S. dos Santos, 2019-2023 (@qleonardolp) //
 ///////////////////////////////////////////////////////////////////////////
 
-//#include <WinSock2.h>
+#include <WinSock2.h>
 
 #include <stdexcept>
 #include <iostream>
@@ -50,13 +50,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mastercallback.h"
 #include "mtwcallback.h"
 
-//#include "qcustomplot\qcustomplot.h"
 #include <xsensdeviceapi.h> // The Xsens device API header 
 #include <xsens/xsmutex.h>
 #include "xstypes.h"
 #include <conio.h>
 #include <thread>
 #include <chrono>
+
+#define CALIBRATION_PERIOD 30.0f
 
 void Habilita_Eixo(int ID);
 
@@ -391,8 +392,8 @@ int main(int argc, char** argv)
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    std::vector<XsUShortVector> accData(mtwCallbacks.size());
-    std::vector<XsUShortVector> gyroData(mtwCallbacks.size());
+    std::vector<XsVector> accData(mtwCallbacks.size());
+    std::vector<XsVector> gyroData(mtwCallbacks.size());
 
     wirelessMasterCallback.mtw_event.clear();
 
@@ -402,9 +403,10 @@ int main(int argc, char** argv)
     float integration_time = 0;
     float imus_ybias[2] = {0,0};
     float gyro_y_last[2] = {0,0};
-    clock_t integration_dt = CLOCKS_PER_SEC*clock();
-    clock_t bias_startpoint = CLOCKS_PER_SEC*clock();
-    while (integration_time <= 40.000f)
+    float deltaT = 0;
+    clock_t bias_startpoint = clock();
+    clock_t last_clk = clock();
+    while (integration_time <= CALIBRATION_PERIOD)
     {
       XsTime::msleep(4);
 
@@ -414,21 +416,24 @@ int main(int argc, char** argv)
         {
           XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
 
-          gyroData[i] = packet->rawGyroscopeData();
+          gyroData[i] = packet->calibratedGyroscopeData();
 
-          mtwCallbacks[i]->deleteOldestPacket();
-
-          imus_ybias[i] += 0.5*(gyro_y_last[i] + gyroData[i].at(2))*integration_dt;
+          imus_ybias[i] += 0.5*(gyro_y_last[i] + gyroData[i].value(2))*deltaT;
           gyro_y_last[i] = gyroData[i].at(2);
+          
+          mtwCallbacks[i]->deleteOldestPacket();
         }
       }
       auto sys_clk = clock();
-      integration_dt = CLOCKS_PER_SEC*(sys_clk - integration_dt);
-      integration_time = (float) CLOCKS_PER_SEC*(sys_clk - bias_startpoint);
-      // debug:
-      std::cout << "dt " << integration_dt << " t_int " << integration_time;
+      deltaT = (float) (sys_clk - last_clk)/CLOCKS_PER_SEC;
+      integration_time = (float) (sys_clk - bias_startpoint)/CLOCKS_PER_SEC;
+      last_clk = sys_clk;
+      // std::cout << "dt " << deltaT << " t_int " << integration_time << std::endl;
     }
-    std::cout << std::endl;
+    imus_ybias[0] = imus_ybias[0]/CALIBRATION_PERIOD;
+    imus_ybias[1] = imus_ybias[1]/CALIBRATION_PERIOD;
+    //debug
+    printf("Bias: %.6f, %.6f\n", imus_ybias[0], imus_ybias[1]);
 
     //Sincroniza as epos
     epos.sync();
@@ -492,8 +497,8 @@ int main(int argc, char** argv)
           newDataAvailable = true;
           XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
 
-          accData[i] = packet->rawAcceleration();
-          gyroData[i] = packet->rawGyroscopeData();
+          accData[i] = packet->calibratedAcceleration();
+          gyroData[i] = packet->calibratedGyroscopeData();
 
           mtwCallbacks[i]->deleteOldestPacket();
         }
@@ -502,13 +507,13 @@ int main(int argc, char** argv)
       if (newDataAvailable)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
-        gyros[0] = mtw_hum = -(float) (gyroData[0].at(2) - imus_ybias[0]);
+        gyros[0] = mtw_hum = -(float) (gyroData[0].value(2) - imus_ybias[0]);
 
         // Put a LowPassFilter2p here...
 
 		// For accBasedPosition and OmegaControlKF
 		if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's'))
-			gyros[1] = mtw_exo =  (float) (gyroData[1].at(2) - imus_ybias[1]);
+			gyros[1] = mtw_exo =  (float) (gyroData[1].value(2) - imus_ybias[1]);
 
         Cv.notify_one();
         Cv.wait(Lck);

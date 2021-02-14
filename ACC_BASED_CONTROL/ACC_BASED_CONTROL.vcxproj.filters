@@ -71,6 +71,9 @@
     <ClCompile Include="Controller.cpp">
       <Filter>Source Files\eposcan</Filter>
     </ClCompile>
+    <ClCompile Include="Estimator.cpp">
+      <Filter>Source Files\eposcan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReleaseNotes.css" />

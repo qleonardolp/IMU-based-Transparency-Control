@@ -800,7 +800,7 @@ void accBasedControl::UpdateControlStatus()
 		break;
 	}
 	sprintf(numbers_str, "%4.2f", 1 / control_t_Dt);
-	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
+  ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n " + std::to_string(downsample) + "\n";
 }
 
 void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)
@@ -829,7 +829,7 @@ void accBasedControl::SavitskyGolay(float window[], float newest_value, float* f
 
 float accBasedControl::constrain_float(float val, float min, float max)
 {
-	if (isnanf(val)) return (min + max)/2;
+	if (_isnan(val)) return (min + max)/2;
 
 	if (val < min) return min;
 
@@ -840,7 +840,7 @@ float accBasedControl::constrain_float(float val, float min, float max)
 
 float accBasedControl::constrain_float(float val, float constrain)
 {
-	if (isnanf(val)) return 0.0f;
+	if (_isnan(val)) return 0.0f;
 
 	float lmt = abs(constrain);
 
