@@ -44,11 +44,11 @@ Matrix<float, EKF_SENSOR_DIM, EKF_CTRL_DIM>	accBasedControl::ekf_Dk;	// Feedforw
 
 float accBasedControl::int_stiffness = STIFFNESS/50;
 uint8_t	accBasedControl::ekf_skip = 1;
-float accBasedControl::ekfPosHum;
-float accBasedControl::ekfPosExo;
-float accBasedControl::ekfVelExo;
-float accBasedControl::ekfPosAct;
-float accBasedControl::ekfVelAct;
+float accBasedControl::ekfPosHum(0.000f);
+float accBasedControl::ekfPosExo(0.000f);
+float accBasedControl::ekfVelExo(0.000f);
+float accBasedControl::ekfPosAct(0.000f);
+float accBasedControl::ekfVelAct(0.000f);
 
 void accBasedControl::ekfUpdate(float velHum, float posExo, float velExo, float posAct, float velAct, float mCurrent)
 {
@@ -65,8 +65,6 @@ void accBasedControl::ekfUpdate(float velHum, float posExo, float velExo, float 
 		ekf_uk << velHum, mCurrent;
 		ekf_skip = 1;
 	}
-
-	ekfLogger();	// logging measurements, control and states
 
 	// Prediction, g(x_k-1,u_k)      //
 	ekf_xk(0,0) = (ekf_Bk * ekf_uk)(0,0);
@@ -99,16 +97,13 @@ void accBasedControl::ekfUpdate(float velHum, float posExo, float velExo, float 
 
 void accBasedControl::ekfLogger()
 {
-	static float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());
+	//float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());
 
-	if (ekf_time < 20.0000f){
-		ekfLogFile = fopen(strcat("./data/ekf-",header_timestamp), "a");
-
-		if(ekfLogFile != NULL){
-			fprintf(ekfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
-			ekf_time, ekf_zk(0,0), ekf_zk(0,1), ekf_zk(0,2), ekf_zk(0,3), ekf_zk(0,4), ekf_uk(0,0), ekf_uk(0,1),\
-			ekf_xk(0,0), ekf_xk(0,1), ekf_xk(0,2), ekf_xk(0,3), ekf_xk(0,4));
-			fclose(ekfLogFile);
-		}
+	ekfLogFile = fopen(ekfLogFileName, "a");
+	if(ekfLogFile != NULL){
+		fprintf(ekfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
+		timestamp, ekf_zk(0,0), ekf_zk(0,1), ekf_zk(0,2), ekf_zk(0,3), ekf_zk(0,4), ekf_uk(0,0), ekf_uk(0,1),\
+		ekf_xk(0,0), ekf_xk(0,1), ekf_xk(0,2), ekf_xk(0,3), ekf_xk(0,4));
+		fclose(ekfLogFile);
 	}
 }

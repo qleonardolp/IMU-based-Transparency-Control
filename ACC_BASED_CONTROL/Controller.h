@@ -27,6 +27,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define CURRENT_CONTROL_H
 
 #define	 UDP_ENABLE		(true)
+#define	 EKF_ENABLE		(true)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
@@ -234,6 +235,9 @@ public:
 			char logfilename[40];
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
       		strcpy(logger_filename, logfilename);
+
+			strcat(ekfLogFileName, "./data/ekf-");
+			strcat(ekfLogFileName, header_timestamp);
 
 			logger = fopen(getLogfilename(), "wt");
 			if (logger != NULL)
@@ -608,6 +612,8 @@ private:
 	static uint8_t ekf_skip;
 
 	FILE *ekfLogFile;
+	char ekfLogFileName[50];
+
 };
 
 #endif // !CURRENT_CONTROL_H

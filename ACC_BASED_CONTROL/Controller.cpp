@@ -324,7 +324,9 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 		// EKF main loop
+#ifdef EKF_ENABLE
 		ekfUpdate(ang_vel[0], theta_l, ang_vel[1], GEAR_RATIO*theta_c, GEAR_RATIO*vel_motor, 0.001*actualCurrent);
+#endif
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -703,6 +705,10 @@ void accBasedControl::Recorder()
 		}// everything logged in standard units (SI)
 		fclose(logger);
 	}
+
+#ifdef EKF_ENABLE
+		ekfLogger();	// logging measurements, control and states
+#endif
 }
 
 void accBasedControl::Run_Logger()
