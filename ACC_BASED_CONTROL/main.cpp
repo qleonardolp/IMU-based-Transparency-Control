@@ -402,7 +402,7 @@ int main(int argc, char** argv)
     // Gyroscopes Bias Calibration (Trapezoial Integration)
     std::cout << "Calculating Gyroscope Bias, do not move the IMUs!";
 
-    float integration_time = 0;
+    float integration_time(0.000f);
     float imus_ybias[2] = {0,0};
     float gyro_y_last[2] = {0,0};
     float deltaT = 0;
