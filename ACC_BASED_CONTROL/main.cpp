@@ -432,8 +432,8 @@ int main(int argc, char** argv)
       last_clk = sys_clk;
       // std::cout << "dt " << deltaT << " t_int " << integration_time << std::endl;
     }
-    imus_ybias[0] = imus_ybias[0]/CALIBRATION_PERIOD;
-    imus_ybias[1] = imus_ybias[1]/CALIBRATION_PERIOD;
+    imus_ybias[0] /= CALIBRATION_PERIOD;
+    imus_ybias[1] /= CALIBRATION_PERIOD;
     //debug
     printf("Bias: %.6f, %.6f\n", imus_ybias[0], imus_ybias[1]);
 
