@@ -57,7 +57,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 #include <chrono>
 
-#define CALIBRATION_PERIOD 30.0f
+#define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
+#define XSENS_CH           25			// Use radio channel 25 for wireless master.
+#define CALIBRATION_PERIOD 30.0f  // Gyroscope Bias integration period
 
 void Habilita_Eixo(int ID);
 
@@ -182,8 +184,8 @@ int main(int argc, char** argv)
 
   */
 
-  const int desiredUpdateRate = 120;						// Use 120 Hz update rate for MTw, 150 Hz usually crashes!
-  const int desiredRadioChannel = 25;						// Use radio channel 25 for wireless master.
+  const int desiredUpdateRate = XSENS_RATE;
+  const int desiredRadioChannel = XSENS_CH;
 
   WirelessMasterCallback wirelessMasterCallback;			// Callback for wireless master
   std::vector<MtwCallback*> mtwCallbacks;					// Callbacks for mtw devices
