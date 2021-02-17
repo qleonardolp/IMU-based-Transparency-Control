@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "EPOS_NETWORK.h"
 #include "generalheader.h"
 #include "Controller.h"
+#include "LowPassFilter2p.h"
 
 #include "findClosestUpdateRate.h"
 #include "mastercallback.h"
@@ -58,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <chrono>
 
 #define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
+#define XSENS_FC           15     // IMU cutoff frequency
 #define XSENS_CH           25			// Use radio channel 25 for wireless master.
 #define CALIBRATION_PERIOD 30.0f  // Gyroscope Bias integration period
 
@@ -467,6 +469,10 @@ int main(int argc, char** argv)
 
     float mtw_hum = 0;
     float mtw_exo = 0;
+    float mtw_hum_raw = 0;
+    float mtw_exo_raw = 0;
+    LowPassFilter2pFloat  mtwHumFiltered(XSENS_RATE, XSENS_FC);
+    LowPassFilter2pFloat  mtwExoFiltered(XSENS_RATE, XSENS_FC);
     std::vector<float> gyros(mtwCallbacks.size());
     std::thread controller_t;
     std::condition_variable Cv;
@@ -509,13 +515,16 @@ int main(int argc, char** argv)
       if (newDataAvailable)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
-        gyros[0] = mtw_hum = -(float) (gyroData[0].value(2) - imus_ybias[0]);
+        mtw_hum_raw = -(float) (gyroData[0].value(2) - imus_ybias[0]);
+        mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
+        gyros[0] = mtw_hum;
 
-        // Put a LowPassFilter2p here...
-
-		// For accBasedPosition and OmegaControlKF
-		if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's'))
-			gyros[1] = mtw_exo =  (float) (gyroData[1].value(2) - imus_ybias[1]);
+        // For accBasedPosition and OmegaControlKF
+        if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's')){
+            mtw_exo_raw = (float) (gyroData[1].value(2) - imus_ybias[1]);
+            mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
+            gyros[1] = mtw_exo;
+        }
 
         Cv.notify_one();
         Cv.wait(Lck);
