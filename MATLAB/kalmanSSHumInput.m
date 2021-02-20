@@ -1,36 +1,38 @@
-%% State Space formulation for Transparency Control with Rotary SEA, with only velHum as a control input
-%   Leonardo Felipe L. S. dos Santos, 2020
-%   EESC@USP
+%% State Space formulation for Transparency Control with Rotary SEA.
+% velHum as a control input
+% Leonardo Felipe L. S. dos Santos, 2020, EESC@USP
 
 % Constants
+W = 4.742065; % Kg
+g   = 9.80665;       % m/ss
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
 Ka  = Ks/20;          % Nm/rad (???)
 Jh  = 0.05;          % Kg.m^2 (???)
 Je  = 0.47*2;        % Kg.m^2 (???)
-We  = 2.00*9.80665;  % N      (???)
+We  = W*g;           % N      
 Le  = 0.40;          % m      (???)
 Beq = 60;            % N.m.s/rad (maybe is 30, I.O.)
 Ja  = 0.47;          % Kg.m^2
 
-% State vector is  [x_h x_e \dot{x_e} x_a \dot{x_a}]
-% Sensor vector is [\dot{x_h} x_e \dot{x_e} x_a \dot{x_a}]
+% State vector is  [x_h x_e x_a \dot{x_e} \dot{x_a}]
+% Sensor vector is [\dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]
 state_dim  = 5;
 sensor_dim = 5;
-control_dim = 2;
+control_dim = 3;
 
 % State Space matrices
 
-A = [0 0 0 0 0; ...
-    0 0 1 0 0; ...
-    Ka/Je -(Ks + Ka - We*Le)/Je 0 Ks/Je 0; ...
+A = [zeros(1,state_dim); ...
+    0 0 0 1 0; ...
     0 0 0 0 1; ...
-    0 Ks/Ja 0 -Ks/Ja -Beq/Ja];
+    Ka/Je -(Ks + Ka)/Je Ks/Je 0 0; ...
+    0 Ks/Ja -Ks/Ja 0 -Beq/Ja];
 
-B = [1 0; zeros(3,control_dim); 0 N*KI/Ja];
+B = [1 0 0; zeros(2,control_dim); 0 -1/Je 0; 0 0 N*KI/Ja];
 
-C = [eye(sensor_dim)]; C(4,4) = N; C(5,5) = N; C(1,1) = 0;
+C = [eye(sensor_dim)]; C(1,1) = 0; C(3,3) = N; C(5,5) = N;
 D = zeros(sensor_dim, control_dim); D(1,1) = 1;
 
 poles = eig(A)  % check open-loop stability

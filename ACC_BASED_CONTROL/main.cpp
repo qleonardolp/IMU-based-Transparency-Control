@@ -59,7 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <chrono>
 
 #define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
-#define XSENS_FC           15     // IMU cutoff frequency
+#define XSENS_FC           30     // IMU cutoff frequency
 #define XSENS_CH           25			// Use radio channel 25 for wireless master.
 #define CALIBRATION_PERIOD 30.0f  // Gyroscope Bias integration period
 
