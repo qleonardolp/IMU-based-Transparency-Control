@@ -71,16 +71,16 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //	Stall current (@ 48 V)  42.4 A
 
 #define		CURRENT_MAX		3.1400f		// Max corrente nominal no motor Maxon RE40 [A]
-#define		VOLTAGE_MAX		21.600f		// Max tens�o de sa�da Vcc = 0.9*24V fornecida pela EPOS 24/5
+#define		VOLTAGE_MAX		21.600f		// Max tensao de saida Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	0.0603f		// Constante de torque do motor RE40	[N.m/A]
 #define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]
 
 #define     GRAVITY         9.8066f		// [m/s^2]
-#define     INERTIA_EXO     0.2620f		// [Kg.m^2], 0.0655 +- 0.0006, estimado em 2019-08-21, estou superdimensionando para 4x
 #define		LOWERLEGMASS	4.7421f		// [Kg] Definido pelo fit usando o torque SEA em 2020-12-19, ver exo_mass_measurement.m para mais detalhes
+#define		L_CG			0.4320f		// [m]
+#define     INERTIA_EXO     (LOWERLEGMASS*L_CG*L_CG) // [Kg.m^2]
 #define		MTW_DIST_LIMB	0.2500f		// [m]
 #define		MTW_DIST_EXO	0.0700f		// [m]
-#define		L_CG			0.4320f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
 #define		J_EQ			0.4700f		// [Kg.m^2]
@@ -244,7 +244,7 @@ public:
 			{
 				// printing the header into the file first line
 				if (control_mode == 'p'){
-					fprintf(logger, "accBasedController [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
+					fprintf(logger, "accBasedController [%s]\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/ss]  acc_exo[rad/ss]  theta_c[rad]  theta_l[rad]\n", header_timestamp);
 				}
 				else if (control_mode == 's'){
 					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  theta_c[rad]  theta_l[rad]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad/s]\n", header_timestamp);
@@ -488,10 +488,9 @@ private:
 
 	//		GAINS		//
 
-	// Speed Control / Position Control
 	static float Kff_V; static float Kp_V; 
 	static float Ki_V; static float Kd_V;
-	static float Kp_acc, Ki_acc;
+	static float Kp_acc, Ki_acc, Kff_acc;
 
 	// |-> Admittance Control <---
 	// |

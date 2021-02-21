@@ -53,6 +53,7 @@ float accBasedControl::Kff_V = 0;
 // acc-based Controller
 float accBasedControl::Kp_acc = 0;
 float accBasedControl::Ki_acc = 0;
+float accBasedControl::Kff_acc = 0;
 
 //		CACu Kalman Filter						//
 Matrix<float, 5, 1> accBasedControl::CAC_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
@@ -163,9 +164,21 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		}
 
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
-		accbased_comp = J_EQ*acc_hum;		// human disturbance input
+		accbased_comp = INERTIA_EXO*acc_hum;		// human disturbance input
+
+		// Tuning from the characteristic equation (acceleration-based)
+
+		static float w_n = 2.165;
+		static float Ka = STIFFNESS/50.0;
+		static float w_max = sqrt(Ka/INERTIA_EXO);
+		static float Kp = 0.35;
+		// From the Canonical form:
+		if(w_n < w_max){
+			Kp = (Ka - INERTIA_EXO*w_n*w_n)/(w_n*w_n);
+		}
+		// Forcing critically damped response (zeta = 1):
+		static float Ki = 2*sqrt((Kp + INERTIA_EXO)*Ka);
 		
-		// Simulink tunning [13.7840 201.7182 1.0]
 		torque_m = grav_comp + accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
@@ -633,12 +646,12 @@ void accBasedControl::GainScan()
 {
 	switch (m_control_mode)
 	{
-	case 'p':	// GainScan_Position()
-		gains_values = fopen("gainsPosition.txt", "rt");
+	case 'p':	// GainScan_accBasedController()
+		gains_values = fopen("gainsAbc.txt", "rt");
 
 		if (gains_values != NULL)
 		{
-			fscanf(gains_values, "KFF_V %f\nKP_V %f\nKI_V %f\nKD_V %f\n", &Kff_V, &Kp_acc, &Ki_acc, &Kd_V); // accBasedController
+			fscanf(gains_values, "Kff %f\nKp %f\nKi %f\n", &Kff_acc, &Kp_acc, &Ki_acc);
 			fclose(gains_values);
 		}
 		break;
@@ -688,8 +701,8 @@ void accBasedControl::Recorder()
 			timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
 			break;
 		case 'p':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, acc_hum, vel_hum, vel_exo, torque_sea, theta_m);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l);
 			break;
 		case 's':
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\

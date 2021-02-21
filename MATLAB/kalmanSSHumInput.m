@@ -10,9 +10,9 @@ KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
 Ka  = Ks/20;          % Nm/rad (???)
 Jh  = 0.05;          % Kg.m^2 (???)
-Je  = 0.47*2;        % Kg.m^2 (???)
-We  = W*g;           % N      
 Le  = 0.40;          % m      (???)
+Je  = W*Le^2;        % Kg.m^2 
+We  = W*g;           % N      
 Beq = 60;            % N.m.s/rad (maybe is 30, I.O.)
 Ja  = 0.47;          % Kg.m^2
 
@@ -59,7 +59,7 @@ Ts = 1; % [ms]
 % discreteSys = c2d(Sys,Ts,disOpt)
 discreteSys = c2d(Sys,Ts)
 
-%% Control Design
+%% Control Design, CAC
 epos_Ki = 1.190; epos_Kp = 11.900;
 
 damping_d = 0.900;
@@ -72,5 +72,18 @@ s = tf('s')
 
 CAC = (1 - stiffness_d/Ks)*s / (stiffness_d + s*damping_d);
 CAC = c2d(CAC,0.001);
-%%
+
 stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks)) - epos_Kp/Ja)
+
+%% Tuning from the characteristic equation (acceleration-based)
+
+w_n = 2.165;      % Hz
+T_s = 4/(1*w_n);  % s
+
+w_max = sqrt(Ka/Je);
+% From the Canonical form:
+Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
+% Forcing critically damped response (zeta = 1):
+Ki_acc = 2*sqrt((Kp_acc + Je)*Ka);
+
+fprintf("Setting time: %.4f\nMax natural freq: %.4f\nKp: %.4f\nKi: %.4f\n",T_s,w_max,Kp_acc,Ki_acc);
