@@ -14,8 +14,13 @@
  */
 #pragma once
 
+#include <stdio.h>
+#include <string.h>
 #include <cmath>
-#include <inttypes.h>
+
+#ifndef M_PI
+  #define M_PI 3.141592653f
+#endif
 
 
 /// @file   LowPassFilter2p.h

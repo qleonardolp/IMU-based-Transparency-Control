@@ -12,7 +12,7 @@ DigitalBiquadFilter<T>::DigitalBiquadFilter() {
 
 template <class T>
 T DigitalBiquadFilter<T>::apply(const T &sample, const struct biquad_params &params) {
-    if(is_zero(params.cutoff_freq) || is_zero(params.sample_freq)) {
+    if(params.cutoff_freq == 0 || params.sample_freq == 0) {
         return sample;
     }
 
@@ -34,7 +34,7 @@ template <class T>
 void DigitalBiquadFilter<T>::compute_params(float sample_freq, float cutoff_freq, biquad_params &ret) {
     ret.cutoff_freq = cutoff_freq;
     ret.sample_freq = sample_freq;
-    if (!is_positive(ret.cutoff_freq)) {
+    if (!(ret.cutoff_freq > 0)) {
         // zero cutoff means pass-thru
         return;
     }
@@ -56,7 +56,7 @@ void DigitalBiquadFilter<T>::compute_params(float sample_freq, float cutoff_freq
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 template <class T>
-LowPassFilter2p<T>::LowPassFilter2p() { 
+LowPassFilter2p<T>::LowPassFilter2p() {
     memset(&_params, 0, sizeof(_params) ); 
 }
 
@@ -86,7 +86,7 @@ float LowPassFilter2p<T>::get_sample_freq(void) const {
 
 template <class T>
 T LowPassFilter2p<T>::apply(const T &sample) {
-    if (!is_positive(_params.cutoff_freq)) {
+    if (!(_params.cutoff_freq > 0)) {
         // zero cutoff means pass-thru
         return sample;
     }

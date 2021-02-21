@@ -17,6 +17,7 @@
     <ClInclude Include="EPOS_NETWORK.h" />
     <ClInclude Include="findClosestUpdateRate.h" />
     <ClInclude Include="generalheader.h" />
+    <ClInclude Include="LowPassFilter2p.h" />
     <ClInclude Include="mtwcallback.h" />
     <ClInclude Include="mastercallback.h" />
     <ClInclude Include="nixnet.h" />
@@ -25,6 +26,7 @@
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="Estimator.cpp" />
     <ClCompile Include="findClosestUpdateRate.cpp" />
+    <ClCompile Include="LowPassFilter2p.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mastercallback.cpp" />
     <ClCompile Include="mtwcallback.cpp" />

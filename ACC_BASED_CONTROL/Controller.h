@@ -27,7 +27,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define CURRENT_CONTROL_H
 
 #define	 UDP_ENABLE		(true)
-#define	 EKF_ENABLE		(true)
+#define	 EKF_ENABLE		(false)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
@@ -102,7 +102,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		DELTA_T			(float) 1/RATE  	// [s]
 
 // -> Low Pass Filtering <- //
-#define     LPF_FC          5.000f		// [Hz] Low Pass Filter Frequency Cutoff
+#define    LPF_FC          70.0f		// [Hz] Low Pass Filter Frequency Cutoff
 // Low Pass Filter Smoothing Factor
 #define		LPF_SMF         (float) ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )
 // ------------------------ //
@@ -244,7 +244,7 @@ public:
 			{
 				// printing the header into the file first line
 				if (control_mode == 'p'){
-					fprintf(logger, "accBasedPosition [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
+					fprintf(logger, "accBasedController [%s]\ntime[s]  acc_hum[rad / s2]  vel_hum[rad / s]  vel_exo[rad / s]  T_Sea[N.m]  theta_m[rad]\n", header_timestamp);
 				}
 				else if (control_mode == 's'){
 					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  theta_c[rad]  theta_l[rad]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad/s]\n", header_timestamp);
