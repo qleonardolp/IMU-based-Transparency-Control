@@ -87,3 +87,88 @@ Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
 Ki_acc = 2*sqrt((Kp_acc + Je)*Ka);
 
 fprintf("Setting time: %.4f\nMax natural freq: %.4f\nKp: %.4f\nKi: %.4f\n",T_s,w_max,Kp_acc,Ki_acc);
+
+%% Frequency Response tuning
+clc, close all
+% Remember to load the original values from the section above!
+% Ki_acc = Ki_acc/8;
+% Kp_acc = Kp_acc/4;
+Ki_acc = 0.6005;
+Kp_acc = 0.0877;
+
+f = logspace(-3,3,1e4);
+Re = @(w,Kp) Ka - w.^2.*(Kp + Je);
+Im = @(w,Ki) -Ki.*w;
+
+% Varying Ki
+Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc).^2);
+Phs  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc));
+
+Mag2  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc/2).^2);
+Phs2  = -atan(Im(f,Ki_acc/2)./Re(f, Kp_acc));
+
+Mag3  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc/4).^2);
+Phs3  = -atan(Im(f,Ki_acc/4)./Re(f, Kp_acc));
+
+Mag4  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc*2).^2);
+Phs4  = -atan(Im(f,Ki_acc*2)./Re(f, Kp_acc));
+
+Mag5  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc*4).^2);
+Phs5  = -atan(Im(f,Ki_acc*4)./Re(f, Kp_acc));
+
+figure,
+subplot(2,1,1)
+semilogx(f, 20*log10(Mag3)), hold on
+semilogx(f, 20*log10(Mag2))
+semilogx(f, 20*log10(Mag))
+semilogx(f, 20*log10(Mag4))
+semilogx(f, 20*log10(Mag5))
+ylabel('Mag (dB)'), title('Frequency Response (Ki varying)'), grid on % using absolute scale
+legend('Ki/4','Ki/2','Ki','Ki*2','Ki*4')
+
+subplot(2,1,2)
+semilogx(f, rad2deg(Phs3))
+hold on
+semilogx(f, rad2deg(Phs2))
+semilogx(f, rad2deg(Phs))
+semilogx(f, rad2deg(Phs4))
+semilogx(f, rad2deg(Phs5))
+ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
+
+% Varying Kp
+
+
+Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc).^2);
+Phs  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc));
+
+Mag2  = sqrt(Re(f, Kp_acc/2).^2 + Im(f, Ki_acc).^2);
+Phs2  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc/2));
+
+Mag3  = sqrt(Re(f, Kp_acc/4).^2 + Im(f, Ki_acc).^2);
+Phs3  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc/4));
+
+Mag4  = sqrt(Re(f, Kp_acc*2).^2 + Im(f, Ki_acc).^2);
+Phs4  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc*2));
+
+Mag5  = sqrt(Re(f, Kp_acc*4).^2 + Im(f, Ki_acc).^2);
+Phs5  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc*4));
+
+figure,
+subplot(2,1,1)
+semilogx(f, 20*log10(Mag3)), hold on
+semilogx(f, 20*log10(Mag2))
+semilogx(f, 20*log10(Mag))
+semilogx(f, 20*log10(Mag4))
+semilogx(f, 20*log10(Mag5))
+ylabel('Mag (dB)'), title('Frequency Response (Kp varying)'), grid on % using absolute scale
+legend('Kp/4','Kp/2','Kp','Kp*2','Kp*4')
+
+subplot(2,1,2)
+semilogx(f, rad2deg(Phs3))
+hold on
+semilogx(f, rad2deg(Phs2))
+semilogx(f, rad2deg(Phs))
+semilogx(f, rad2deg(Phs4))
+semilogx(f, rad2deg(Phs5))
+ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
+%%
