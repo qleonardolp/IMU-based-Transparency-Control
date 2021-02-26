@@ -94,27 +94,31 @@ clc, close all
 % Ki_acc = Ki_acc/8;
 % Kp_acc = Kp_acc/4;
 Ki_acc = 0.6005;
-Kp_acc = 0.0877;
+Kp_acc = 0.0219;
 
 f = logspace(-3,3,1e4);
-Re = @(w,Kp) Ka - w.^2.*(Kp + Je);
-Im = @(w,Ki) -Ki.*w;
+
+% s^2 + (Ki/(Kp + Je))*s + Ka/(Kp + Je)     (Eq)
+Re = @(w,Kp) Ka./(Kp + Je) - w.^2;
+Im = @(w,Ki,Kp) -(Ki./(Kp + Je)).*w;
+
+Re_w0 = (Ka/(Kp_acc + Je));
 
 % Varying Ki
-Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc).^2);
-Phs  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc));
+Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc));
 
-Mag2  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc/2).^2);
-Phs2  = -atan(Im(f,Ki_acc/2)./Re(f, Kp_acc));
+Mag2  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc/2,Kp_acc).^2);
+Phs2  = -atan(Im(f,Ki_acc/2,Kp_acc)./Re(f, Kp_acc));
 
-Mag3  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc/4).^2);
-Phs3  = -atan(Im(f,Ki_acc/4)./Re(f, Kp_acc));
+Mag3  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc/4,Kp_acc).^2);
+Phs3  = -atan(Im(f,Ki_acc/4,Kp_acc)./Re(f, Kp_acc));
 
-Mag4  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc*2).^2);
-Phs4  = -atan(Im(f,Ki_acc*2)./Re(f, Kp_acc));
+Mag4  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc*2,Kp_acc).^2);
+Phs4  = -atan(Im(f,Ki_acc*2,Kp_acc)./Re(f, Kp_acc));
 
-Mag5  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc*4).^2);
-Phs5  = -atan(Im(f,Ki_acc*4)./Re(f, Kp_acc));
+Mag5  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc*4,Kp_acc).^2);
+Phs5  = -atan(Im(f,Ki_acc*4,Kp_acc)./Re(f, Kp_acc));
 
 figure,
 subplot(2,1,1)
@@ -123,6 +127,7 @@ semilogx(f, 20*log10(Mag2))
 semilogx(f, 20*log10(Mag))
 semilogx(f, 20*log10(Mag4))
 semilogx(f, 20*log10(Mag5))
+semilogx(f, 20*log10(Re_w0)*ones(1,length(f)),'--k')
 ylabel('Mag (dB)'), title('Frequency Response (Ki varying)'), grid on % using absolute scale
 legend('Ki/4','Ki/2','Ki','Ki*2','Ki*4')
 
@@ -138,20 +143,20 @@ ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
 % Varying Kp
 
 
-Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f, Ki_acc).^2);
-Phs  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc));
+Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc));
 
-Mag2  = sqrt(Re(f, Kp_acc/2).^2 + Im(f, Ki_acc).^2);
-Phs2  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc/2));
+Mag2  = sqrt(Re(f, Kp_acc/2).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs2  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc/2));
 
-Mag3  = sqrt(Re(f, Kp_acc/4).^2 + Im(f, Ki_acc).^2);
-Phs3  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc/4));
+Mag3  = sqrt(Re(f, Kp_acc/4).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs3  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc/4));
 
-Mag4  = sqrt(Re(f, Kp_acc*2).^2 + Im(f, Ki_acc).^2);
-Phs4  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc*2));
+Mag4  = sqrt(Re(f, Kp_acc*2).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs4  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc*2));
 
-Mag5  = sqrt(Re(f, Kp_acc*4).^2 + Im(f, Ki_acc).^2);
-Phs5  = -atan(Im(f,Ki_acc)./Re(f, Kp_acc*4));
+Mag5  = sqrt(Re(f, Kp_acc*4).^2 + Im(f,Ki_acc,Kp_acc).^2);
+Phs5  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc*4));
 
 figure,
 subplot(2,1,1)
