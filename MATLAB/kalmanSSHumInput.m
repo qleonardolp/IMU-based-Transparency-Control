@@ -75,19 +75,6 @@ CAC = c2d(CAC,0.001);
 
 stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks)) - epos_Kp/Ja)
 
-%% Tuning from the characteristic equation (acceleration-based)
-
-w_n = 2.165;      % Hz
-T_s = 4/(1*w_n);  % s
-
-w_max = sqrt(Ka/Je);
-% From the Canonical form:
-Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
-% Forcing critically damped response (zeta = 1):
-Ki_acc = 2*sqrt((Kp_acc + Je)*Ka);
-
-fprintf("Setting time: %.4f\nMax natural freq: %.4f\nKp: %.4f\nKi: %.4f\n",T_s,w_max,Kp_acc,Ki_acc);
-
 %% Frequency Response tuning
 clc, close all
 
@@ -95,18 +82,16 @@ clc, close all
 % Kp_acc = 0.0243;
 w_n = 2.165;  % Hz
 zeta = 0.01;
+w_max = sqrt(Ka/Je);
 % From the Canonical form:
 Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
 Ki_acc = 2*zeta*sqrt((Kp_acc + Je)*Ka);
 
 f = logspace(-2,2,1e4);
-m = 2;
 
 % s^2 + (Ki/(Kp + Je))*s + Ka/(Kp + Je)     (Eq)
-% Re = w_n^2 - w^2
-% Im = 2*zeta *w_n *w
-Re = @(w,Kp) Ka./(Kp + Je) - w.^2;
-Im = @(w,Kp) (2*zeta*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
+Re = @(w,w_n) w_n.^2 - w.^2;
+Im = @(w,w_n,d) 2*d.*w_n.*w;
 P  = @(w) (Ka - Je*w.^2)./(w.^2);
 
 Re_w0 = (Ka/(Kp_acc + Je));
@@ -117,43 +102,44 @@ xline(w_max,'--r',{'\omega_{max}'})
 ylabel('K_p'), xlabel('Damped Frequency (Hz)'), grid on
 %}
 
-% Varying Kp
-Cpx  = Re(f, Kp_acc)     + j*Im(f,Kp_acc);
-Cpx2 = Re(f, Kp_acc/m)   + j*Im(f,Kp_acc/m);
-Cpx3 = Re(f, Kp_acc/m^2) + j*Im(f,Kp_acc/m^2);
-Cpx4 = Re(f, Kp_acc*m)   + j*Im(f,Kp_acc*m);
-Cpx5 = Re(f, Kp_acc*m^2) + j*Im(f,Kp_acc*m^2);
+% Varying w_n
+w2 = 1 + 2*(w_max - 1)/3;
+w3 = 1 + 1*(w_max - 1)/3;
+w4 = 1 + 0*(w_max - 1)/3;
+
+Cpx  = Re(f, w_max) + j*Im(f,w_max,zeta);
+Cpx2 = Re(f, w2)    + j*Im(f,w2,zeta);
+Cpx3 = Re(f, w3)    + j*Im(f,w3,zeta);
+Cpx4 = Re(f, w4)    + j*Im(f,w4,zeta);
 
 w_PM = f( min(find(abs(abs(Cpx)-1) <= 0.007)) );      % Phase Margin freq
 w_GM = f( min(find(angle(Cpx) > 0.995*pi)) );         % Gain Margin freq
 
-PM = pi - angle(Re(w_PM, Kp_acc) + j*Im(w_PM,Kp_acc));
+PM = pi - angle(Re(w_PM, w_max) + 1i*Im(w_PM, w_max, zeta));
 PM = rad2deg(PM);
 
-GM = abs(Re(w_GM, Kp_acc) + j*Im(w_GM,Kp_acc));
+GM = abs(Re(w_GM, w_max) + 1i*Im(w_GM, w_max, zeta));
 GM = -20*log10(GM);
 
 figure,
 subplot(2,1,1)
-semilogx(f, 20*log10(abs(Cpx3))), hold on
+semilogx(f, 20*log10(abs(Cpx))), hold on
 semilogx(f, 20*log10(abs(Cpx2)))
-semilogx(f, 20*log10(abs(Cpx)))
+semilogx(f, 20*log10(abs(Cpx3)))
 semilogx(f, 20*log10(abs(Cpx4)))
-semilogx(f, 20*log10(abs(Cpx5)))
 xline(w_max,'--r',{'\omega_{max}'})
 xline(1.00,'--b')
 xline(w_GM,'--k',{'GM'})
 ylabel('Mag (dB)'), 
-title(['Frequency Response (Kp varying | ','\zeta = ',num2str(zeta), ')']), grid on % using absolute scale
-legend('Kp/m^2','Kp/m','Kp','Kp*m','Kp*m^2'), axis tight
+title(['Frequency Response (\omega_n varying | ','\zeta = ',num2str(zeta), ')']), grid on % using absolute scale
+legend('\omega_n','\omega_n/m','\omega_n/m^2','\omega_n/m^3'), axis tight
 
 subplot(2,1,2)
-semilogx(f, rad2deg(angle(Cpx3)))
+semilogx(f, rad2deg(angle(Cpx)))
 hold on
 semilogx(f, rad2deg(angle(Cpx2)))
-semilogx(f, rad2deg(angle(Cpx)))
+semilogx(f, rad2deg(angle(Cpx3)))
 semilogx(f, rad2deg(angle(Cpx4)))
-semilogx(f, rad2deg(angle(Cpx5)))
 xline(w_max,'--r')
 xline(1.00,'--b')
 xline(w_PM,'--k',{'PM'})
