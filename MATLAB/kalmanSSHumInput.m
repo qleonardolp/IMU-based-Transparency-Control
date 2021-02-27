@@ -90,90 +90,129 @@ fprintf("Setting time: %.4f\nMax natural freq: %.4f\nKp: %.4f\nKi: %.4f\n",T_s,w
 
 %% Frequency Response tuning
 clc, close all
-% Remember to load the original values from the section above!
-% Ki_acc = Ki_acc/8;
-% Kp_acc = Kp_acc/4;
-Ki_acc = 0.6005;
-Kp_acc = 0.0219;
 
-f = logspace(-3,3,1e4);
+% Kp_acc = 0.3507;
+% Kp_acc = 0.0243;
+w_n = 2.165;  % Hz
+zeta = 0.01;
+% From the Canonical form:
+Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
+Ki_acc = 2*zeta*sqrt((Kp_acc + Je)*Ka);
+
+f = logspace(-2,2,1e4);
+m = 2;
 
 % s^2 + (Ki/(Kp + Je))*s + Ka/(Kp + Je)     (Eq)
+% Re = w_n^2 - w^2
+% Im = 2*zeta *w_n *w
 Re = @(w,Kp) Ka./(Kp + Je) - w.^2;
-Im = @(w,Ki,Kp) -(Ki./(Kp + Je)).*w;
+Im = @(w,Kp) (2*zeta*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
+P  = @(w) (Ka - Je*w.^2)./(w.^2);
 
 Re_w0 = (Ka/(Kp_acc + Je));
-
-% Varying Ki
-Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc));
-
-Mag2  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc/2,Kp_acc).^2);
-Phs2  = -atan(Im(f,Ki_acc/2,Kp_acc)./Re(f, Kp_acc));
-
-Mag3  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc/4,Kp_acc).^2);
-Phs3  = -atan(Im(f,Ki_acc/4,Kp_acc)./Re(f, Kp_acc));
-
-Mag4  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc*2,Kp_acc).^2);
-Phs4  = -atan(Im(f,Ki_acc*2,Kp_acc)./Re(f, Kp_acc));
-
-Mag5  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc*4,Kp_acc).^2);
-Phs5  = -atan(Im(f,Ki_acc*4,Kp_acc)./Re(f, Kp_acc));
-
-figure,
-subplot(2,1,1)
-semilogx(f, 20*log10(Mag3)), hold on
-semilogx(f, 20*log10(Mag2))
-semilogx(f, 20*log10(Mag))
-semilogx(f, 20*log10(Mag4))
-semilogx(f, 20*log10(Mag5))
-semilogx(f, 20*log10(Re_w0)*ones(1,length(f)),'--k')
-ylabel('Mag (dB)'), title('Frequency Response (Ki varying)'), grid on % using absolute scale
-legend('Ki/4','Ki/2','Ki','Ki*2','Ki*4')
-
-subplot(2,1,2)
-semilogx(f, rad2deg(Phs3))
-hold on
-semilogx(f, rad2deg(Phs2))
-semilogx(f, rad2deg(Phs))
-semilogx(f, rad2deg(Phs4))
-semilogx(f, rad2deg(Phs5))
-ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
+% semilogx(f, 20*log10(Re_w0)*ones(1,length(f)),'--k')
+%{
+figure, semilogx(logspace(-1,1,1000), P(logspace(-1,1,1000))), hold on
+xline(w_max,'--r',{'\omega_{max}'})
+ylabel('K_p'), xlabel('Damped Frequency (Hz)'), grid on
+%}
 
 % Varying Kp
+Cpx  = Re(f, Kp_acc)     + j*Im(f,Kp_acc);
+Cpx2 = Re(f, Kp_acc/m)   + j*Im(f,Kp_acc/m);
+Cpx3 = Re(f, Kp_acc/m^2) + j*Im(f,Kp_acc/m^2);
+Cpx4 = Re(f, Kp_acc*m)   + j*Im(f,Kp_acc*m);
+Cpx5 = Re(f, Kp_acc*m^2) + j*Im(f,Kp_acc*m^2);
 
+w_PM = f( min(find(abs(abs(Cpx)-1) <= 0.007)) );      % Phase Margin freq
+w_GM = f( min(find(angle(Cpx) > 0.995*pi)) );         % Gain Margin freq
 
-Mag  = sqrt(Re(f, Kp_acc).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc));
+PM = pi - angle(Re(w_PM, Kp_acc) + j*Im(w_PM,Kp_acc));
+PM = rad2deg(PM);
 
-Mag2  = sqrt(Re(f, Kp_acc/2).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs2  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc/2));
-
-Mag3  = sqrt(Re(f, Kp_acc/4).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs3  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc/4));
-
-Mag4  = sqrt(Re(f, Kp_acc*2).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs4  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc*2));
-
-Mag5  = sqrt(Re(f, Kp_acc*4).^2 + Im(f,Ki_acc,Kp_acc).^2);
-Phs5  = -atan(Im(f,Ki_acc,Kp_acc)./Re(f, Kp_acc*4));
+GM = abs(Re(w_GM, Kp_acc) + j*Im(w_GM,Kp_acc));
+GM = -20*log10(GM);
 
 figure,
 subplot(2,1,1)
-semilogx(f, 20*log10(Mag3)), hold on
-semilogx(f, 20*log10(Mag2))
-semilogx(f, 20*log10(Mag))
-semilogx(f, 20*log10(Mag4))
-semilogx(f, 20*log10(Mag5))
-ylabel('Mag (dB)'), title('Frequency Response (Kp varying)'), grid on % using absolute scale
-legend('Kp/4','Kp/2','Kp','Kp*2','Kp*4')
+semilogx(f, 20*log10(abs(Cpx3))), hold on
+semilogx(f, 20*log10(abs(Cpx2)))
+semilogx(f, 20*log10(abs(Cpx)))
+semilogx(f, 20*log10(abs(Cpx4)))
+semilogx(f, 20*log10(abs(Cpx5)))
+xline(w_max,'--r',{'\omega_{max}'})
+xline(1.00,'--b')
+xline(w_GM,'--k',{'GM'})
+ylabel('Mag (dB)'), 
+title(['Frequency Response (Kp varying | ','\zeta = ',num2str(zeta), ')']), grid on % using absolute scale
+legend('Kp/m^2','Kp/m','Kp','Kp*m','Kp*m^2'), axis tight
 
 subplot(2,1,2)
-semilogx(f, rad2deg(Phs3))
+semilogx(f, rad2deg(angle(Cpx3)))
 hold on
-semilogx(f, rad2deg(Phs2))
-semilogx(f, rad2deg(Phs))
-semilogx(f, rad2deg(Phs4))
-semilogx(f, rad2deg(Phs5))
+semilogx(f, rad2deg(angle(Cpx2)))
+semilogx(f, rad2deg(angle(Cpx)))
+semilogx(f, rad2deg(angle(Cpx4)))
+semilogx(f, rad2deg(angle(Cpx5)))
+xline(w_max,'--r')
+xline(1.00,'--b')
+xline(w_PM,'--k',{'PM'})
 ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
-%%
+legend(['GM ',num2str(GM),'dB'],['PM ',num2str(PM),'°']), legend('boxoff'), axis tight
+%% Change w and zeta:
+Re_w = @(Kp,w) Ka./(Kp + Je) - w.^2;
+Im_w = @(Kp,w,d) (2.*d*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
+
+Kp_ = logspace(-3,3,1e4);
+zeta = 0.3;
+
+Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
+Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
+Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+
+figure,
+subplot(2,3,1)
+semilogx(Kp_, 20*log10(abs(Cpx))), hold on
+semilogx(Kp_, 20*log10(abs(Cpx2))), semilogx(Kp_, 20*log10(abs(Cpx3)))
+xline(Kp_acc,'--b',{'K_p'})
+ylabel('Mag (dB)'), title(['\zeta = ',num2str(zeta)]), grid on
+legend('\omega_{max}','2.00','1.00'), axis tight
+
+subplot(2,3,4)
+semilogx(Kp_, rad2deg(angle(Cpx))), hold on
+semilogx(Kp_, rad2deg(angle(Cpx2))), semilogx(Kp_, rad2deg(angle(Cpx3)))
+xline(Kp_acc,'--b')
+ylabel('Phase (deg)'), grid on, axis tight
+
+zeta = 0.1;
+Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
+Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
+Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+
+subplot(2,3,2)
+semilogx(Kp_, 20*log10(abs(Cpx))), hold on
+semilogx(Kp_, 20*log10(abs(Cpx2))), semilogx(Kp_, 20*log10(abs(Cpx3)))
+xline(Kp_acc,'--b',{'K_p'})
+title(['\zeta = ',num2str(zeta)]), grid on, axis tight
+
+subplot(2,3,5)
+semilogx(Kp_, rad2deg(angle(Cpx))), hold on
+semilogx(Kp_, rad2deg(angle(Cpx2))), semilogx(Kp_, rad2deg(angle(Cpx3)))
+xline(Kp_acc,'--b')
+xlabel('Kp'), grid on, axis tight
+
+zeta = 0.01;
+Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
+Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
+Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+
+subplot(2,3,3)
+semilogx(Kp_, 20*log10(abs(Cpx))), hold on
+semilogx(Kp_, 20*log10(abs(Cpx2))), semilogx(Kp_, 20*log10(abs(Cpx3)))
+xline(Kp_acc,'--b',{'K_p'})
+title(['\zeta = ',num2str(zeta)]), grid on, axis tight
+
+subplot(2,3,6)
+semilogx(Kp_, rad2deg(angle(Cpx))), hold on
+semilogx(Kp_, rad2deg(angle(Cpx2))), semilogx(Kp_, rad2deg(angle(Cpx3)))
+xline(Kp_acc,'--b'), grid on, axis tight
