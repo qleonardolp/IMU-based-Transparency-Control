@@ -78,7 +78,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     GRAVITY         9.8066f		// [m/s^2]
 #define		LOWERLEGMASS	4.7421f		// [Kg] Definido pelo fit usando o torque SEA em 2020-12-19, ver exo_mass_measurement.m para mais detalhes
 #define		L_CG			0.4320f		// [m]
-#define     INERTIA_EXO     (LOWERLEGMASS*L_CG*L_CG) // [Kg.m^2]
+#define   INERTIA_EXO     (float) (LOWERLEGMASS*L_CG*L_CG) // [Kg.m^2]
 #define		MTW_DIST_LIMB	0.2500f		// [m]
 #define		MTW_DIST_EXO	0.0700f		// [m]
 
@@ -87,7 +87,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		B_EQ			60.000f		// [N.m s/rad]
 
 // Feedforward-Feedback PI acc-based controller:
-#define		K_FF			1.0000f		// [dimensionless]
+#define		  K_FF			1.0000f		// [dimensionless]
 #define     KP_A			4.5600f     // [Kg.m^2]
 #define     KI_A			5.7900f     // [Kg.m^2/s]
 
