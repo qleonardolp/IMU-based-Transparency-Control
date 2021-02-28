@@ -80,8 +80,12 @@ clc, close all
 
 % Kp_acc = 0.3507;
 % Kp_acc = 0.0243;
+% MomentOfInertia = ??? (lower leg)
+% Stiffness = ???       (lower leg)
+% w_n = sqrt(Stiffness/MomentOfInertia)
 w_n = 2.165;  % Hz
 zeta = 0.01;
+% these dynamic parameters should respect the user knee dynamics?
 w_max = sqrt(Ka/Je);
 % From the Canonical form:
 Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
