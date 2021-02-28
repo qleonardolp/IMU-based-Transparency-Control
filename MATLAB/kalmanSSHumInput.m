@@ -8,8 +8,8 @@ g   = 9.80665;       % m/ss
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
-Ka  = Ks/20;          % Nm/rad (???)
-Jh  = 0.05;          % Kg.m^2 (???)
+Ka  = Ks/20;         % Nm/rad (???)
+Jh  = 0.0437;        % Kg.m^2   (check KneeJointParameters.m)
 Le  = 0.40;          % m      (???)
 Je  = W*Le^2;        % Kg.m^2 
 We  = W*g;           % N      
@@ -80,15 +80,18 @@ clc, close all
 
 % Kp_acc = 0.3507;
 % Kp_acc = 0.0243;
-% MomentOfInertia = ??? (lower leg)
-% Stiffness = ???       (lower leg)
-% w_n = sqrt(Stiffness/MomentOfInertia)
-w_n = 2.165;  % Hz
-zeta = 0.01;
+MomentOfInertia = I_zz;                            %(lower leg)
+kneeStiffness = min(isometricKneeStiffness);       %(lower leg)
+w_n_desired = sqrt(kneeStiffness/MomentOfInertia); % Hz
 % these dynamic parameters should respect the user knee dynamics?
 w_max = sqrt(Ka/Je);
+zeta = 0.06;
+w_n  = 1.53;
 % From the Canonical form:
 Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
+% Ka - Je*w_n^2 > 0 -> Ka/je > w_n^2 -> Ka/Je > Kk/I_zz, then:
+% kneeStiffness < Ka/Je * I_zz
+kneeStiffness_max = Ka/Je * I_zz;
 Ki_acc = 2*zeta*sqrt((Kp_acc + Je)*Ka);
 
 f = logspace(-2,2,1e4);
@@ -107,6 +110,7 @@ ylabel('K_p'), xlabel('Damped Frequency (Hz)'), grid on
 %}
 
 % Varying w_n
+% w_max = w_n_desired
 w2 = 1 + 2*(w_max - 1)/3;
 w3 = 1 + 1*(w_max - 1)/3;
 w4 = 1 + 0*(w_max - 1)/3;
@@ -116,14 +120,13 @@ Cpx2 = Re(f, w2)    + j*Im(f,w2,zeta);
 Cpx3 = Re(f, w3)    + j*Im(f,w3,zeta);
 Cpx4 = Re(f, w4)    + j*Im(f,w4,zeta);
 
+%{
 w_PM = f( min(find(abs(abs(Cpx)-1) <= 0.007)) );      % Phase Margin freq
 w_GM = f( min(find(angle(Cpx) > 0.995*pi)) );         % Gain Margin freq
-
-PM = pi - angle(Re(w_PM, w_max) + 1i*Im(w_PM, w_max, zeta));
-PM = rad2deg(PM);
-
-GM = abs(Re(w_GM, w_max) + 1i*Im(w_GM, w_max, zeta));
-GM = -20*log10(GM);
+PM = pi - angle(Re(w_PM, w_max) + 1i*Im(w_PM, w_max, zeta));    PM = rad2deg(PM);
+GM = abs(Re(w_GM, w_max) + 1i*Im(w_GM, w_max, zeta));           GM = -20*log10(GM);
+%}
+GM = -52.1892; PM = 128.7671;
 
 figure,
 subplot(2,1,1)
@@ -154,11 +157,11 @@ Re_w = @(Kp,w) Ka./(Kp + Je) - w.^2;
 Im_w = @(Kp,w,d) (2.*d*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
 
 Kp_ = logspace(-3,3,1e4);
-zeta = 0.3;
+zeta = 0.36;
 
 Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
-Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
-Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+Cpx2 = Re_w(Kp_,w_max/2) + 1i*(Im_w(Kp_,w_max/2,zeta));
+Cpx3 = Re_w(Kp_,w_max/4) + 1i*(Im_w(Kp_,w_max/4,zeta));
 
 figure,
 subplot(2,3,1)
@@ -174,10 +177,10 @@ semilogx(Kp_, rad2deg(angle(Cpx2))), semilogx(Kp_, rad2deg(angle(Cpx3)))
 xline(Kp_acc,'--b')
 ylabel('Phase (deg)'), grid on, axis tight
 
-zeta = 0.1;
+zeta = 0.06;
 Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
-Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
-Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+Cpx2 = Re_w(Kp_,w_max/2) + 1i*(Im_w(Kp_,w_max/2,zeta));
+Cpx3 = Re_w(Kp_,w_max/4) + 1i*(Im_w(Kp_,w_max/4,zeta));
 
 subplot(2,3,2)
 semilogx(Kp_, 20*log10(abs(Cpx))), hold on
@@ -193,8 +196,8 @@ xlabel('Kp'), grid on, axis tight
 
 zeta = 0.01;
 Cpx = Re_w(Kp_,w_max) + 1i*(Im_w(Kp_,w_max,zeta));
-Cpx2 = Re_w(Kp_,2) + 1i*(Im_w(Kp_,2,zeta));
-Cpx3 = Re_w(Kp_,1) + 1i*(Im_w(Kp_,1,zeta));
+Cpx2 = Re_w(Kp_,w_max/2) + 1i*(Im_w(Kp_,w_max/2,zeta));
+Cpx3 = Re_w(Kp_,w_max/4) + 1i*(Im_w(Kp_,w_max/4,zeta));
 
 subplot(2,3,3)
 semilogx(Kp_, 20*log10(abs(Cpx))), hold on
