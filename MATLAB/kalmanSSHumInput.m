@@ -76,8 +76,16 @@ CAC = c2d(CAC,0.001);
 stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks)) - epos_Kp/Ja)
 
 %% Frequency Response tuning
+% From 
+% _Design and control of an active knee orthosis driven by a rotary Series Elastic Actuator_
+% Regarding that more than 95%
+% of the PSD of knee joint torque is in the frequency range between
+% 0 and 5 Hz a minimum bandwidth of 5 Hz is defined as a requirement
+% to torque control.
 clc, close all
-
+% So... let's suppose we can choose Ka, such as kneeStiffness_max is 
+% 80 Nm/rad:
+Ka = 1387.6;
 % Kp_acc = 0.3507;
 % Kp_acc = 0.0243;
 MomentOfInertia = I_zz;                            %(lower leg)
@@ -86,7 +94,7 @@ w_n_desired = sqrt(kneeStiffness/MomentOfInertia); % Hz
 % these dynamic parameters should respect the user knee dynamics?
 w_max = sqrt(Ka/Je);
 zeta = 0.06;
-w_n  = 1.53;
+w_n = w_n_desired;
 % From the Canonical form:
 Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
 % Ka - Je*w_n^2 > 0 -> Ka/je > w_n^2 -> Ka/Je > Kk/I_zz, then:
@@ -94,26 +102,32 @@ Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
 kneeStiffness_max = Ka/Je * I_zz;
 Ki_acc = 2*zeta*sqrt((Kp_acc + Je)*Ka);
 
-f = logspace(-2,2,1e4);
-
 % s^2 + (Ki/(Kp + Je))*s + Ka/(Kp + Je)     (Eq)
 Re = @(w,w_n) w_n.^2 - w.^2;
 Im = @(w,w_n,d) 2*d.*w_n.*w;
 P  = @(w) (Ka - Je*w.^2)./(w.^2);
+I  = @(w) 2*zeta*sqrt(((Ka - Je*w.^2)./(w.^2) + Je)*Ka);
 
 Re_w0 = (Ka/(Kp_acc + Je));
 % semilogx(f, 20*log10(Re_w0)*ones(1,length(f)),'--k')
-%{
-figure, semilogx(logspace(-1,1,1000), P(logspace(-1,1,1000))), hold on
-xline(w_max,'--r',{'\omega_{max}'})
-ylabel('K_p'), xlabel('Damped Frequency (Hz)'), grid on
+%%{
+figure,
+f = linspace(5,w_n_desired+5,500);
+plot(f, P(f)), hold on
+plot(f, I(f)), grid on
+xline(w_n_desired,'--k',{'\omega_{des}'})
+title('Tunning from the desired coupled system \omega_d')
+legend('K_p','K_i'), xlabel('\omega_d (Hz)'), axis tight
 %}
 
+f = logspace(-2,2,1e4);
 % Varying w_n
-% w_max = w_n_desired
 w2 = 1 + 2*(w_max - 1)/3;
 w3 = 1 + 1*(w_max - 1)/3;
 w4 = 1 + 0*(w_max - 1)/3;
+
+w2 = w_n_desired;
+w3 = 10;
 
 Cpx  = Re(f, w_max) + j*Im(f,w_max,zeta);
 Cpx2 = Re(f, w2)    + j*Im(f,w2,zeta);
@@ -126,7 +140,7 @@ w_GM = f( min(find(angle(Cpx) > 0.995*pi)) );         % Gain Margin freq
 PM = pi - angle(Re(w_PM, w_max) + 1i*Im(w_PM, w_max, zeta));    PM = rad2deg(PM);
 GM = abs(Re(w_GM, w_max) + 1i*Im(w_GM, w_max, zeta));           GM = -20*log10(GM);
 %}
-GM = -52.1892; PM = 128.7671;
+% GM = -52.1892; PM = 128.7671;
 
 figure,
 subplot(2,1,1)
@@ -136,7 +150,7 @@ semilogx(f, 20*log10(abs(Cpx3)))
 semilogx(f, 20*log10(abs(Cpx4)))
 xline(w_max,'--r',{'\omega_{max}'})
 xline(1.00,'--b')
-xline(w_GM,'--k',{'GM'})
+% xline(w_GM,'--k',{'GM'})
 ylabel('Mag (dB)'), 
 title(['Frequency Response (\omega_n varying | ','\zeta = ',num2str(zeta), ')']), grid on % using absolute scale
 legend('\omega_n','\omega_n/m','\omega_n/m^2','\omega_n/m^3'), axis tight
@@ -149,9 +163,9 @@ semilogx(f, rad2deg(angle(Cpx3)))
 semilogx(f, rad2deg(angle(Cpx4)))
 xline(w_max,'--r')
 xline(1.00,'--b')
-xline(w_PM,'--k',{'PM'})
-ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on
-legend(['GM ',num2str(GM),'dB'],['PM ',num2str(PM),'°']), legend('boxoff'), axis tight
+% xline(w_PM,'--k',{'PM'})
+ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on, axis tight
+% legend(['GM ',num2str(GM),'dB'],['PM ',num2str(PM),'°']), legend('boxoff'), axis tight
 %% Change w and zeta:
 Re_w = @(Kp,w) Ka./(Kp + Je) - w.^2;
 Im_w = @(Kp,w,d) (2.*d*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
