@@ -636,8 +636,8 @@ void accBasedControl::SetEposVelocityLimited(float speed_stp)
 
 void accBasedControl::SetEposCurrentLimited(float current_stp)
 {
-	int current_limited = (int) 1000*constrain_float(current_stp, CURRENT_MAX);
-	m_eixo_in->PDOsetCurrentSetpoint(current_limited);	// esse argumento é em mA !!!
+	actualCurrent = (int) 1000*constrain_float(current_stp, CURRENT_MAX);
+	m_eixo_in->PDOsetCurrentSetpoint(actualCurrent);	// esse argumento é em mA !!!
 	m_eixo_in->WritePDO01();
 }
 
@@ -750,15 +750,13 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += " Setpoint Position: " + (std::string) numbers_str + " | ";
 		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_l);
 		ctrl_word += "Leg Position: " + (std::string) numbers_str + " deg\n";
-		sprintf(numbers_str, "%+5.3f", vel_motor);
-		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
-		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
-		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
-		sprintf(numbers_str, "%5.3f", Kff_V);
+		sprintf(numbers_str, "%+5d", actualCurrent);
+		ctrl_word += " Current: " + (std::string) numbers_str + " mA\n";
+		sprintf(numbers_str, "%5.3f", Kff_acc);
 		ctrl_word += " Kff_P: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Kp_V);
+		sprintf(numbers_str, "%5.3f", Kp_acc);
 		ctrl_word += " Kp_P: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Ki_V);
+		sprintf(numbers_str, "%5.3f", Ki_acc);
 		ctrl_word += " Ki_P: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", Kd_V);
 		ctrl_word += " Kd_P: " + (std::string) numbers_str + "\n";

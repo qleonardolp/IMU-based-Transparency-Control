@@ -422,8 +422,8 @@ int main(int argc, char** argv)
 
           gyroData[i] = packet->calibratedGyroscopeData();
 
-          imus_ybias[i] += 0.5*(gyro_y_last[i] + gyroData[i].value(2))*deltaT;
-          gyro_y_last[i] = gyroData[i].value(2);
+          imus_ybias[i] += 0.5*(gyro_y_last[i] + (float)gyroData[i].value(2))*deltaT;
+          gyro_y_last[i] = (float)gyroData[i].value(2);
           
           mtwCallbacks[i]->deleteOldestPacket();
         }
