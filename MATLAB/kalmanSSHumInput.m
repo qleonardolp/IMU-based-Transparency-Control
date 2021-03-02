@@ -112,22 +112,24 @@ Re_w0 = (Ka/(Kp_acc + Je));
 % semilogx(f, 20*log10(Re_w0)*ones(1,length(f)),'--k')
 %%{
 figure,
-f = linspace(5,w_n_desired+5,500);
+f = linspace(10,w_n_desired*2,500);
 plot(f, P(f)), hold on
 plot(f, I(f)), grid on
 xline(w_n_desired,'--k',{'\omega_{des}'})
+xline(35.3,'--k',{'\omega_{act}'})
 title('Tunning from the desired coupled system \omega_d')
 legend('K_p','K_i'), xlabel('\omega_d (Hz)'), axis tight
 %}
 
 f = logspace(-2,2,1e4);
 % Varying w_n
-w2 = 1 + 2*(w_max - 1)/3;
-w3 = 1 + 1*(w_max - 1)/3;
-w4 = 1 + 0*(w_max - 1)/3;
+% w2 = 1 + 2*(w_max - 1)/3;
+% w3 = 1 + 1*(w_max - 1)/3;
+% w4 = 1 + 0*(w_max - 1)/3;
 
-w2 = w_n_desired;
-w3 = 10;
+w2 = w_j_des(60);
+w3 = w_j_des(0);
+w4 = w_n_desired;
 
 Cpx  = Re(f, w_max) + j*Im(f,w_max,zeta);
 Cpx2 = Re(f, w2)    + j*Im(f,w2,zeta);

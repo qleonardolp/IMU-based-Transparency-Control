@@ -179,7 +179,8 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		// Forcing critically damped response (zeta = 1):
 		static float Ki = 2*sqrt((Kp + INERTIA_EXO)*Ka);
 		
-		torque_m = grav_comp + accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+		torque_m = grav_comp*Kff_acc + accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+		// using Kff to adjust the gravitational term...
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -745,7 +746,7 @@ void accBasedControl::UpdateControlStatus()
 	switch (m_control_mode)
 	{
 	case 'p':
-		ctrl_word = " POSITION CONTROLLER\n";
+		ctrl_word = " ACC CONTROLLER\n";
 		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_m);
 		ctrl_word += " Setpoint Position: " + (std::string) numbers_str + " | ";
 		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_l);

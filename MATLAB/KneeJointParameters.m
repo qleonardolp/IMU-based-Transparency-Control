@@ -64,7 +64,7 @@ I_zz = mass_scale*body_mass*(L_leg*r_zz)^2;
 sqrt(passiveKneeStiffness/I_zz)
 sqrt(isometricKneeStiffness/I_zz)
 
-% What if:
+% What if...
 KneeRoM = 80; % deg
 passKneeStiff = passiveKneeStiffness;
 isoKneeStiff = isometricKneeStiffness(2);
@@ -72,12 +72,16 @@ K_j = @(o) passKneeStiff + (isoKneeStiff - passKneeStiff)/KneeRoM*(o - 0);
 w_j_des = @(o) sqrt(passKneeStiff/I_zz + (isoKneeStiff - passKneeStiff)/KneeRoM*(o - 0)/I_zz);
 
 ang = linspace(-10,KneeRoM-10,250);
-figure, plot(ang, w_j_des(ang)), grid on
+figure, plot(ang, w_j_des(ang)), grid on, axis tight
+title('Knee \omega_n using first order variable stiffness')
+ylabel('\omega_n (Hz)'), xlabel('Leg flexion (deg)')
 
+zeta = 0.06;
 P  = @(w) (Ka - Je*w.^2)./(w.^2);
 I  = @(w) 2*zeta*sqrt(((Ka - Je*w.^2)./(w.^2) + Je)*Ka);
 
 figure,
 plot(ang, P(w_j_des(ang))), hold on
 plot(ang, I(w_j_des(ang))), grid on
-% senssaaaaa d+ Matlab
+title('PI tuning from knee dynamics')
+legend('K_p','K_i'), xlabel('Leg flexion (deg)'), axis tight
