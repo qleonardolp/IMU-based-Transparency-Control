@@ -128,6 +128,8 @@ float accBasedControl::IntAccMotor = 0;
 float accBasedControl::IntAccHum = 0;
 float accBasedControl::IntAccExo = 0;
 uint8_t	accBasedControl::downsample = 1;
+uint8_t	accBasedControl::downsamplelog = 1;
+
 
 
 
@@ -193,7 +195,12 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -272,7 +279,12 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 		
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -308,8 +320,13 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
-
-		Run_Logger();
+		
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -374,7 +391,12 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -462,7 +484,12 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -527,7 +554,12 @@ void accBasedControl::CACurrent(float &velHum, std::condition_variable &cv, std:
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 
@@ -624,7 +656,12 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		Run_Logger();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
 	}
 }
 

@@ -54,6 +54,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #endif
 
 #define		SGVECT_SIZE		11				// Size of the window vector for Savitsky-Golay smoothing and derivative
+#define		LOG_DELAY		4				// Logging downsample
 
 // CONSTANTS
 
@@ -566,6 +567,7 @@ private:
 	static float IntAccHum;
 	static float IntAccExo;
 	static uint8_t downsample;
+	static uint8_t downsamplelog;
 
 	//		STATE MEMORY VECTORS        //
 
