@@ -152,7 +152,8 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		// Positions Measurement:
 		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		torque_sea = STIFFNESS*(theta_c - theta_l);
+		
+		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -320,7 +321,7 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
-		
+
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){

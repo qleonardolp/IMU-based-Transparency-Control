@@ -11,7 +11,7 @@ Ks  = 104;           % Nm/rad
 % Ka  = Ks/20;         % Nm/rad (???)
 Ka  = 1387.6;
 Jh  = 0.0437;        % Kg.m^2   (check KneeJointParameters.m)
-Le  = 0.40;          % m      (???)
+Le  = 0.432;          % m      (???)
 Je  = W*Le^2;        % Kg.m^2 
 We  = W*g;           % N      
 Beq = 60;            % N.m.s/rad (maybe is 30, I.O.)
@@ -86,9 +86,9 @@ stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*(1 - stiffness_d/Ks
 clc, close all
 % So... let's suppose we can choose Ka, such as kneeStiffness_max is 
 % 80 Nm/rad:
-Ka = 1387.6;
+Ka = 800;
 % Kp_acc = 0.3507;
-% Kp_acc = 0.0243;
+
 MomentOfInertia = I_zz;                            %(lower leg)
 kneeStiffness = min(isometricKneeStiffness);       %(lower leg)
 w_n_desired = sqrt(kneeStiffness/MomentOfInertia); % Hz
@@ -117,7 +117,7 @@ f = linspace(10,w_n_desired*2,500);
 plot(f, P(f)), hold on
 plot(f, I(f)), grid on
 xline(w_n_desired,'--k',{'\omega_{des}'})
-xline(35.3,'--k',{'\omega_{act}'})
+xline(33.51,'--k',{'\omega_{act}'})
 title('Tunning from the desired coupled system \omega_d')
 legend('K_p','K_i'), xlabel('\omega_d (Hz)'), axis tight
 %}
@@ -169,6 +169,18 @@ xline(1.00,'--b')
 % xline(w_PM,'--k',{'PM'})
 ylabel('Phase (deg)'), xlabel('Frequency (Hz)'), grid on, axis tight
 % legend(['GM ',num2str(GM),'dB'],['PM ',num2str(PM),'°']), legend('boxoff'), axis tight
+
+% Using the Adimittance Transfer Function:
+A_i = tf([P(w_max/4) I(w_max/4)],[(Je/Ka) 0 1]);
+
+figure,
+bode(A_i,{0.01,100}),hold on
+
+A_i = tf([P(w_max/2) I(w_max/2)],[(Je/Ka) 0 1]);
+bode(A_i,{0.01,100})
+A_i = tf([P(w_max) I(w_max)],[(Je/Ka) 0 1]);
+bode(A_i,{0.01,100}), grid on
+
 %% Change w and zeta:
 Re_w = @(Kp,w) Ka./(Kp + Je) - w.^2;
 Im_w = @(Kp,w,d) (2.*d*sqrt((Kp + Je)*Ka)./(Kp + Je)).*w;
