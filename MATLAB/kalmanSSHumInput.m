@@ -98,9 +98,6 @@ zeta = 0.06;
 w_n = w_n_desired;
 % From the Canonical form:
 Kp_acc = (Ka - Je*w_n^2)/(w_n^2);
-% Ka - Je*w_n^2 > 0 -> Ka/je > w_n^2 -> Ka/Je > Kk/I_zz, then:
-% kneeStiffness < Ka/Je * I_zz
-kneeStiffness_max = Ka/Je * I_zz;
 Ki_acc = 2*zeta*sqrt((Kp_acc + Je)*Ka);
 
 % s^2 + (Ki/(Kp + Je))*s + Ka/(Kp + Je)     (Eq)

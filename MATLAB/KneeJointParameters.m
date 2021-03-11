@@ -60,28 +60,49 @@ mass_scale = 0.048;
 r_zz = 0.28;
 I_zz = mass_scale*body_mass*(L_leg*r_zz)^2;
 %% User leg natural frequency estimation:
-% Considering a desired stiffness for passive joint moments:
-sqrt(passiveKneeStiffness/I_zz)
-sqrt(isometricKneeStiffness/I_zz)
-
+clc, close all
 % What if...
 KneeRoM = 80; % deg
-passKneeStiff = passiveKneeStiffness;
-isoKneeStiff = isometricKneeStiffness(2);
-K_j = @(o) passKneeStiff + (isoKneeStiff - passKneeStiff)/KneeRoM*(o - 0);
-w_j_des = @(o) sqrt(passKneeStiff/I_zz + (isoKneeStiff - passKneeStiff)/KneeRoM*(o - 0)/I_zz);
+% passKneeStiff = passiveKneeStiffness;
+% isoKneeStiff = isometricKneeStiffness(2);
+% Ka - Je*w_n^2 > 0 -> Ka/je > w_n^2 -> Ka/Je > Kk/I_zz, then:
+% kneeStiffness < Ka/Je * I_zz
+Ka = 6500; Je = 0.8850;
+kneeStiffness_max = Ka/Je * I_zz;
+%For 1.53 Hz hopping the knee stiffness is:
+K_j = @(o) 110.0 + 169.3*deg2rad(o - 0);
+Eta = @(o) Ka./(110.0 + 169.3*deg2rad(o - 0));
+w_j_des = @(o) sqrt(110.0/I_zz + 169.3*deg2rad(o - 0)/I_zz);
 
-ang = linspace(-10,KneeRoM-10,250);
+offset = 10;
+ang = linspace(-offset, KneeRoM-offset, 300);
 figure, plot(ang, w_j_des(ang)), grid on, axis tight
 title('Knee \omega_n using first order variable stiffness')
 ylabel('\omega_n (Hz)'), xlabel('Leg flexion (deg)')
 
-zeta = 0.06;
-P  = @(w) (Ka - Je*w.^2)./(w.^2);
-I  = @(w) 2*zeta*sqrt(((Ka - Je*w.^2)./(w.^2) + Je)*Ka);
+figure, plot(ang, K_j(ang)), hold on
+plot(ang, Eta(ang)), grid on
+yline(kneeStiffness_max,'--',{'k_k^{max}'})
+legend('k_{knee}','\eta')
+
+zeta = 0.025;
+P  = @(n) -Je + n.*I_zz;
+I  = @(n) 2*zeta*sqrt(n.*Ka*I_zz);
 
 figure,
-plot(ang, P(w_j_des(ang))), hold on
-plot(ang, I(w_j_des(ang))), grid on
+plot(ang, P(Eta(ang))), hold on
+plot(ang, I(Eta(ang))), grid on
 title('PI tuning from knee dynamics')
 legend('K_p','K_i'), xlabel('Leg flexion (deg)'), axis tight
+
+% Using the Adimittance Transfer Function:
+A_i = tf([P(Eta(-5)) I(Eta(-5))],[(Je/Ka) 0 1]);
+
+figure,
+bode(A_i),hold on
+
+A_i = tf([P(Eta(25)) I(Eta(25))],[(Je/Ka) 0 1]);
+bode(A_i)
+A_i = tf([P(Eta(55)) I(Eta(55))],[(Je/Ka) 0 1]);
+bode(A_i), grid on
+% ... compare Knee and coupled-system impedance...
