@@ -69,6 +69,7 @@ KneeRoM = 80; % deg
 % kneeStiffness < Ka/Je * I_zz
 Ka = 6500; Je = 0.8850;
 kneeStiffness_max = Ka/Je * I_zz;
+w_max = sqrt(Ka/Je);
 %For 1.53 Hz hopping the knee stiffness is:
 K_j = @(o) 110.0 + 169.3*deg2rad(o - 0);
 Eta = @(o) Ka./(110.0 + 169.3*deg2rad(o - 0));
@@ -85,7 +86,8 @@ plot(ang, Eta(ang)), grid on
 yline(kneeStiffness_max,'--',{'k_k^{max}'})
 legend('k_{knee}','\eta')
 
-zeta = 0.025;
+% zeta = 0.025;
+zeta = 0.06;
 P  = @(n) -Je + n.*I_zz;
 I  = @(n) 2*zeta*sqrt(n.*Ka*I_zz);
 
@@ -95,14 +97,87 @@ plot(ang, I(Eta(ang))), grid on
 title('PI tuning from knee dynamics')
 legend('K_p','K_i'), xlabel('Leg flexion (deg)'), axis tight
 
-% Using the Adimittance Transfer Function:
-A_i = tf([P(Eta(-5)) I(Eta(-5))],[(Je/Ka) 0 1]);
+% Using the Impedance (F/X) Transfer Function (Xa = 0):
+Z_r = @(tht) tf([P(Eta(tht)) I(Eta(tht)) 0],[(Je/Ka) 0 1]);
+Z_h = @(tht) tf([K_j(tht)],[1]);
+A_r = @(tht) tf([(Je/Ka) 0 1], [P(Eta(tht)) I(Eta(tht)) 0]);
+A_h = @(tht) tf([1],[K_j(tht)]);
 
-figure,
-bode(A_i),hold on
+% Using the Impedance (F/X) Transfer Function (DX = 0):
+Z_act = tf([-Ja 0 0],[(Je/Ka) 0 1]);
+A_act = 1/Z_act;
 
-A_i = tf([P(Eta(25)) I(Eta(25))],[(Je/Ka) 0 1]);
-bode(A_i)
-A_i = tf([P(Eta(55)) I(Eta(55))],[(Je/Ka) 0 1]);
-bode(A_i), grid on
-% ... compare Knee and coupled-system impedance...
+ang_step = 30;
+ang1 = -5;
+ang2 = ang1 +   ang_step;
+ang3 = ang1 + 2*ang_step;
+
+figure, 
+bode(Z_r(ang1), Z_h(ang1), Z_r(ang2), Z_h(ang2), Z_r(ang3), Z_h(ang3)), grid on
+hold on, bode(tf([Ka*P(Eta(ang1))/Je],[1]),'--k')
+bode(Z_act,'--b')
+title('Impedance Bode')
+
+legend(['Z_i(',num2str(ang1),')'],['Z_k(',num2str(ang1),')'],...
+       ['Z_i(',num2str(ang2),')'],['Z_k(',num2str(ang2),')'],...
+       ['Z_i(',num2str(ang3),')'],['Z_k(',num2str(ang3),')'])
+
+figure, 
+bode(A_r(ang1), A_h(ang1), A_r(ang2), A_h(ang2), A_r(ang3), A_h(ang3)), grid on
+hold on, bode(tf([1],[Ka*P(Eta(ang1))/Je]),'--k')
+bode(A_act,'--b')
+title('Admittance Bode')
+
+legend(['A_i(',num2str(ang1),')'],['A_k(',num2str(ang1),')'],...
+       ['A_i(',num2str(ang2),')'],['A_k(',num2str(ang2),')'],...
+       ['A_i(',num2str(ang3),')'],['A_k(',num2str(ang3),')'])
+
+   
+% MISO transfer function:
+% Z_all = [Z_i(ang2) Z_act];
+% figure, bode(Z_all), grid on
+
+%%
+% Check signal Z = -F/V...
+% Using the Impedance (F/V) Transfer Function (Xa = 0):
+Z_r = @(tht) tf([P(Eta(tht)) I(Eta(tht))],[(Je/Ka) 0 1]);
+Z_h = @(tht) tf([K_j(tht)],[1 0]);
+A_r = @(tht) tf([(Je/Ka) 0 1], [P(Eta(tht)) I(Eta(tht))]);
+A_h = @(tht) tf([1 0],[K_j(tht)]);
+
+% Using the Impedance (F/V) Transfer Function (DX = 0):
+Z_act = tf([-Ja 0],[(Je/Ka) 0 1]);
+A_act = 1/Z_act;
+
+%{
+figure, 
+bode(A_r(ang1), A_h(ang1), A_r(ang2), A_h(ang2), A_r(ang3), A_h(ang3)), grid on
+% xline(w_max,'--r',{'\omega_{max}'})
+title('Exo and Knee Admittance')
+
+legend(['A_r(',num2str(ang1),')'],['A_h(',num2str(ang1),')'],...
+       ['A_r(',num2str(ang2),')'],['A_h(',num2str(ang2),')'],...
+       ['A_r(',num2str(ang3),')'],['A_h(',num2str(ang3),')'])
+%}
+
+figure, 
+bode(Z_r(ang1), Z_h(ang1), Z_r(ang2), Z_h(ang2), Z_r(ang3), Z_h(ang3)), grid on
+% xline(w_max,'--r',{'\omega_{max}'})
+title('Exo and Knee Impedance')
+
+legend(['Z_r(',num2str(ang1),')'],['Z_h(',num2str(ang1),')'],...
+       ['Z_r(',num2str(ang2),')'],['Z_h(',num2str(ang2),')'],...
+       ['Z_r(',num2str(ang3),')'],['Z_h(',num2str(ang3),')'])
+   
+% Limitations (using 25 deg):
+figure, bode(Z_r(ang2)), hold on
+bode(tf([I(Eta(ang2))],[1]),'--k')  % s -> 0
+bode(Z_h(ang2))                     % Des Imp
+bode(tf([Je 0],[1]),'--g')          % Pure Mass Imp
+bode(tf([Ks],[1 0]),'--r')          % Pure SEA Imp
+bode(tf([Ka],[1 0]),'--m')          % Pure Ka Imp
+grid on
+legend(['Z_r(',num2str(ang2),')'],...
+        'Z_r(s\rightarrow0)',...
+        ['Z_h(',num2str(ang2),')'],...
+        'J_e','K_{sea}','K_a')
