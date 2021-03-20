@@ -157,5 +157,6 @@ $RECYCLE.BIN/
 
 # My ignored
 .vs/
-MATLAB/*.slxc
+*.slxc
 MATLAB/slprj/
+ACC_BASED_CONTROL/data/slprj/
