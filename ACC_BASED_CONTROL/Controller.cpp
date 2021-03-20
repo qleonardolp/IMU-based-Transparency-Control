@@ -355,9 +355,9 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-		// EKF main loop
-#ifdef EKF_ENABLE
-		ekfUpdate(ang_vel[0], theta_l, ang_vel[1], GEAR_RATIO*theta_c, GEAR_RATIO*vel_motor, 0.001*actualCurrent);
+		// AKF main loop
+#ifdef AKF_ENABLE
+		//
 #endif
 
 		downsample++;
@@ -758,8 +758,8 @@ void accBasedControl::Recorder()
 		fclose(logger);
 	}
 
-#ifdef EKF_ENABLE
-		ekfLogger();	// logging measurements, control and states
+#ifdef AKF_ENABLE
+		kalmanLogger();	// logging measurements, control and states
 #endif
 }
 
@@ -918,5 +918,18 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 	}
 	else {
 		return 0.0f;
+	}
+}
+
+void accBasedControl::kalmanLogger()
+{
+	//float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());
+
+	akfLogFile = fopen(akfLogFileName, "a");
+	if(akfLogFile != NULL){
+		//fprintf(akfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
+		//timestamp, ekf_zk(0,0), ekf_zk(0,1), ekf_zk(0,2), ekf_zk(0,3), ekf_zk(0,4), ekf_uk(0,0), ekf_uk(0,1),\
+		//ekf_xk(0,0), ekf_xk(0,1), ekf_xk(0,2), ekf_xk(0,3), ekf_xk(0,4));
+		fclose(akfLogFile);
 	}
 }
