@@ -47,6 +47,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #include <Eigen/LU>
 #include <Eigen/Core>
+#include <unsupported/Eigen/MatrixFunctions>
+
 
 
 #ifdef UDP_ENABLE
@@ -97,10 +99,10 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KD_F			0.0200f     // [s]
 
 #define     C_RATE    1000.0f
-#define     C_DT      (float) 1/C_RATE
+#define     C_DT      (float) (1/C_RATE)
 
 #define     RATE            125.0f		// [Hz]	IMUs update rate
-#define		DELTA_T			(float) 1/RATE  	// [s]
+#define		DELTA_T			(float) (1/RATE)  	// [s]
 
 // -> Low Pass Filtering <- //
 #define    LPF_FC          70.0f		// [Hz] Low Pass Filter Frequency Cutoff
@@ -115,17 +117,20 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		HPF_FC			0.7f	// [Hz]
 #define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
-// EKF dimensions
-#define EKF_STATE_DIM  5
-#define EKF_SENSOR_DIM 5
-#define EKF_CTRL_DIM   2
+// AKF dimensions
+#define AKF_STATE_DIM  5
+#define AKF_SENSOR_DIM 6
+#define AKF_CTRL_DIM   3
 #define IMU_DELAY 	   8				// N Samples of Ts=0.001s
 
 using namespace Eigen;
 
-typedef Matrix<float, EKF_STATE_DIM, EKF_STATE_DIM> StateSzMtx;
-typedef Matrix<float, EKF_SENSOR_DIM, EKF_SENSOR_DIM> SensorSzMtx;
-
+typedef Matrix<float, AKF_STATE_DIM, 1> StateSzVec;
+typedef Matrix<float, AKF_SENSOR_DIM, 1> SensorSzVec;
+typedef Matrix<float, AKF_CTRL_DIM, 1> ControlSzVec;
+typedef Matrix<float, AKF_STATE_DIM, AKF_STATE_DIM> StateSzMtx;
+typedef Matrix<float, AKF_SENSOR_DIM, AKF_SENSOR_DIM> SensorSzMtx;
+typedef Matrix<float, AKF_SENSOR_DIM, AKF_CTRL_DIM>	ControlSzMtx;
 
 class accBasedControl
 {
@@ -264,7 +269,6 @@ public:
 		}
 
 		//		KALMAN FILTER SETUP		//
-		float Dt = 0.0010f;
 		CAC_xk.setZero();
 		CAC_zk.setZero();
 		CAC_KG.setZero();
@@ -275,7 +279,7 @@ public:
 		// Row 2
 		CAC_Fk(1, 1) = 1;
 		// Row 3
-		CAC_Fk(2, 1) = Dt;
+		CAC_Fk(2, 1) = C_DT;
 		CAC_Fk(2, 2) = 1;
 		// Row 4
 		CAC_Fk(3, 3) = 1;
@@ -284,8 +288,8 @@ public:
 		CAC_Fk(4, 3) = -STIFFNESS;
 
 		CAC_Bk.setZero();
-		CAC_Bk(1, 0) = Dt;
-		CAC_Bk(2, 0) = 0.500f * Dt * Dt;
+		CAC_Bk(1, 0) = C_DT;
+		CAC_Bk(2, 0) = 0.500f * C_DT * C_DT;
 
 		CAC_Hk.setZero();
 		CAC_Hk(0, 0) = 1;
@@ -313,7 +317,62 @@ public:
 		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
 		CAC_Qk(3, 3) = pow(0.0000307, 2);
 		CAC_Qk(4, 4) = pow(0.0032034, 2);
+
+		//		AKF SETUP		//
+		int_stiffness = 1387.6;
+		xk.setZero();
+		zk.setZero();
+		uk.setZero();
+		Fk.setZero();
+		At.setZero();
+		Gk.setZero();
+		Bt.setZero();
+		Ck.setZero();
+		Dk.setZero();
+		KG.setZero();
+
+		At(1,3) = 1;
+		At(2,4) = 1;
+		At(3,0) = int_stiffness/INERTIA_EXO;
+		At(3,1) = -(int_stiffness + STIFFNESS)/INERTIA_EXO;
+		At(3,2) = STIFFNESS/INERTIA_EXO;
+		At(4,1) = STIFFNESS/J_EQ;
+		At(4,2) = -STIFFNESS/J_EQ;
+		At(4,4) = -B_EQ/J_EQ;
+
+		Bt(0,0) = 1;
+		Bt(3,1) = -1/INERTIA_EXO;
+		Bt(4,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
+
+		Fk = discretize_A(At, C_DT);
+		Gk = discretize_B(At, Bt, C_DT);
+
+		Ck(0,0) = -int_stiffness;
+		Ck(0,1) = int_stiffness;
+		Ck(2,1) = 1;
+		Ck(3,2) = GEAR_RATIO;
+		Ck(4,3) = 1;
+		Ck(5,4) = GEAR_RATIO;
+
+		Dk(1,0) = 1;
+		// define covariances ...
+
 	}
+
+	// Update Ka
+	void updateIntStiffness();
+
+	// Kalman Filter loop
+	void updateKalmanFilter(SensorSzVec z, ControlSzVec u);
+
+	// Update discrete state-space model:
+	void updateStateSpaceModel(float Ka);
+
+	// Discretize state-space transition matrix
+	StateSzMtx discretize_A(StateSzMtx A, float dt);
+
+	// Discretize state-space control matrix
+	ControlSzMtx discretize_B(StateSzMtx A, ControlSzMtx B, float dt);
 
 	// Kalman Log
 	void kalmanLogger();
@@ -540,6 +599,33 @@ private:
 	static Matrix<float, 4, 4> CAC_Rk;	// Sensor noise Covariance
 	static Matrix<float, 4, 5> CAC_Hk;	// Sensor Expectations Matrix
 	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
+
+	//	Adaptive Kalman Filter	//
+
+	static StateSzVec xk;	// State Vector
+	static SensorSzVec zk;	// Sensor reading Vector
+	static ControlSzVec uk; 	// Control Vector
+	static StateSzMtx Pk;	// State Covariance Matrix
+	static StateSzMtx Fk;	// Prediction Matrix
+	static StateSzMtx At;	// Continuous time state transition Matrix
+	static ControlSzMtx Gk;	// Control Matrix
+	static ControlSzMtx Bt;	// Continuous time state Control Matrix
+	static StateSzMtx Qk;	// Process noise Covariance
+	static SensorSzMtx Rk;	// Sensor noise Covariance
+	static Matrix<float,AKF_SENSOR_DIM,AKF_STATE_DIM> Ck;	// Sensor Expectations Matrix
+	static Matrix<float,AKF_SENSOR_DIM,AKF_CTRL_DIM> Dk;	// Feedthrough Matrix
+	static Matrix<float,AKF_STATE_DIM,AKF_SENSOR_DIM> KG;	// Kalman Gain Matrix	
+
+	static float kf_pos_hum;
+	static float kf_pos_exo;
+	static float kf_pos_act;
+	static float kf_vel_exo;
+	static float kf_vel_act;
+
+	static float kf_vel_hum;
+	static float kf_acc_hum;
+	static float kf_acc_exo;
+	static float kf_torque_int;
 
 	FILE *akfLogFile;
 	char akfLogFileName[50];

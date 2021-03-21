@@ -921,6 +921,35 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 	}
 }
 
+StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
+{
+	return StateSzMtx::Identity() + A*dt + (A*dt)*(A*dt)/2 + (A*dt)*(A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/24;
+	// or
+	//return StateSzMtx::Identity() + A*dt + (A*dt).pow(2)/2 + (A*dt).pow(3)/6 + (A*dt).pow(4)/24;
+}
+
+ControlSzMtx accBasedControl::discretize_B(StateSzMtx A, ControlSzMtx B, float dt)
+{
+	return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)/24 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/120)*B;
+	// or
+	//return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt).pow(2)/6 + (A*dt).pow(3)/24 + (A*dt).pow(4)/120)*B;
+}
+
+void accBasedControl::updateStateSpaceModel(float Ka)
+{
+	At(3,0) = Ka/INERTIA_EXO;
+	At(3,1) = -(Ka + STIFFNESS)/INERTIA_EXO;
+
+	Fk = discretize_A(At, C_DT);
+	Gk = discretize_B(At, Bt, C_DT);
+
+	Ck(0,0) = -Ka;
+	Ck(0,1) =  Ka;
+
+	// define covariances terms related to Ka...
+
+}
+
 void accBasedControl::kalmanLogger()
 {
 	//float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());

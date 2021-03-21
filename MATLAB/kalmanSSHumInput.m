@@ -49,6 +49,12 @@ elseif (rank(ctrb(A,B)) ~= state_dim) && (rank(obsv(A,C)) == state_dim)
 else
     disp('System is neither controllable and observable.')
 end
+
+% Discretization using Taylor expansion (F = exp(A*dt)):
+dt = 0.001;
+Fk = eye(state_dim) + A*dt + (A*dt)^2/prod(1:2) + (A*dt)^3/prod(1:3) + (A*dt)^4/prod(1:4);
+Gk = dt*(eye(state_dim) + A*dt/prod(1:2) + (A*dt)^2/prod(1:3) + (A*dt)^3/prod(1:4) + (A*dt)^4/prod(1:5))*B;
+
 %% State Space definition, 
 % considering the different sensors 
 % sample rate as output delay:
