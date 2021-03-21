@@ -92,6 +92,8 @@ float accBasedControl::kf_acc_hum(0);
 float accBasedControl::kf_acc_exo(0);
 float accBasedControl::kf_torque_int(0);
 float accBasedControl::kf_vel_hum_last(0);
+float accBasedControl::kf_vel_hum_hold(0);
+float accBasedControl::kf_vel_exo_hold(0);
 uint8_t accBasedControl::downsamplekf = 1;
 
 // Adimittance Control [a,u] Variables
@@ -187,9 +189,9 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 #ifdef AKF_ENABLE
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
-		float vel_act = RPM2RADS*m_eixo_in->PDOgetActualVelocity();
+		static float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
 		m_eixo_in->ReadPDO01();
-		float m_current = 0.001f*m_eixo_in->PDOgetActualCurrent();
+		static float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
 
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
 		uk << ang_vel[0], grav_comp, m_current;
@@ -1004,27 +1006,28 @@ void accBasedControl::updateKalmanFilter()
 	downsamplekf++;
 	if(downsamplekf >= IMU_DELAY){
 		xk = xk + KG * (zk - Ck*xk);
+    kf_vel_hum_hold = zk(1,0);
+    kf_vel_exo_hold = zk(4,0);
 		downsamplekf = 1;
 	} else {
 		// there is no truly inovation about zk_1 and zk_4 then:
-    xk(0,0) = xk(0,0) + (KG*(zk - Ck*xk))(0,0);
-		xk(2,0) = xk(2,0) + (KG*(zk - Ck*xk))(2,0);
-		xk(3,0) = xk(3,0) + (KG*(zk - Ck*xk))(3,0);
-		xk(5,0) = xk(5,0) + (KG*(zk - Ck*xk))(5,0);
+    zk(1,0) = kf_vel_hum_hold;
+    zk(4,0) = kf_vel_exo_hold;
+    xk = xk + KG * (zk - Ck*xk);
 	}
 	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
 
-	kf_vel_hum = (xk(0) - kf_pos_hum)/C_DT;
-	kf_pos_hum = xk(0);
+	kf_vel_hum = (xk(0,0) - kf_pos_hum)/C_DT;
+	kf_pos_hum = xk(0,0);
 
 	kf_acc_hum = (kf_vel_hum - kf_vel_hum_last)/C_DT;
 	kf_vel_hum_last = kf_vel_hum;
-	kf_acc_exo = (xk(3) - kf_vel_exo)/C_DT;
-	kf_vel_exo = xk(3);
+	kf_acc_exo = (xk(3,0) - kf_vel_exo)/C_DT;
+	kf_vel_exo = xk(3,0);
 
-	kf_pos_exo = xk(1);
-	kf_pos_act = xk(2);
-	kf_vel_act = xk(4);
+	kf_pos_exo = xk(1,0);
+	kf_pos_act = xk(2,0);
+	kf_vel_act = xk(4,0);
 	kf_torque_int = int_stiffness*(kf_pos_exo - kf_pos_hum);
 }
 

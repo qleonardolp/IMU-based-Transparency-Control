@@ -61,7 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
 #define XSENS_FC           35     // IMU cutoff frequency
 #define XSENS_CH           25			// Use radio channel 25 for wireless master.
-#define CALIBRATION_PERIOD 30.0f  // Gyroscope Bias integration period
+#define CALIBRATION_PERIOD 3.0f  // Gyroscope Bias integration period
 
 void Habilita_Eixo(int ID);
 
@@ -550,7 +550,7 @@ int main(int argc, char** argv)
       if (printer == (int)RATE / 4)   // printing the status @ 4Hz
       {
         system("cls");
-		xsens2Eposcan.UpdateControlStatus();
+		    xsens2Eposcan.UpdateControlStatus();
         std::cout << xsens2Eposcan.ctrl_word;
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:

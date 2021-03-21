@@ -240,10 +240,14 @@ public:
 			strftime(header_timestamp, sizeof(header_timestamp), "%Y-%m-%d-%H-%M-%S", timeinfo);
 			char logfilename[40];
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-      		strcpy(logger_filename, logfilename);
+      strcpy(logger_filename, logfilename);
 
-			strcat(akfLogFileName, "./data/akf-");
-			strcat(akfLogFileName, header_timestamp);
+      strftime(akfLogFileName, sizeof(akfLogFileName), "./data/akf-%Y-%m-%d-%H-%M-%S.txt", timeinfo);
+      akfLogFile = fopen(akfLogFileName, "wt");
+      if (akfLogFile != NULL)
+      {
+        fclose(akfLogFile);
+      }
 
 			logger = fopen(getLogfilename(), "wt");
 			if (logger != NULL)
@@ -648,6 +652,8 @@ private:
 	static float kf_acc_exo;
 	static float kf_torque_int;
 	static float kf_vel_hum_last;
+  static float kf_vel_hum_hold;
+  static float kf_vel_exo_hold;
 	static uint8_t downsamplekf;
 
 	FILE *akfLogFile;
