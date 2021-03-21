@@ -26,7 +26,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
-#define	 UDP_ENABLE		(true)
+#define	 UDP_ENABLE		(false)
 #define	 AKF_ENABLE		(true)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -130,7 +130,7 @@ typedef Matrix<float, AKF_SENSOR_DIM, 1> SensorSzVec;
 typedef Matrix<float, AKF_CTRL_DIM, 1> ControlSzVec;
 typedef Matrix<float, AKF_STATE_DIM, AKF_STATE_DIM> StateSzMtx;
 typedef Matrix<float, AKF_SENSOR_DIM, AKF_SENSOR_DIM> SensorSzMtx;
-typedef Matrix<float, AKF_SENSOR_DIM, AKF_CTRL_DIM>	ControlSzMtx;
+typedef Matrix<float, AKF_STATE_DIM, AKF_CTRL_DIM>	ControlSzMtx;
 
 class accBasedControl
 {
@@ -381,7 +381,7 @@ public:
 	}
 
 	// Update Ka
-	void updateIntStiffness();
+  void updateIntStiffness(){}
 
 	// Kalman Filter loop
 	void updateKalmanFilter();
@@ -571,7 +571,7 @@ private:
 	static int   actualCurrent;		// [mA]
 
 	static float torque_sea;		// [N.m]
-  	static float torque_sea_last;	// [N.m]
+  static float torque_sea_last;	// [N.m]
 	static float d_torque_sea;		// [N.m/s]
 	static float accbased_comp;		// [N.m]
 	static float d_accbased_comp;	// [N.m/s]

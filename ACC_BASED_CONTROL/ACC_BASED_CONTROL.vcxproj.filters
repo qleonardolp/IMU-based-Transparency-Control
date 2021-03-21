@@ -74,9 +74,6 @@
     <ClCompile Include="Controller.cpp">
       <Filter>Source Files\eposcan</Filter>
     </ClCompile>
-    <ClCompile Include="Estimator.cpp">
-      <Filter>Source Files\eposcan</Filter>
-    </ClCompile>
     <ClCompile Include="LowPassFilter2p.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

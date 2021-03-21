@@ -24,7 +24,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Controller.cpp" />
-    <ClCompile Include="Estimator.cpp" />
     <ClCompile Include="findClosestUpdateRate.cpp" />
     <ClCompile Include="LowPassFilter2p.cpp" />
     <ClCompile Include="main.cpp" />

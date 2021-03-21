@@ -156,6 +156,7 @@ float accBasedControl::IntAccHum = 0;
 float accBasedControl::IntAccExo = 0;
 uint8_t	accBasedControl::downsample = 1;
 uint8_t	accBasedControl::downsamplelog = 1;
+float accBasedControl::int_stiffness(0);
 
 
 
@@ -947,8 +948,8 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 		if(!limit || ((*integrator > 0.0f && error < 0.0f) || (*integrator < 0.0f && error > 0.0f)) ) {
 			*integrator += error * Ki * C_DT;
 			*integrator = constrain_float(*integrator, 1e6f);
-			return *integrator;
 		}
+    return *integrator;
 	}
 	else {
 		return 0.0f;
@@ -958,7 +959,7 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
 {
 	// Fourth order discretezation
-	return StateSzMtx::Identity() + A*dt + (A*dt)*(A*dt)/2 + (A*dt)*(A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/24;
+	return StateSzMtx::Identity() + dt*A + (dt*A)*(dt*A)/2 + (dt*A)*(dt*A)*(dt*A)/6 + (dt*A)*(dt*A)*(dt*A)*(dt*A)/24;
 	// or
 	//return StateSzMtx::Identity() + A*dt + (A*dt).pow(2)/2 + (A*dt).pow(3)/6 + (A*dt).pow(4)/24;
 }
@@ -966,7 +967,7 @@ StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
 ControlSzMtx accBasedControl::discretize_B(StateSzMtx A, ControlSzMtx B, float dt)
 {
 	// Fourth order discretezation
-	return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)/24 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/120)*B;
+	return dt*(StateSzMtx::Identity() + dt*A/2 + (dt*A)*(dt*A)/6 + (dt*A)*(dt*A)*(dt*A)/24 + (dt*A)*(dt*A)*(dt*A)*(dt*A)/120)*B;
 	// or
 	//return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt).pow(2)/6 + (A*dt).pow(3)/24 + (A*dt).pow(4)/120)*B;
 }
@@ -1006,10 +1007,10 @@ void accBasedControl::updateKalmanFilter()
 		downsamplekf = 1;
 	} else {
 		// there is no truly inovation about zk_1 and zk_4 then:
-		xk(0) = xk(0) + (KG*(zk - Ck*xk))(0);
-		xk(2) = xk(2) + (KG*(zk - Ck*xk))(2);
-		xk(3) = xk(3) + (KG*(zk - Ck*xk))(3);
-		xk(5) = xk(5) + (KG*(zk - Ck*xk))(5);
+    xk(0,0) = xk(0,0) + (KG*(zk - Ck*xk))(0,0);
+		xk(2,0) = xk(2,0) + (KG*(zk - Ck*xk))(2,0);
+		xk(3,0) = xk(3,0) + (KG*(zk - Ck*xk))(3,0);
+		xk(5,0) = xk(5,0) + (KG*(zk - Ck*xk))(5,0);
 	}
 	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
 
