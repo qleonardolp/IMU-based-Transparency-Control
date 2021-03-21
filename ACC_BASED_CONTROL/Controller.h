@@ -27,7 +27,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define CURRENT_CONTROL_H
 
 #define	 UDP_ENABLE		(true)
-#define	 AKF_ENABLE		(false)
+#define	 AKF_ENABLE		(true)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
@@ -242,7 +242,7 @@ public:
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
       		strcpy(logger_filename, logfilename);
 
-			strcat(akfLogFileName, "./data/ekf-");
+			strcat(akfLogFileName, "./data/akf-");
 			strcat(akfLogFileName, header_timestamp);
 
 			logger = fopen(getLogfilename(), "wt");
@@ -355,7 +355,28 @@ public:
 		Ck(5,4) = GEAR_RATIO;
 
 		Dk(1,0) = 1;
-		// define covariances ...
+
+		Pk.setIdentity();
+		Pk(0,0) = pow(0.0023400, 2);
+		Pk(1,1) = pow(2*MY_PI/ENCODER_OUT, 2);
+		Pk(2,2) = pow(2*MY_PI/ENCODER_IN, 2);
+		Pk(3,3) = pow(0.0032034, 2);
+		Pk(4,4) = pow(0.0032034, 2);
+
+		Rk.setIdentity();
+		Rk(0,0) = pow(int_stiffness*(2*0.0023400*C_DT), 2); // ~0.00649
+		Rk(1,1) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
+		Rk(2,2) = pow(2*MY_PI/ENCODER_OUT, 2);
+		Rk(3,3) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
+		Rk(4,4) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
+		Rk(5,5) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO*C_DT),2);
+
+		Qk.setIdentity();
+		Qk(0,0) = pow(0.0002340, 2);
+		Qk(1,1) = pow(0.05*2*MY_PI/ENCODER_OUT, 2);
+		Qk(2,2) = pow(0.05*2*MY_PI/ENCODER_IN, 2);
+		Qk(3,3) = pow((C_DT/INERTIA_EXO)*(int_stiffness*0.0023400 + (int_stiffness + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2); // ~0.00902
+		Qk(4,4) = pow((STIFFNESS/J_EQ)*(2*MY_PI/ENCODER_OUT + 2*MY_PI/ENCODER_IN),2);
 
 	}
 
@@ -363,7 +384,7 @@ public:
 	void updateIntStiffness();
 
 	// Kalman Filter loop
-	void updateKalmanFilter(SensorSzVec z, ControlSzVec u);
+	void updateKalmanFilter();
 
 	// Update discrete state-space model:
 	void updateStateSpaceModel(float Ka);
@@ -626,6 +647,8 @@ private:
 	static float kf_acc_hum;
 	static float kf_acc_exo;
 	static float kf_torque_int;
+	static float kf_vel_hum_last;
+	static uint8_t downsamplekf;
 
 	FILE *akfLogFile;
 	char akfLogFileName[50];

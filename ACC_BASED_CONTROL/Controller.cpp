@@ -67,6 +67,33 @@ Matrix<float, 4, 4> accBasedControl::CAC_Rk;	// Sensor noise Covariance
 Matrix<float, 4, 5> accBasedControl::CAC_Hk;	// Sensor Expectations Matrix
 Matrix<float, 5, 4> accBasedControl::CAC_KG;	// Kalman Gain Matrix
 
+//	Adaptive Kalman Filter	//
+StateSzVec accBasedControl::xk;	// State Vector
+SensorSzVec accBasedControl::zk;	// Sensor reading Vector
+ControlSzVec accBasedControl::uk; 	// Control Vector
+StateSzMtx accBasedControl::Pk;	// State Covariance Matrix
+StateSzMtx accBasedControl::Fk;	// Prediction Matrix
+StateSzMtx accBasedControl::At;	// Continuous time state transition Matrix
+ControlSzMtx accBasedControl::Gk;	// Control Matrix
+ControlSzMtx accBasedControl::Bt;	// Continuous time state Control Matrix
+StateSzMtx accBasedControl::Qk;	// Process noise Covariance
+SensorSzMtx accBasedControl::Rk;	// Sensor noise Covariance
+Matrix<float,AKF_SENSOR_DIM,AKF_STATE_DIM> accBasedControl::Ck;	// Sensor Expectations Matrix
+Matrix<float,AKF_SENSOR_DIM,AKF_CTRL_DIM> accBasedControl::Dk;	// Feedthrough Matrix
+Matrix<float,AKF_STATE_DIM,AKF_SENSOR_DIM> accBasedControl::KG;	// Kalman Gain Matrix
+
+float accBasedControl::kf_pos_hum(0);
+float accBasedControl::kf_pos_exo(0);
+float accBasedControl::kf_pos_act(0);
+float accBasedControl::kf_vel_exo(0);
+float accBasedControl::kf_vel_act(0);
+float accBasedControl::kf_vel_hum(0);
+float accBasedControl::kf_acc_hum(0);
+float accBasedControl::kf_acc_exo(0);
+float accBasedControl::kf_torque_int(0);
+float accBasedControl::kf_vel_hum_last(0);
+uint8_t accBasedControl::downsamplekf = 1;
+
 // Adimittance Control [a,u] Variables
 float accBasedControl::Ki_adm = 0;
 float accBasedControl::Kp_adm = 0;
@@ -154,6 +181,19 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
+		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+
+#ifdef AKF_ENABLE
+		// Assigning the measured states to the Sensor reading Vector
+		m_eixo_in->ReadPDO02();
+		float vel_act = RPM2RADS*m_eixo_in->PDOgetActualVelocity();
+		m_eixo_in->ReadPDO01();
+		float m_current = 0.001f*m_eixo_in->PDOgetActualCurrent();
+
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
+		uk << ang_vel[0], grav_comp, m_current;
+		updateKalmanFilter();
+#endif
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -166,7 +206,6 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 			downsample = 1;
 		}
 
-		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 		accbased_comp = INERTIA_EXO*acc_hum;		// human disturbance input
 
 		// Tuning from the characteristic equation (acceleration-based)
@@ -354,11 +393,6 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		// Motor Current
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-
-		// AKF main loop
-#ifdef AKF_ENABLE
-		//
-#endif
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -759,7 +793,7 @@ void accBasedControl::Recorder()
 	}
 
 #ifdef AKF_ENABLE
-		kalmanLogger();	// logging measurements, control and states
+	kalmanLogger();	// logging measurements, control and states
 #endif
 }
 
@@ -923,6 +957,7 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 
 StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
 {
+	// Fourth order discretezation
 	return StateSzMtx::Identity() + A*dt + (A*dt)*(A*dt)/2 + (A*dt)*(A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/24;
 	// or
 	//return StateSzMtx::Identity() + A*dt + (A*dt).pow(2)/2 + (A*dt).pow(3)/6 + (A*dt).pow(4)/24;
@@ -930,6 +965,7 @@ StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
 
 ControlSzMtx accBasedControl::discretize_B(StateSzMtx A, ControlSzMtx B, float dt)
 {
+	// Fourth order discretezation
 	return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt)*(A*dt)/6 + (A*dt)*(A*dt)*(A*dt)/24 + (A*dt)*(A*dt)*(A*dt)*(A*dt)/120)*B;
 	// or
 	//return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt).pow(2)/6 + (A*dt).pow(3)/24 + (A*dt).pow(4)/120)*B;
@@ -946,19 +982,58 @@ void accBasedControl::updateStateSpaceModel(float Ka)
 	Ck(0,0) = -Ka;
 	Ck(0,1) =  Ka;
 
-	// define covariances terms related to Ka...
+	Rk(0,0) = pow(Ka*(2*0.0023400*C_DT), 2);
+	Qk(3,3) = pow((C_DT/INERTIA_EXO)*(Ka*0.0023400 + (Ka + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2);
 
+
+}
+
+void accBasedControl::updateKalmanFilter()
+{
+	// Prediction
+	xk = Fk*xk + Gk*uk;
+	Pk = Fk*Pk*Fk.transpose() + Qk;
+
+	// Kalman Gain
+	static FullPivLU<SensorSzMtx> TotalCovariance(Ck * Pk * Ck.transpose() + Rk);
+	if (TotalCovariance.isInvertible())
+		KG = Pk * Ck.transpose() * TotalCovariance.inverse();
+
+	// Update
+	downsamplekf++;
+	if(downsamplekf >= IMU_DELAY){
+		xk = xk + KG * (zk - Ck*xk);
+		downsamplekf = 1;
+	} else {
+		// there is no truly inovation about zk_1 and zk_4 then:
+		xk(0) = xk(0) + (KG*(zk - Ck*xk))(0);
+		xk(2) = xk(2) + (KG*(zk - Ck*xk))(2);
+		xk(3) = xk(3) + (KG*(zk - Ck*xk))(3);
+		xk(5) = xk(5) + (KG*(zk - Ck*xk))(5);
+	}
+	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
+
+	kf_vel_hum = (xk(0) - kf_pos_hum)/C_DT;
+	kf_pos_hum = xk(0);
+
+	kf_acc_hum = (kf_vel_hum - kf_vel_hum_last)/C_DT;
+	kf_vel_hum_last = kf_vel_hum;
+	kf_acc_exo = (xk(3) - kf_vel_exo)/C_DT;
+	kf_vel_exo = xk(3);
+
+	kf_pos_exo = xk(1);
+	kf_pos_act = xk(2);
+	kf_vel_act = xk(4);
+	kf_torque_int = int_stiffness*(kf_pos_exo - kf_pos_hum);
 }
 
 void accBasedControl::kalmanLogger()
 {
-	//float ekf_time = 1e-6*((float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count());
-
 	akfLogFile = fopen(akfLogFileName, "a");
 	if(akfLogFile != NULL){
-		//fprintf(akfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
-		//timestamp, ekf_zk(0,0), ekf_zk(0,1), ekf_zk(0,2), ekf_zk(0,3), ekf_zk(0,4), ekf_uk(0,0), ekf_uk(0,1),\
-		//ekf_xk(0,0), ekf_xk(0,1), ekf_xk(0,2), ekf_xk(0,3), ekf_xk(0,4));
+		fprintf(akfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
+		timestamp, kf_pos_hum, kf_pos_exo, kf_pos_act, kf_vel_exo, kf_vel_act, kf_vel_hum, kf_acc_hum,\
+		kf_acc_exo, kf_torque_int);
 		fclose(akfLogFile);
 	}
 }
