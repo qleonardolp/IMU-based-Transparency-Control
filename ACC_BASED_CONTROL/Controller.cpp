@@ -415,13 +415,14 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
     	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
 
-		//vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
-    	vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
+		vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+    	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
 
 		des_tsea_last = grav_comp + accbased_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
-		vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm+vel_hum);
+		//vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm+vel_hum);
+		vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm);
 
 		SetEposVelocityLimited(vel_motor);
 
