@@ -150,7 +150,6 @@ float accBasedControl::theta_m = 0;			// [rad]
 float accBasedControl::theta_m_last = 0;	//
 int	  accBasedControl::actualVelocity = 0;	// [rpm]
 int   accBasedControl::exoVelocity = 0;		// [rpm]
-float accBasedControl::diffCutoff = CUTOFF;	// [Hz] ?
 float accBasedControl::IntegratorHum = 0;
 float accBasedControl::IntegratorExo = 0;
 float accBasedControl::IntAccMotor = 0;
@@ -175,7 +174,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(1500));
+		this_thread::sleep_for(nanoseconds(15));
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -309,15 +308,6 @@ void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_v
 		theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea);
 
-		// Jerk Feedforward:
-		//m_eixo_out->ReadPDO02();
-		//vel_motor = vel_exo + (Kff_V*INERTIA_EXO*jerk_hum + Kp_V*(jerk_hum - jerk_exo) + Ki_V*(acc_hum - acc_exo)) / STIFFNESS;
-
-		//vel_motor = RADS2RPM * GEAR_RATIO * vel_motor;
-		//vel_motor_filt += LPF_SMF*(vel_motor - vel_motor_filt);
-
-		//SetEposVelocityLimited(vel_motor_filt);
-
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float) duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
@@ -356,8 +346,6 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 		//vel_motor = (theta_m - theta_m_last) / C_DT;
 		//theta_m_last = theta_m;
 
-		//vel_motor = RADS2RPM*GEAR_RATIO*vel_motor;
-
 		//SetEposVelocityLimited(vel_motor);
 
 		auto control_t_end = steady_clock::now();
@@ -383,7 +371,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(15));
+		this_thread::sleep_for(nanoseconds(1500));
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -421,8 +409,8 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		des_tsea_last = grav_comp + accbased_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
-		//vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm+vel_hum);
-		vel_motor = RADS2RPM*GEAR_RATIO*(vel_adm);
+		//vel_motor = vel_adm+vel_hum;
+		vel_motor = vel_adm;
 
 		SetEposVelocityLimited(vel_motor);
 
@@ -515,7 +503,7 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 			resetInt = 0;
 		}
 
-		vel_motor = RADS2RPM*GEAR_RATIO*IntTorqueM;
+		vel_motor = IntTorqueM;
 
 		SetEposVelocityLimited(vel_motor);
 
@@ -706,7 +694,7 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 void accBasedControl::SetEposVelocityLimited(float speed_stp)
 {
-	int speed_limited = (int) constrain_float(speed_stp, -SPEED_CONST*VOLTAGE_MAX, SPEED_CONST*VOLTAGE_MAX);
+	int speed_limited = (int) constrain_float(RADS2RPM*GEAR_RATIO*speed_stp, -SPEED_CONST*VOLTAGE_MAX, SPEED_CONST*VOLTAGE_MAX);
 	m_eixo_in->PDOsetVelocitySetpoint(speed_limited); // speed in RPM
 	m_eixo_in->WritePDO02();
 }
@@ -775,15 +763,15 @@ void accBasedControl::Recorder()
 		{
 		case 'a':
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, vel_hum, vel_adm, RPM2RADS*vel_motor, torque_sea);
+			timestamp, vel_hum, vel_adm, vel_motor, torque_sea);
 			break;
 		case 'p':
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l);
 			break;
 		case 's':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, acc_hum, vel_hum, vel_exo, vel_adm, theta_c, theta_l, grav_comp, accbased_comp, RPM2RADS*vel_motor);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor);
 			break;
 		case 'k':
 		case 'u':

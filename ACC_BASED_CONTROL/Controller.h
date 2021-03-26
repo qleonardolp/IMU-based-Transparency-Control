@@ -464,7 +464,7 @@ public:
 	// Set Current setpoint on EPOS within safe limits
 	void SetEposCurrentLimited(float current_stp);
 
-	// Set Current setpoint on EPOS within safe limits
+	// Set Current setpoint on EPOS within safe limits, applying RADS2RPM*GEAR_RATIO
 	void SetEposVelocityLimited(float speed_stp);
 
 	// Integrator update method with anti-windup and saturation
@@ -594,7 +594,6 @@ private:
 	static int actualVelocity;		// [rpm]
 	static int exoVelocity;			// [rpm]
 
-	static float diffCutoff;
 	static float IntegratorHum;
 	static float IntegratorExo;
 	static float IntAccMotor;
