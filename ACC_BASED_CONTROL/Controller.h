@@ -379,7 +379,7 @@ public:
 		Qk(0,0) = pow(0.0002340, 2);
 		Qk(1,1) = pow(0.05*2*MY_PI/ENCODER_OUT, 2);
 		Qk(2,2) = pow(0.05*2*MY_PI/ENCODER_IN, 2);
-		Qk(3,3) = pow((C_DT/INERTIA_EXO)*(int_stiffness*0.0023400 + (int_stiffness + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2); // ~0.00902
+		Qk(3,3) = pow((DELTA_T/INERTIA_EXO)*(int_stiffness*0.0023400 + (int_stiffness + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2); // ~0.00902
 		Qk(4,4) = pow((STIFFNESS/J_EQ)*(2*MY_PI/ENCODER_OUT + 2*MY_PI/ENCODER_IN),2);
 
 	}

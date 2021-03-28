@@ -67,7 +67,7 @@ KneeRoM = 80; % deg
 % isoKneeStiff = isometricKneeStiffness(2);
 % Ka - Je*w_n^2 > 0 -> Ka/je > w_n^2 -> Ka/Je > Kk/I_zz, then:
 % kneeStiffness < Ka/Je * I_zz
-Ka = 6500; Je = 0.8850;
+Ka = 104*63; Je = 0.8850;
 kneeStiffness_max = Ka/Je * I_zz;
 w_max = sqrt(Ka/Je);
 %For 1.53 Hz hopping the knee stiffness is:
