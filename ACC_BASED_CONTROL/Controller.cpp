@@ -158,6 +158,7 @@ float accBasedControl::IntAccExo = 0;
 uint8_t	accBasedControl::downsample = 1;
 uint8_t	accBasedControl::downsamplelog = 1;
 float accBasedControl::int_stiffness(0);
+float accBasedControl::vel_motor_last(0);
 
 
 
@@ -185,15 +186,19 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
 		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
 
-		// Assigning the measured states to the Sensor reading Vector
+		// Motor Velocity
 		m_eixo_in->ReadPDO02();
-		float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+		// Motor Current
 		m_eixo_in->ReadPDO01();
-		float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
-		uk << ang_vel[0], grav_comp, m_current;
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
 		updateKalmanFilter();
+		updateIntStiffness();
 #endif
 
 		downsample++;
@@ -208,9 +213,9 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		}
 
 		accbased_comp = INERTIA_EXO*acc_hum;		// human disturbance input
-		vel_motor_filt += 0.30547*(vel_act/GEAR_RATIO - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
-		acc_motor = (vel_motor_filt - vel_motor)*C_RATE;
-		vel_motor = vel_motor_filt;
+		vel_motor_filt += 0.30547*(vel_motor - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
+		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
+		vel_motor_last = vel_motor_filt;
 
 		// Knee impedance tuning
 		static float I_zz = 0.04374463f;
@@ -382,14 +387,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
 		// Assigning the measured states to the Sensor reading Vector
-		m_eixo_in->ReadPDO02();
-		float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
-		m_eixo_in->ReadPDO01();
-		float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
 #ifdef AKF_ENABLE
-		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
-		uk << ang_vel[0], grav_comp, m_current;
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
 		updateKalmanFilter();
+		updateIntStiffness();
 #endif
 
 		downsample++;
@@ -826,14 +828,13 @@ void accBasedControl::UpdateControlStatus()
 		sprintf(numbers_str, "%+5d", actualCurrent);
 		ctrl_word += " Current: " + (std::string) numbers_str + " mA\n";
 		sprintf(numbers_str, "%5.3f", Kff_acc);
-		ctrl_word += " Kff_P: " + (std::string) numbers_str;
+		ctrl_word += " Kff: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", Kp_acc);
-		ctrl_word += " Kp_P: " + (std::string) numbers_str;
+		ctrl_word += " Kp: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", Ki_acc);
-		ctrl_word += " Ki_P: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Kd_V);
-		ctrl_word += " Kd_P: " + (std::string) numbers_str + "\n";
+		ctrl_word += " Ki: " + (std::string) numbers_str + "\n";
 		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
+		ctrl_word += " Int K: " + std::to_string(int_stiffness) + "\n";
 		break;
 	case 's':
 		ctrl_word = " SPEED CONTROLLER\n";
@@ -1035,6 +1036,19 @@ void accBasedControl::updateKalmanFilter()
 	kf_pos_act = xk(2,0);
 	kf_vel_act = xk(4,0);
 	kf_torque_int = int_stiffness*(kf_pos_exo - kf_pos_hum);
+}
+
+void accBasedControl::updateIntStiffness()
+{
+	// Was:
+	//int_stiffness -= 0.005*(kf_pos_exo - kf_pos_hum)/(abs(kf_pos_exo - kf_pos_hum));
+	// Simplifying:
+	if(kf_pos_exo > kf_pos_hum){
+		int_stiffness -= 0.005;
+	} else{
+		int_stiffness += 0.005;
+	}
+	//updateStateSpaceModel(int_stiffness);
 }
 
 void accBasedControl::kalmanLogger()

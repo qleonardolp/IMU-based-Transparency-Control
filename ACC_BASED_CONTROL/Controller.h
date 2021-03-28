@@ -385,7 +385,7 @@ public:
 	}
 
 	// Update Ka
-  void updateIntStiffness(){}
+  	void updateIntStiffness();
 
 	// Kalman Filter loop
 	void updateKalmanFilter();
@@ -575,7 +575,7 @@ private:
 	static int   actualCurrent;		// [mA]
 
 	static float torque_sea;		// [N.m]
-  static float torque_sea_last;	// [N.m]
+  	static float torque_sea_last;	// [N.m]
 	static float d_torque_sea;		// [N.m/s]
 	static float accbased_comp;		// [N.m]
 	static float d_accbased_comp;	// [N.m/s]
@@ -587,6 +587,7 @@ private:
 	static float acc_motor;			// [rad/s^2]
 	static float vel_motor;			// [rad/s]
 	static float vel_motor_filt;	// [rad/s]
+	static float vel_motor_last;	// [rad/s]
 	static float voltage;			// [V]
 
 	static float theta_m;			// [rad]
