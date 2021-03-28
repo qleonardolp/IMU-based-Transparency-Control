@@ -187,9 +187,9 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
-		static float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
+		float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
 		m_eixo_in->ReadPDO01();
-		static float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
+		float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
 #ifdef AKF_ENABLE
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
 		uk << ang_vel[0], grav_comp, m_current;
@@ -215,14 +215,14 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		// Knee impedance tuning
 		static float I_zz = 0.04374463f;
 		static float Ka = 63*STIFFNESS;
-    static float zeta = 0.06f;
-    float eta = 28.280f; // default value from eta at 40.57 deg, position on which the static tuning works well
-    if (-70 < 180/MY_PI*theta_l && 10 > 180/MY_PI*theta_l)
-    {
-      eta = Ka/(110.00f + 169.30f*(-theta_l)); // try to do with theta_l... on the functions
-      //Kp_acc = -INERTIA_EXO + eta*I_zz;
-      //Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
-    }
+		static float zeta = 0.06f;
+		float eta = 28.280f; // default value from eta at 40.57 deg, position on which the static tuning works well
+		if (-70 < 180/MY_PI*theta_l && 10 > 180/MY_PI*theta_l)
+		{
+		eta = Ka/(110.00f + 169.30f*(-theta_l)); // try to do with theta_l... on the functions
+		//Kp_acc = -INERTIA_EXO + eta*I_zz;
+		//Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
+		}
 		
 		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
@@ -383,9 +383,9 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
-		static float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
+		float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
 		m_eixo_in->ReadPDO01();
-		static float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
+		float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
 #ifdef AKF_ENABLE
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
 		uk << ang_vel[0], grav_comp, m_current;
@@ -996,37 +996,40 @@ void accBasedControl::updateStateSpaceModel(float Ka)
 
 void accBasedControl::updateKalmanFilter()
 {
+	downsamplekf++;
+	if (downsamplekf >= IMU_DELAY){
+		kf_vel_hum_hold = zk(1,0);
+    	kf_vel_exo_hold = zk(4,0);
+	} else {
+	// there is no truly inovation about zk_1 and zk_4 then:
+    	zk(1,0) = kf_vel_hum_hold;
+    	zk(4,0) = kf_vel_exo_hold;
+		uk(0,0) = kf_vel_hum_hold;
+	}
+
 	// Prediction
 	xk = Fk*xk + Gk*uk;
 	Pk = Fk*Pk*Fk.transpose() + Qk;
 
 	// Kalman Gain
-	static FullPivLU<SensorSzMtx> TotalCovariance(Ck * Pk * Ck.transpose() + Rk);
+	FullPivLU<SensorSzMtx> TotalCovariance(Ck * Pk * Ck.transpose() + Rk);
 	if (TotalCovariance.isInvertible())
 		KG = Pk * Ck.transpose() * TotalCovariance.inverse();
 
 	// Update
-	downsamplekf++;
-	if(downsamplekf >= IMU_DELAY){
-		xk = xk + KG * (zk - Ck*xk);
-    kf_vel_hum_hold = zk(1,0);
-    kf_vel_exo_hold = zk(4,0);
-		downsamplekf = 1;
-	} else {
-		// there is no truly inovation about zk_1 and zk_4 then:
-    zk(1,0) = kf_vel_hum_hold;
-    zk(4,0) = kf_vel_exo_hold;
-    xk = xk + KG * (zk - Ck*xk);
-	}
+	xk = xk + KG * (zk - Ck*xk);
 	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
 
-	kf_vel_hum = (xk(0,0) - kf_pos_hum)/DELTA_T;
-	kf_pos_hum = xk(0,0);
+	if (downsamplekf >= IMU_DELAY){
+		kf_vel_hum = (xk(0,0) - kf_pos_hum)/DELTA_T;
+		kf_pos_hum = xk(0,0);
 
-	kf_acc_hum = (kf_vel_hum - kf_vel_hum_last)/DELTA_T;
-	kf_vel_hum_last = kf_vel_hum;
-	kf_acc_exo = (xk(3,0) - kf_vel_exo)/DELTA_T;
-	kf_vel_exo = xk(3,0);
+		kf_acc_hum = (kf_vel_hum - kf_vel_hum_last)/DELTA_T;
+		kf_vel_hum_last = kf_vel_hum;
+		kf_acc_exo = (xk(3,0) - kf_vel_exo)/DELTA_T;
+		kf_vel_exo = xk(3,0);
+		downsamplekf = 1;
+	}
 
 	kf_pos_exo = xk(1,0);
 	kf_pos_act = xk(2,0);

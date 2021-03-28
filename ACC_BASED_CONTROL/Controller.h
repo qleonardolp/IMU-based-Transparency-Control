@@ -651,8 +651,8 @@ private:
 	static float kf_acc_exo;
 	static float kf_torque_int;
 	static float kf_vel_hum_last;
-  static float kf_vel_hum_hold;
-  static float kf_vel_exo_hold;
+  	static float kf_vel_hum_hold;
+  	static float kf_vel_exo_hold;
 	static uint8_t downsamplekf;
 
 	FILE *akfLogFile;
