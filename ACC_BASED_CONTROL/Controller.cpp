@@ -1048,7 +1048,10 @@ void accBasedControl::updateIntStiffness()
 	} else{
 		int_stiffness += 0.005;
 	}
-	//updateStateSpaceModel(int_stiffness);
+	float Err_Ka = int_stiffness*(kf_pos_exo - kf_pos_hum) - torque_sea + (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l) + INERTIA_EXO*kf_acc_exo;
+	if(Err_Ka < 0.00001){
+		//updateStateSpaceModel(int_stiffness);
+	}
 }
 
 void accBasedControl::kalmanLogger()
