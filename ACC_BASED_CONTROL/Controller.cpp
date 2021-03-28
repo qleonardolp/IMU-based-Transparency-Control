@@ -183,7 +183,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
-		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
 
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
@@ -225,7 +225,6 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
     }
 		
 		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
-		// using Kff to adjust the gravitational term...
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -409,18 +408,18 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
 		float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
-		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l)*0;	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
     	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
 		accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
-		vel_adm = C1*vel_adm + C2*(accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+		vel_adm = C1*vel_adm + C2*(accbased_comp + grav_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
     	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
 
-		des_tsea_last = accbased_comp;
+		des_tsea_last = accbased_comp + grav_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
 		vel_motor = vel_adm+vel_hum;
-		//vel_motor = vel_adm;
+		//vel_motor = vel_hum;
 
 		SetEposVelocityLimited(vel_motor);
 
