@@ -97,8 +97,8 @@ float accBasedControl::kf_vel_exo_hold(0);
 uint8_t accBasedControl::downsamplekf = 1;
 
 // Adimittance Control [a,u] Variables
-float accBasedControl::Ki_adm = 0;
-float accBasedControl::Kp_adm = 0;
+float accBasedControl::Ki_adm = 1.190;
+float accBasedControl::Kp_adm = 11.90;
 float accBasedControl::torque_m;
 float accBasedControl::IntInnerC = 0;
 float accBasedControl::vel_inner = 0;
@@ -185,13 +185,12 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
-#ifdef AKF_ENABLE
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
 		static float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
 		m_eixo_in->ReadPDO01();
 		static float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
-
+#ifdef AKF_ENABLE
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
 		uk << ang_vel[0], grav_comp, m_current;
 		updateKalmanFilter();
@@ -209,6 +208,9 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		}
 
 		accbased_comp = INERTIA_EXO*acc_hum;		// human disturbance input
+		vel_motor_filt += 0.30547*(vel_act/GEAR_RATIO - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
+		acc_motor = (vel_motor_filt - vel_motor)*C_RATE;
+		vel_motor = vel_motor_filt;
 
 		// Knee impedance tuning
 		static float I_zz = 0.04374463f;
@@ -218,19 +220,15 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
     if (-70 < 180/MY_PI*theta_l && 10 > 180/MY_PI*theta_l)
     {
       eta = Ka/(110.00f + 169.30f*(-theta_l)); // try to do with theta_l... on the functions
-      Kp_acc = -INERTIA_EXO + eta*I_zz;
-      Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
+      //Kp_acc = -INERTIA_EXO + eta*I_zz;
+      //Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
     }
 		
-		torque_m = grav_comp*Kff_acc + accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 		// using Kff to adjust the gravitational term...
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
-
-		// Motor Velocity to log
-		m_eixo_in->ReadPDO02();
-		vel_motor = 1 / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
 
 		auto control_t_end = steady_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
@@ -384,13 +382,12 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-#ifdef AKF_ENABLE
 		// Assigning the measured states to the Sensor reading Vector
 		m_eixo_in->ReadPDO02();
 		static float vel_act = RPM2RADS*(m_eixo_in->PDOgetActualVelocity());
 		m_eixo_in->ReadPDO01();
 		static float m_current = 0.001f*(m_eixo_in->PDOgetActualCurrent());
-
+#ifdef AKF_ENABLE
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_act;
 		uk << ang_vel[0], grav_comp, m_current;
 		updateKalmanFilter();
@@ -399,10 +396,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		downsample++;
 		if (downsample >= IMU_DELAY){
 			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
+			vel_exo += LPF_SMF*(ang_vel[1] - vel_exo);
 			acc_hum = (vel_hum - vel_hum_last)*RATE;
-			accbased_comp = J_EQ*acc_hum;		// human disturbance input
+			acc_exo = (vel_exo - vel_exo_last)*RATE;
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
-			vel_exo = ang_vel[1];
+			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
 		}
 
@@ -412,12 +410,13 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
 		grav_comp = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l)*0;	// inverse dynamics, \tau_W = -M g l sin(\theta_e)
-    torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
+    	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
+		accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
-		vel_adm = C1*vel_adm + C2*(grav_comp + accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+		vel_adm = C1*vel_adm + C2*(accbased_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
     	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
 
-		des_tsea_last = grav_comp + accbased_comp;
+		des_tsea_last = accbased_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
 		vel_motor = vel_adm+vel_hum;
@@ -727,8 +726,8 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-			//fscanf(gains_values, "Kff %f\nKp %f\nKi %f\n", &Kff_acc, &Kp_acc, &Ki_acc);
-			//fclose(gains_values);
+			fscanf(gains_values, "Kff %f\nKp %f\nKi %f\n", &Kff_acc, &Kp_acc, &Ki_acc);
+			fclose(gains_values);
 		}
 		break;
 	case 's':	// GainScan_Velocity()
@@ -736,7 +735,7 @@ void accBasedControl::GainScan()
 
 		if (gains_values != NULL)
 		{
-      fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
+      fscanf(gains_values, "Kff %f\nKp %f\nKi %f\nSTF %f\nDAM %f\n", &Kff_acc, &Kp_acc, &Ki_acc, &stiffness_d, &damping_d);
 			fclose(gains_values);
 		}
 		break;
@@ -776,8 +775,8 @@ void accBasedControl::Recorder()
 			timestamp, vel_hum, vel_adm, vel_motor, torque_sea);
 			break;
 		case 'p':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l);
+			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor);
 			break;
 		case 's':
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
