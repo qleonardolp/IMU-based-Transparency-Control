@@ -16,7 +16,7 @@ Je  = W*Le^2;        % Kg.m^2
 We  = W*g;           % N      
 Beq = 60;            % N.m.s/rad (maybe is 30, I.O.)
 Ja  = 0.47;          % Kg.m^2
-
+%%
 % State vector is  [x_h x_e x_a \dot{x_e} \dot{x_a}]
 % Sensor vector is [tau_i \dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]
 state_dim  = 5;
