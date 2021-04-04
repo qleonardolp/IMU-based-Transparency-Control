@@ -889,7 +889,7 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += "\n -> Passivity Constraints <-\n ";
 
 		k_bar = 1 - stiffness_d / STIFFNESS;
-		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_d / k_bar - Kp_adm));
+		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_d / k_bar + Kp_adm));
 
 		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
 		break;
