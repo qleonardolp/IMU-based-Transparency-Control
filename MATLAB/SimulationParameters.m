@@ -80,6 +80,14 @@ zeta = 0.06;
 Kp_acc = 0.5436;
 Ki_acc = 11.560;
 
+%% CollocatedAdmittanceControl (CAC)
+epos_Ki = 1.190; 
+epos_Kp = 11.900;
+damping_d = 10.0;
+stiffness_d = 42.0;
+k_bar = 1 - stiffness_d/Ks;
+stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja)
+
 %% Data
 % abc_data = importdata('abc_sem_ID/2021-03-27-21-59-14.txt');
 t_begin = 32.5;
