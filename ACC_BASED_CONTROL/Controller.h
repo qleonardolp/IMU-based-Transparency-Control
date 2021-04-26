@@ -118,8 +118,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
 // AKF dimensions
-#define AKF_STATE_DIM  5
-#define AKF_SENSOR_DIM 6
+#define AKF_STATE_DIM  6
+#define AKF_SENSOR_DIM 5
 #define AKF_CTRL_DIM   3
 #define IMU_DELAY 	   8				// N Samples of Ts=0.001s
 
@@ -143,66 +143,6 @@ public:
 		m_eixo_in = eixo_in;
 		m_eixo_out = eixo_out;
 		m_seconds = seconds;
-
-#ifdef UDP_ENABLE
-		// Initialize Winsock
-		ListenSocket = INVALID_SOCKET;
-		int iResult;
-		struct addrinfo *result = NULL, *ptr = NULL, hints;
-		iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-
-		if (iResult != 0) {
-    		printf("WSAStartup failed: %d\n", iResult);
-		} else {
-
-			ZeroMemory(&hints, sizeof (hints));
-			hints.ai_family = AF_INET;
-			hints.ai_socktype = SOCK_STREAM;
-			hints.ai_protocol = IPPROTO_UDP;
-			hints.ai_flags = AI_PASSIVE;
-
-			// Resolve the local address and port to be used by the server
-			iResult = getaddrinfo(NULL, UDP_PORT, &hints, &result);
-			if (iResult != 0) {
-				printf("getaddrinfo failed: %d\n", iResult);
-				WSACleanup();
-			} else {
-				// Create a SOCKET for the server to listen for client connections
-				ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-				if (ListenSocket == INVALID_SOCKET) {
-					printf("Error at socket(): %ld\n", WSAGetLastError());
-					freeaddrinfo(result);
-					WSACleanup();
-				} else {
-					// Setup the TCP listening socket
-					iResult = bind( ListenSocket, result->ai_addr, (int)result->ai_addrlen);
-					if (iResult == SOCKET_ERROR) {
-						printf("bind failed with error: %d\n", WSAGetLastError());
-						freeaddrinfo(result);
-						closesocket(ListenSocket);
-						WSACleanup();
-					} else {
-						freeaddrinfo(result);
-						
-						if ( listen( ListenSocket, SOMAXCONN ) == SOCKET_ERROR ) {
-							printf( "Listen failed with error: %ld\n", WSAGetLastError() );
-							closesocket(ListenSocket);
-							WSACleanup();
-						} else {
-							ClientSocket = INVALID_SOCKET;
-							// Accept a client socket
-							ClientSocket = accept(ListenSocket, NULL, NULL);
-							if (ClientSocket == INVALID_SOCKET) {
-								printf("accept failed: %d\n", WSAGetLastError());
-								closesocket(ListenSocket);
-								WSACleanup();
-							}
-						}
-					}
-				}
-			}
-		}
-#endif
 
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
@@ -322,8 +262,8 @@ public:
 		CAC_Qk(3, 3) = pow(0.0000307, 2);
 		CAC_Qk(4, 4) = pow(0.0032034, 2);
 
-		//		AKF SETUP		//
-		int_stiffness = 1387.6;
+		//	Kalman Filter SETUP		//
+		int_stiffness = STIFFNESS/20;
 		xk.setZero();
 		zk.setZero();
 		uk.setZero();
@@ -343,20 +283,20 @@ public:
 		At(4,1) = STIFFNESS/J_EQ;
 		At(4,2) = -STIFFNESS/J_EQ;
 		At(4,4) = -B_EQ/J_EQ;
+		At(5,4) = int_stiffness;
 
 		Bt(0,0) = 1;
 		Bt(3,1) = -1/INERTIA_EXO;
 		Bt(4,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
+		Bt(5,0) = -int_stiffness;
 
 		Fk = discretize_A(At, C_DT);
 		Gk = discretize_B(At, Bt, C_DT);
 
-		Ck(0,0) = -int_stiffness;
-		Ck(0,1) = int_stiffness;
-		Ck(2,1) = 1;
-		Ck(3,2) = GEAR_RATIO;
-		Ck(4,3) = 1;
-		Ck(5,4) = GEAR_RATIO;
+		Ck(1,1) = 1;
+		Ck(2,2) = GEAR_RATIO;
+		Ck(3,3) = 1;
+		Ck(4,4) = GEAR_RATIO;
 
 		Dk(1,0) = 1;
 
@@ -366,14 +306,14 @@ public:
 		Pk(2,2) = pow(2*MY_PI/ENCODER_IN, 2);
 		Pk(3,3) = pow(0.0032034, 2);
 		Pk(4,4) = pow(0.0032034, 2);
+		Pk(5,5) = pow(0.500,2);
 
 		Rk.setIdentity();
-		Rk(0,0) = pow(int_stiffness*(2*0.0023400*C_DT), 2); // ~0.00649
-		Rk(1,1) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
-		Rk(2,2) = pow(2*MY_PI/ENCODER_OUT, 2);
-		Rk(3,3) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
-		Rk(4,4) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
-		Rk(5,5) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO*C_DT),2);
+		Rk(0,0) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
+		Rk(1,1) = pow(2*MY_PI/ENCODER_OUT, 2);
+		Rk(2,2) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
+		Rk(3,3) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
+		Rk(4,4) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO*C_DT),2);
 
 		Qk.setIdentity();
 		Qk(0,0) = pow(0.0002340, 2);
@@ -381,6 +321,7 @@ public:
 		Qk(2,2) = pow(0.05*2*MY_PI/ENCODER_IN, 2);
 		Qk(3,3) = pow((DELTA_T/INERTIA_EXO)*(int_stiffness*0.0023400 + (int_stiffness + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2); // ~0.00902
 		Qk(4,4) = pow((STIFFNESS/J_EQ)*(2*MY_PI/ENCODER_OUT + 2*MY_PI/ENCODER_IN),2);
+		Qk(5,5) = pow(0.08*int_stiffness*(2*0.00234*C_DT), 2);
 
 	}
 
@@ -625,7 +566,7 @@ private:
 	static Matrix<float, 4, 5> CAC_Hk;	// Sensor Expectations Matrix
 	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
 
-	//	Adaptive Kalman Filter	//
+	//	Kalman Filter	//
 
 	static StateSzVec xk;	// State Vector
 	static SensorSzVec zk;	// Sensor reading Vector

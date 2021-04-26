@@ -195,7 +195,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		zk << ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
 		updateKalmanFilter();
 		updateIntStiffness();
@@ -388,7 +388,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		zk << ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
 		updateKalmanFilter();
 		updateIntStiffness();
@@ -999,12 +999,12 @@ void accBasedControl::updateKalmanFilter()
 {
 	downsamplekf++;
 	if (downsamplekf >= IMU_DELAY){
-		kf_vel_hum_hold = zk(1,0);
-    	kf_vel_exo_hold = zk(4,0);
+		kf_vel_hum_hold = zk(0,0);
+    	kf_vel_exo_hold = zk(3,0);
 	} else {
-	// there is no truly inovation about zk_1 and zk_4 then:
-    	zk(1,0) = kf_vel_hum_hold;
-    	zk(4,0) = kf_vel_exo_hold;
+	// there is no truly inovation about zk_0 and zk_3 then:
+    	zk(0,0) = kf_vel_hum_hold;
+    	zk(3,0) = kf_vel_exo_hold;
 		uk(0,0) = kf_vel_hum_hold;
 	}
 
@@ -1018,7 +1018,7 @@ void accBasedControl::updateKalmanFilter()
 		KG = Pk * Ck.transpose() * TotalCovariance.inverse();
 
 	// Update
-	xk = xk + KG * (zk - Ck*xk);
+	xk = xk + KG * (zk - ( Ck*xk + Dk*uk ));
 	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
 
 	if (downsamplekf >= IMU_DELAY){
@@ -1035,7 +1035,7 @@ void accBasedControl::updateKalmanFilter()
 	kf_pos_exo = xk(1,0);
 	kf_pos_act = xk(2,0);
 	kf_vel_act = xk(4,0);
-	kf_torque_int = int_stiffness*(kf_pos_exo - kf_pos_hum);
+	kf_torque_int = xk(5,0);
 }
 
 void accBasedControl::updateIntStiffness()
