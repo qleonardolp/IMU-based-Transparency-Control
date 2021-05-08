@@ -32,7 +32,7 @@ control_dim = 3;
 A = [0 0 0 1 0 0; ...
     0 0 0 0 1 0; ...
     0 0 0 0 0 1; ...
-    -Ka/Jh Ka/Jh 0 0 0 0
+    -Ka/Jh Ka/Jh 0 0 0 0;...
     Ka/Je -(Ks + Ka)/Je Ks/Je 0 0 0; ...
     0 Ks/Ja -Ks/Ja 0 0 -Beq/Ja];
 
@@ -62,6 +62,73 @@ dt = 0.001;
 Fk = eye(state_dim) + A*dt + (A*dt)^2/prod(1:2) + (A*dt)^3/prod(1:3) + (A*dt)^4/prod(1:4);
 Gk = dt*(eye(state_dim) + A*dt/prod(1:2) + (A*dt)^2/prod(1:3) + (A*dt)^3/prod(1:4) +...
         (A*dt)^4/prod(1:5))*B;
+    
+%% Kalman Estimation model:
+% State vector is  [tau_i x_h x_e x_a \dot{x_e} \dot{x_a}]
+% Sensor vector is [tau_i \dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]
+% Control vector is [\dot{x_h} tau_w I_m]
+kf_ste_dim  = 6;
+kf_snr_dim = 6;
+kf_ctrl_dim = 3;
+
+% State Space matrices
+
+A_kf = [0 0 0 0 Ka 0; ...
+    0 0 0 0 0 0; ...
+    0 0 0 0 1 0; ...
+    0 0 0 0 0 1; ...
+    0 Ka/Je -(Ks + Ka)/Je Ks/Je 0 0; ...
+    0 0 Ks/Ja -Ks/Ja 0 -Beq/Ja];
+
+B_kf = [-Ka 0 0; 1 0 0; zeros(2,kf_ctrl_dim); 0 -1/Je 0; 0 0 N*KI/Ja];
+
+C_kf = [zeros(kf_snr_dim,kf_ste_dim)]; 
+C_kf(1,1) = 1;
+C_kf(3,3) = 1; C_kf(4,4) = N;
+C_kf(5,5) = 1; C_kf(6,6) = N;
+
+D_kf = zeros(kf_snr_dim, kf_ctrl_dim); D_kf(2,1) = 1;
+
+poles = eig(A_kf)  % check open-loop stability
+
+% Discretization using Taylor expansion (F = exp(A*dt)):
+dt = 0.001;
+Fk = eye(kf_ste_dim) + A_kf*dt + (A_kf*dt)^2/prod(1:2) + (A_kf*dt)^3/prod(1:3) + (A_kf*dt)^4/prod(1:4);
+Gk = dt*(eye(kf_ste_dim) + A_kf*dt/prod(1:2) + (A_kf*dt)^2/prod(1:3) + (A_kf*dt)^3/prod(1:4) +...
+        (A_kf*dt)^4/prod(1:5))*B_kf;
+    
+% Check Controllability & Observability:
+if (rank(ctrb(Fk,Gk)) == kf_ste_dim) && (rank(obsv(Fk,C_kf)) == kf_ste_dim)
+    disp('System is controllable and observable.')
+elseif (rank(ctrb(Fk,Gk)) == kf_ste_dim) && (rank(obsv(Fk,C_kf)) ~= kf_ste_dim)
+    disp('System is controllable and not observable.')
+elseif (rank(ctrb(Fk,Gk)) ~= kf_ste_dim) && (rank(obsv(Fk,C_kf)) == kf_ste_dim)
+    disp('System is not controllable and is observable.')
+else
+    disp('System is neither controllable and observable.')
+end 
+
+% sysr = minreal(ss(A_kf, B_kf, C_kf, D_kf))
+
+mtw_cov = 5.476e-6;
+Qk = eye(kf_ste_dim);
+
+Qk(6,6) = (0.5*Ks/Ja*(2*pi/2048 + 2*pi/4096))^2;
+Qk = 5.476e-6*eye(kf_ste_dim); % t_i piorou, x_h melhorou, x_e piorou
+Qk(1,1) = (Ka*2*8*sqrt(mtw_cov)*dt)^2;
+Qk(2,2) = 1e-7;
+Qk(3,3) = 1e-8;
+Qk(4,4) = 1e-7;
+Qk(5,5) = ( 1/Je*(Ka*(1e-7) + (Ka + Ks)*(1e-8) + Ks*(N*1e-7)) )^2;
+Qk(6,6) = ( 1/Ja*(Ks*1e-8 + Ks*1e-7 + Beq*1e-3) )^2;
+
+Rk = eye(kf_snr_dim);
+Rk(1,1) = (70*Ka*2*8*sqrt(mtw_cov)*dt)^2; %desconfiar mais da medida do que do processo...
+Rk(2,2) = 64*mtw_cov;
+Rk(3,3) = (143*2*pi/2048)^2; % 7% of 2048
+Rk(4,4) = (N*2*pi/4096)^2;
+Rk(5,5) = 64*mtw_cov;
+Rk(6,6) = (2*N*2*pi/60)^2; %devpad 2 rpm
 
 %% _Adjustments to McConville et al. and Young et al. body segment inertial parameters_ (2006)
 % My leg lenght is about 44 cm
