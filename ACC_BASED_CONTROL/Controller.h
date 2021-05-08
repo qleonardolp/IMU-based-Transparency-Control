@@ -36,6 +36,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
+#include "LowPassFilter2p.h"
 #include <stdio.h>
 #include <vector>
 #include <time.h>
@@ -99,10 +100,10 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KD_F			0.0200f     // [s]
 
 #define     C_RATE    1000.0f
-#define     C_DT      (float) (1/C_RATE)
+#define     C_DT      0.0010f
 
 #define     RATE            125.0f		// [Hz]	IMUs update rate
-#define		DELTA_T			(float) (1/RATE)  	// [s]
+#define		DELTA_T			0.008f 		// [s]
 
 // -> Low Pass Filtering <- //
 #define    LPF_FC          70.0f		// [Hz] Low Pass Filter Frequency Cutoff
@@ -119,7 +120,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 // AKF dimensions
 #define AKF_STATE_DIM  6
-#define AKF_SENSOR_DIM 5
+#define AKF_SENSOR_DIM 6
 #define AKF_CTRL_DIM   3
 #define IMU_DELAY 	   8				// N Samples of Ts=0.001s
 
@@ -275,53 +276,56 @@ public:
 		Dk.setZero();
 		KG.setZero();
 
-		At(1,3) = 1;
+		At(0,4) = int_stiffness;
 		At(2,4) = 1;
-		At(3,0) = int_stiffness/INERTIA_EXO;
-		At(3,1) = -(int_stiffness + STIFFNESS)/INERTIA_EXO;
-		At(3,2) = STIFFNESS/INERTIA_EXO;
-		At(4,1) = STIFFNESS/J_EQ;
-		At(4,2) = -STIFFNESS/J_EQ;
-		At(4,4) = -B_EQ/J_EQ;
-		At(5,4) = int_stiffness;
+		At(3,5) = 1;
+		At(4,1) = int_stiffness/INERTIA_EXO;
+		At(4,2) = -(int_stiffness + STIFFNESS)/INERTIA_EXO;
+		At(4,3) = STIFFNESS/INERTIA_EXO;
+		At(5,2) = STIFFNESS/J_EQ;
+		At(5,3) = -At(5,2);
+		At(5,5) = -B_EQ/J_EQ;
 
-		Bt(0,0) = 1;
-		Bt(3,1) = -1/INERTIA_EXO;
-		Bt(4,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
-		Bt(5,0) = -int_stiffness;
+		Bt(0,0) = -int_stiffness;
+		Bt(1,0) = 1;
+		Bt(4,1) = -1/INERTIA_EXO;
+		Bt(5,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
 
 		Fk = discretize_A(At, C_DT);
 		Gk = discretize_B(At, Bt, C_DT);
 
-		Ck(1,1) = 1;
-		Ck(2,2) = GEAR_RATIO;
-		Ck(3,3) = 1;
-		Ck(4,4) = GEAR_RATIO;
+		Ck(0,0) = 1;
+		Ck(2,2) = 1;
+		Ck(3,3) = GEAR_RATIO;
+		Ck(4,4) = 1;
+		Ck(5,5) = GEAR_RATIO;
 
 		Dk(1,0) = 1;
 
-		Pk.setIdentity();
-		Pk(0,0) = pow(0.0023400, 2);
-		Pk(1,1) = pow(2*MY_PI/ENCODER_OUT, 2);
-		Pk(2,2) = pow(2*MY_PI/ENCODER_IN, 2);
-		Pk(3,3) = pow(0.0032034, 2);
-		Pk(4,4) = pow(0.0032034, 2);
-		Pk(5,5) = pow(0.500,2);
+		// Setup Covariances
+		Pk = 1e-2f*StateSzMtx::Identity();
 
+		const float mtwCov = 5.476e-6;	// MTw Noise x sqrt(Bandwidth) in rad/s
 		Rk.setIdentity();
-		Rk(0,0) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
-		Rk(1,1) = pow(2*MY_PI/ENCODER_OUT, 2);
-		Rk(2,2) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
-		Rk(3,3) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s
-		Rk(4,4) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO*C_DT),2);
+		Rk(0,0) = pow( (70*int_stiffness*2*8*sqrt(mtwCov)*C_DT) ,2);
+		Rk(1,1) = 64*mtwCov; 
+		Rk(2,2) = pow(143*2*MY_PI/ENCODER_OUT, 2); // 7% of 2048
+		Rk(3,3) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
+		Rk(4,4) =  64*mtwCov;
+		Rk(5,5) = pow(2*RPM2RADS/GEAR_RATIO, 2);
+		// IMU error upon int_torque:
+		Rk(0,1) = pow(8*sqrt(mtwCov)*C_DT, 2);
+		Rk(0,2) = Rk(0,1);
+		// IMU error upon exo position:
+		Rk(2,1) = Rk(0,1);
 
 		Qk.setIdentity();
-		Qk(0,0) = pow(0.0002340, 2);
-		Qk(1,1) = pow(0.05*2*MY_PI/ENCODER_OUT, 2);
-		Qk(2,2) = pow(0.05*2*MY_PI/ENCODER_IN, 2);
-		Qk(3,3) = pow((DELTA_T/INERTIA_EXO)*(int_stiffness*0.0023400 + (int_stiffness + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2); // ~0.00902
-		Qk(4,4) = pow((STIFFNESS/J_EQ)*(2*MY_PI/ENCODER_OUT + 2*MY_PI/ENCODER_IN),2);
-		Qk(5,5) = pow(0.08*int_stiffness*(2*0.00234*C_DT), 2);
+		Qk(0,0) = pow( (int_stiffness*2*8*sqrt(mtwCov)*C_DT) ,2);
+		Qk(1,1) = 1e-7f;
+		Qk(2,2) = 1e-8f;
+		Qk(3,3) = 1e-7f;
+		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);
+		Qk(5,5) = pow(( 1/J_EQ*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
 
 	}
 
@@ -567,6 +571,9 @@ private:
 	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
 
 	//	Kalman Filter	//
+	// State vector is  [tau_i x_h x_e x_a \dot{x_e} \dot{x_a}]
+	// Sensor vector is [tau_i \dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]
+	// Control vector is [\dot{x_h} tau_w I_m]
 
 	static StateSzVec xk;	// State Vector
 	static SensorSzVec zk;	// Sensor reading Vector
@@ -599,6 +606,10 @@ private:
 
 	FILE *akfLogFile;
 	char akfLogFileName[50];
+
+	static LowPassFilter2pFloat  kfVelHumFilt;
+	static LowPassFilter2pFloat  kfAccHumFilt;
+	static LowPassFilter2pFloat  kfAccExoFilt;
 
 };
 

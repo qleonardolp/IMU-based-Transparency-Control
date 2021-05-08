@@ -112,23 +112,26 @@ end
 
 mtw_cov = 5.476e-6;
 Qk = eye(kf_ste_dim);
-
-Qk(6,6) = (0.5*Ks/Ja*(2*pi/2048 + 2*pi/4096))^2;
-Qk = 5.476e-6*eye(kf_ste_dim); % t_i piorou, x_h melhorou, x_e piorou
 Qk(1,1) = (Ka*2*8*sqrt(mtw_cov)*dt)^2;
 Qk(2,2) = 1e-7;
 Qk(3,3) = 1e-8;
 Qk(4,4) = 1e-7;
-Qk(5,5) = ( 1/Je*(Ka*(1e-7) + (Ka + Ks)*(1e-8) + Ks*(N*1e-7)) )^2;
+Qk(5,5) = ( 1/Je*(Ka*(1e-7) + (Ka + Ks)*(1e-8) + Ks*(1e-7)) )^2;
 Qk(6,6) = ( 1/Ja*(Ks*1e-8 + Ks*1e-7 + Beq*1e-3) )^2;
 
 Rk = eye(kf_snr_dim);
 Rk(1,1) = (70*Ka*2*8*sqrt(mtw_cov)*dt)^2; %desconfiar mais da medida do que do processo...
 Rk(2,2) = 64*mtw_cov;
 Rk(3,3) = (143*2*pi/2048)^2; % 7% of 2048
-Rk(4,4) = (N*2*pi/4096)^2;
+Rk(4,4) = (2*pi/4096/N)^2;
 Rk(5,5) = 64*mtw_cov;
-Rk(6,6) = (2*N*2*pi/60)^2; %devpad 2 rpm
+Rk(6,6) = (2*2*pi/60/N)^2; %devpad 2 rpm
+
+%Erro das IMUs em fi
+Rk(1,2) = (8*sqrt(mtw_cov)*dt)^2;
+Rk(1,3) = (8*sqrt(mtw_cov)*dt)^2;
+%Erro da IMU em pos_exo
+Rk(3,2) = (8*sqrt(mtw_cov)*dt)^2;
 
 %% _Adjustments to McConville et al. and Young et al. body segment inertial parameters_ (2006)
 % My leg lenght is about 44 cm

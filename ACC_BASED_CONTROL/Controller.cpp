@@ -67,7 +67,7 @@ Matrix<float, 4, 4> accBasedControl::CAC_Rk;	// Sensor noise Covariance
 Matrix<float, 4, 5> accBasedControl::CAC_Hk;	// Sensor Expectations Matrix
 Matrix<float, 5, 4> accBasedControl::CAC_KG;	// Kalman Gain Matrix
 
-//	Adaptive Kalman Filter	//
+//	Kalman Filter	//
 StateSzVec accBasedControl::xk;	// State Vector
 SensorSzVec accBasedControl::zk;	// Sensor reading Vector
 ControlSzVec accBasedControl::uk; 	// Control Vector
@@ -160,7 +160,9 @@ uint8_t	accBasedControl::downsamplelog = 1;
 float accBasedControl::int_stiffness(0);
 float accBasedControl::vel_motor_last(0);
 
-
+LowPassFilter2pFloat  accBasedControl::kfVelHumFilt(C_RATE, 7);
+LowPassFilter2pFloat  accBasedControl::kfAccHumFilt(C_RATE, 7);
+LowPassFilter2pFloat  accBasedControl::kfAccExoFilt(C_RATE, 7);
 
 
 // Control Functions //
@@ -195,16 +197,16 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
-		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		updateIntStiffness();
+		//updateIntStiffness();
 #endif
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
-			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
-			vel_exo += LPF_SMF*(ang_vel[1] - vel_exo);
+			vel_hum = ang_vel[0];
+			vel_exo = ang_vel[1];
 			acc_hum = (vel_hum - vel_hum_last)*RATE;
 			acc_exo = (vel_exo - vel_exo_last)*RATE;
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
@@ -388,16 +390,16 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
-		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent;
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		updateIntStiffness();
+		//updateIntStiffness();
 #endif
 
 		downsample++;
 		if (downsample >= IMU_DELAY){
-			vel_hum += LPF_SMF*(ang_vel[0] - vel_hum);
-			vel_exo += LPF_SMF*(ang_vel[1] - vel_exo);
+			vel_hum = ang_vel[0];
+			vel_exo = ang_vel[1];
 			acc_hum = (vel_hum - vel_hum_last)*RATE;
 			acc_exo = (vel_exo - vel_exo_last)*RATE;
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
@@ -997,45 +999,46 @@ void accBasedControl::updateStateSpaceModel(float Ka)
 
 void accBasedControl::updateKalmanFilter()
 {
-	downsamplekf++;
-	if (downsamplekf >= IMU_DELAY){
-		kf_vel_hum_hold = zk(0,0);
-    	kf_vel_exo_hold = zk(3,0);
-	} else {
-	// there is no truly inovation about zk_0 and zk_3 then:
-    	zk(0,0) = kf_vel_hum_hold;
-    	zk(3,0) = kf_vel_exo_hold;
-		uk(0,0) = kf_vel_hum_hold;
-	}
-
+	
+	//-->	Kalman Filter Loop	----------------------------------------//
+	// State vector is  [tau_i x_h x_e x_a \dot{x_e} \dot{x_a}]			//
+	// Sensor vector is [tau_i \dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]	//
+	// Control vector is [\dot{x_h} tau_w I_m]							//
+	//																	//
+	//------------------------------------------------------------------//
+	
 	// Prediction
 	xk = Fk*xk + Gk*uk;
 	Pk = Fk*Pk*Fk.transpose() + Qk;
 
 	// Kalman Gain
 	FullPivLU<SensorSzMtx> TotalCovariance(Ck * Pk * Ck.transpose() + Rk);
-	if (TotalCovariance.isInvertible())
+	if (TotalCovariance.isInvertible()){
 		KG = Pk * Ck.transpose() * TotalCovariance.inverse();
+	}
 
 	// Update
 	xk = xk + KG * (zk - ( Ck*xk + Dk*uk ));
 	Pk = (StateSzMtx::Identity() - KG*Ck)*Pk;
 
-	if (downsamplekf >= IMU_DELAY){
-		kf_vel_hum = (xk(0,0) - kf_pos_hum)/DELTA_T;
-		kf_pos_hum = xk(0,0);
+	kf_torque_int = xk(0,0);
+	kf_pos_exo = xk(2,0);
+	kf_pos_act = xk(3,0);
+	kf_vel_act = xk(5,0);
 
-		kf_acc_hum = (kf_vel_hum - kf_vel_hum_last)/DELTA_T;
-		kf_vel_hum_last = kf_vel_hum;
-		kf_acc_exo = (xk(3,0) - kf_vel_exo)/DELTA_T;
-		kf_vel_exo = xk(3,0);
-		downsamplekf = 1;
-	}
+	kf_vel_hum = (xk(1,0) - kf_pos_hum)/C_DT;
+	kf_pos_hum = xk(1,0);
 
-	kf_pos_exo = xk(1,0);
-	kf_pos_act = xk(2,0);
-	kf_vel_act = xk(4,0);
-	kf_torque_int = xk(5,0);
+	float kf_vel_hum_filt = kfVelHumFilt.apply(kf_vel_hum);
+	kf_acc_hum = (kf_vel_hum_filt - kf_vel_hum_last)/C_DT;
+	kf_vel_hum_last = kf_vel_hum_filt;
+
+	kf_acc_hum = kfAccHumFilt.apply(kf_acc_hum);
+
+	kf_acc_exo = (xk(4,0) - kf_vel_exo)/C_DT;
+	kf_acc_exo = kfAccExoFilt.apply(kf_acc_exo);
+	kf_vel_exo = xk(4,0);
+	
 }
 
 void accBasedControl::updateIntStiffness()
