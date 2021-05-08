@@ -100,7 +100,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KD_F			0.0200f     // [s]
 
 #define     C_RATE    1000.0f
-#define     C_DT      0.0010f
+#define     C_DT      0.0010
 
 #define     RATE            125.0f		// [Hz]	IMUs update rate
 #define		DELTA_T			0.008f 		// [s]
@@ -291,8 +291,8 @@ public:
 		Bt(4,1) = -1/INERTIA_EXO;
 		Bt(5,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
 
-		Fk = discretize_A(At, C_DT);
-		Gk = discretize_B(At, Bt, C_DT);
+		Fk = discretize_A(&At, C_DT);
+		Gk = discretize_B(&At, &Bt, C_DT);
 
 		Ck(0,0) = 1;
 		Ck(2,2) = 1;
@@ -339,10 +339,10 @@ public:
 	void updateStateSpaceModel(float Ka);
 
 	// Discretize state-space transition matrix
-	StateSzMtx discretize_A(StateSzMtx A, float dt);
+	StateSzMtx discretize_A(StateSzMtx* A, float dt);
 
 	// Discretize state-space control matrix
-	ControlSzMtx discretize_B(StateSzMtx A, ControlSzMtx B, float dt);
+	ControlSzMtx discretize_B(StateSzMtx* A, ControlSzMtx* B, float dt);
 
 	// Kalman Log
 	void kalmanLogger();

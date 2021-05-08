@@ -177,7 +177,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(15));
+		//this_thread::sleep_for(nanoseconds(1));
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -214,7 +214,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 			downsample = 1;
 		}
 
-		accbased_comp = INERTIA_EXO*acc_hum;		// human disturbance input
+    accbased_comp = INERTIA_EXO*kf_acc_hum;		// human disturbance input
 		vel_motor_filt += 0.30547*(vel_motor - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
 		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
 		vel_motor_last = vel_motor_filt;
@@ -231,7 +231,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		//Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
 		}
 		
-		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -374,7 +374,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		control_t_begin = steady_clock::now();
 
 		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(15));
+		//this_thread::sleep_for(nanoseconds(15));
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -414,7 +414,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
     	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
-		accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+      accbased_comp =  Kff_acc*INERTIA_EXO*kf_acc_hum + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
 
 		vel_adm = C1*vel_adm + C2*(accbased_comp + grav_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
     	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
@@ -422,7 +422,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		des_tsea_last = accbased_comp + grav_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
-		vel_motor = vel_adm+vel_hum;
+		vel_motor = vel_adm+kf_vel_hum;
 		//vel_motor = vel_hum;
 
 		SetEposVelocityLimited(vel_motor);
@@ -964,18 +964,20 @@ float accBasedControl::update_i(float error, float Ki, bool limit, float *integr
 	}
 }
 
-StateSzMtx accBasedControl::discretize_A(StateSzMtx A, float dt)
+StateSzMtx accBasedControl::discretize_A(StateSzMtx* A, float dt)
 {
 	// Fourth order discretezation
-	return StateSzMtx::Identity() + dt*A + (dt*A)*(dt*A)/2 + (dt*A)*(dt*A)*(dt*A)/6 + (dt*A)*(dt*A)*(dt*A)*(dt*A)/24;
+  const StateSzMtx intA = dt*(*A);
+	return StateSzMtx::Identity() + intA + (intA)*(intA)/2 + (intA)*(intA)*(intA)/6 + (intA)*(intA)*(intA)*(intA)/24;
 	// or
 	//return StateSzMtx::Identity() + A*dt + (A*dt).pow(2)/2 + (A*dt).pow(3)/6 + (A*dt).pow(4)/24;
 }
 
-ControlSzMtx accBasedControl::discretize_B(StateSzMtx A, ControlSzMtx B, float dt)
+ControlSzMtx accBasedControl::discretize_B(StateSzMtx* A, ControlSzMtx* B, float dt)
 {
 	// Fourth order discretezation
-	return dt*(StateSzMtx::Identity() + dt*A/2 + (dt*A)*(dt*A)/6 + (dt*A)*(dt*A)*(dt*A)/24 + (dt*A)*(dt*A)*(dt*A)*(dt*A)/120)*B;
+  const StateSzMtx intA = dt*(*A);
+	return dt*(StateSzMtx::Identity() + intA/2 + (intA)*(intA)/6 + (intA)*(intA)*(intA)/24 + (intA)*(intA)*(intA)*(intA)/120)*(*B);
 	// or
 	//return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt).pow(2)/6 + (A*dt).pow(3)/24 + (A*dt).pow(4)/120)*B;
 }
@@ -985,16 +987,14 @@ void accBasedControl::updateStateSpaceModel(float Ka)
 	At(3,0) = Ka/INERTIA_EXO;
 	At(3,1) = -(Ka + STIFFNESS)/INERTIA_EXO;
 
-	Fk = discretize_A(At, C_DT);
-	Gk = discretize_B(At, Bt, C_DT);
+	Fk = discretize_A(&At, C_DT);
+	Gk = discretize_B(&At, &Bt, C_DT);
 
 	Ck(0,0) = -Ka;
 	Ck(0,1) =  Ka;
 
 	Rk(0,0) = pow(Ka*(2*0.0023400*C_DT), 2);
 	Qk(3,3) = pow((DELTA_T/INERTIA_EXO)*(Ka*0.0023400 + (Ka + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2);
-
-
 }
 
 void accBasedControl::updateKalmanFilter()
