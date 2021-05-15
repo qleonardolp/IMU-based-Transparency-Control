@@ -373,8 +373,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		control_t_begin = steady_clock::now();
 
-		// try with low values until get confident 1000 Hz
-		//this_thread::sleep_for(nanoseconds(15));
+		
+		//no sleep: 1600 Hz
+    //this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+    //this_thread::sleep_for(milliseconds(7)); // ... 160 Hz
+    this_thread::sleep_for(microseconds(4000)); // ... 270 hz
 
 		m_epos->sync();	// CAN Synchronization
 

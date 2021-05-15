@@ -61,7 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
 #define XSENS_FC           60     // IMU cutoff frequency
 #define XSENS_CH           25			// Use radio channel 25 for wireless master.
-#define CALIBRATION_PERIOD 10.0f  // Gyroscope Bias integration period
+#define CALIBRATION_PERIOD 3.0f  // Gyroscope Bias integration period
 
 void Habilita_Eixo(int ID);
 
@@ -519,7 +519,7 @@ int main(int argc, char** argv)
         mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
         gyros[0] = mtw_hum;
 
-        // For accBasedPosition and OmegaControlKF
+        
         if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's')){
             mtw_exo_raw = (float) (gyroData[1].value(2) - imus_ybias[1]);
             mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);

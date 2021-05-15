@@ -99,10 +99,10 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KP_F			1.5310f     // [dimensionless]
 #define     KD_F			0.0200f     // [s]
 
-#define     C_RATE    1000.0f
-#define     C_DT      0.0010
+#define     C_RATE    270.0f
+#define     C_DT      0.0037
 
-#define     RATE            125.0f		// [Hz]	IMUs update rate
+#define   RATE        125.0f		// [Hz]	IMUs update rate
 #define		DELTA_T			0.008f 		// [s]
 
 // -> Low Pass Filtering <- //
@@ -122,7 +122,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define AKF_STATE_DIM  6
 #define AKF_SENSOR_DIM 6
 #define AKF_CTRL_DIM   3
-#define IMU_DELAY 	   8				// N Samples of Ts=0.001s
+#define IMU_DELAY 	   (int)	C_RATE/RATE			// N Samples of the main loop rate
 
 using namespace Eigen;
 
