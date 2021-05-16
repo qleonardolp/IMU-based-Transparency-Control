@@ -321,7 +321,7 @@ public:
 
 		Qk.setIdentity();
 		Qk(0,0) = pow( (int_stiffness*2*8*sqrt(mtwCov)*C_DT) ,2);
-		Qk(1,1) = 1e-7f;
+		Qk(1,1) = 1e-6f; // input vector add noise to the transition equation
 		Qk(2,2) = 1e-8f;
 		Qk(3,3) = 1e-7f;
 		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);

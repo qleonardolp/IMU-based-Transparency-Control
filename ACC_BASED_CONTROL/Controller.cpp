@@ -176,8 +176,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		control_t_begin = steady_clock::now();
 
-		// try with low values until get confident 1000 Hz
-		//this_thread::sleep_for(nanoseconds(1));
+    this_thread::sleep_for(microseconds(4000)); // ... 270 hz
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -391,9 +390,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
+    grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
+
 		// Assigning the measured states to the Sensor reading Vector
 #ifdef AKF_ENABLE
-		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+    zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
 		//updateIntStiffness();
@@ -415,7 +416,6 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
 		float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
-		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
     	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
       accbased_comp =  Kff_acc*INERTIA_EXO*kf_acc_hum + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
 
