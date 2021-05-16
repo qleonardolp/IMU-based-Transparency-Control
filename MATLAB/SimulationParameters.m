@@ -117,7 +117,7 @@ Qk(2,2) = 1e-7;
 Qk(3,3) = 1e-8;
 Qk(4,4) = 1e-7;
 Qk(5,5) = ( 1/Je*(Ka*(1e-7) + (Ka + Ks)*(1e-8) + Ks*(1e-7)) )^2;
-Qk(6,6) = ( 1/Ja*(Ks*1e-8 + Ks*1e-7 + Beq*1e-3) )^2;
+Qk(6,6) = ( 1/Ja*(Ks*1e-8 + Ks*1e-7 + Beq*0.6e-4) )^2;
 
 Rk = eye(kf_snr_dim);
 Rk(1,1) = (70*Ka*2*8*sqrt(mtw_cov)*dt)^2; %desconfiar mais da medida do que do processo...
@@ -272,6 +272,55 @@ subplot(2,2,4)
 plot(cac_log_eval.time, cac_log_eval.signals(2).values), grid on
 legend('T_i')
 xlabel('time (s)')
+
+%% Kalman Plot
+close all
+
+%States
+figure,
+subplot(2,3,1)
+plot(kalmanStates.time, ...
+    rad2deg([kalmanStates.signals(2).values(:,2) kalmanStates.signals(2).values(:,1)]) ), grid on
+ylabel('deg'), title('Human Position')
+
+subplot(2,3,2)
+plot(kalmanStates.time, ...
+    rad2deg([kalmanStates.signals(3).values(:,2) kalmanStates.signals(3).values(:,1)]) ), grid on
+ylabel('deg'), title('Exo Position')
+
+subplot(2,3,3)
+plot(kalmanStates.time, ...
+    rad2deg([kalmanStates.signals(4).values(:,2) kalmanStates.signals(4).values(:,1)]) ), grid on
+ylabel('deg'), title('Actuator Position')
+
+subplot(2,3,4)
+plot(kalmanStates.time, ...
+    [kalmanStates.signals(1).values(:,2) kalmanStates.signals(1).values(:,1)] ), grid on
+ylabel('N.m'), title('Interaction Torque')
+
+subplot(2,3,5)
+plot(kalmanStates.time, ...
+    rad2deg([kalmanStates.signals(5).values(:,2) kalmanStates.signals(5).values(:,1)]) ), grid on
+ylabel('deg/s'), title('Exo Velocity')
+xlabel('time (s)')
+
+subplot(2,3,6)
+plot(kalmanStates.time, ...
+    rad2deg([kalmanStates.signals(6).values(:,2) kalmanStates.signals(6).values(:,1)]) ), grid on
+ylabel('deg/s'), title('Actuator Velocity')
+
+%Accelerations
+figure,
+subplot(1,2,1)
+plot(kalmanAccHum.time,...
+    rad2deg([kalmanAccHum.signals(2).values kalmanAccHum.signals(1).values]) ), grid on
+xlabel('time (s)'), ylabel('deg/s^2'), title('Human Acceleration')
+
+subplot(1,2,2)
+plot(kalmanAccHum.time,...
+    rad2deg([kalmanAccExo.signals(2).values kalmanAccExo.signals(1).values]) ), grid on
+xlabel('time (s)'), title('Exo Acceleration')
+
 %% Nelder-Mead algorithm
 nm_window = 2.0;
 alpha = 1.00;
