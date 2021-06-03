@@ -152,30 +152,32 @@ Kp_acc = 0.5436;
 Ki_acc = 11.560;
 
 %Ideal
-% Kp = 340;
-% Ki = 289;
-% Kd = 0.034;
+% Kp = 410;
+% Ki = 330;
+% Kd = 0.15;
 
 %Non Ideal
-% Kp = 1.7;
-% Ki = 195.5;
-% Kd = 0.459;
+% Kp = 346.80;
+% Ki = 18;
+% Kd = 4.92;
 
 %% CollocatedAdmittanceControl (CAC)
 epos_Ki = 1.190; 
 epos_Kp = 11.900;
-damping_d = 60;
-stiffness_d = 10.4;
+damping_d = 2.10;
+stiffness_d = 0; % hmm possible
+stiffness_d = 36.7/100*Ks;
 k_bar = 1 - stiffness_d/Ks;
-stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja)
+stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja);
 
+[stiffness_d damping_d]
 %Ideal
-% damping_d = 60;
-% stiffness_d = 10.4;
+% damping_d = 0.43;
+% stiffness_d = 42.6400;
 
 %Non Ideal
-% damping_d = 60;
-% stiffness_d = 10.4;
+% damping_d = 2.10;
+% stiffness_d = 38.1680;
 
 %% Data
 % abc_data = importdata('abc_sem_ID/2021-03-27-21-59-14.txt');
@@ -185,24 +187,19 @@ t_end = abc_data.data(end,1);
 t_end = t_begin+10
 
 %% Results Analysis
-% plotStruct = idealAbc_eval;
-% plotStruct = nonidealAbc_eval;
-% plotStruct = idealCac_eval;
-% plotStruct = nonidealCac_eval;
-figure,
-subplot(2,1,1)
-plot(plotStruct.time, [plotStruct.signals(1,1).values]), grid on
-legend('\theta_h','\theta_e')
-ylabel('Position (deg)')
-subplot(2,1,2)
-plot(plotStruct.time, [plotStruct.signals(1,2).values]), grid on
-legend('\tau_h','\tau_i')
-xlabel('time (s)'), ylabel('Torque (N.m)')
 
-% idealAbcPID_eval % Avg abs pos error = 0.07005 rad
-% idealCAC_eval % Avg abs pos error = 0.1818 rad
-% nonidealAbcPID_eval % Avg abs pos error = 0.1564 rad
-% nonidealCAC_eval % Avg abs pos error = 0.1804 rad
+% Choose the structure to save the last simulation run data:
+% idealAbcPID_eval    = [evaluation desCurrent]
+% nonidealAbcPID_eval = [evaluation desCurrent]
+% idealCAC_eval       = [evaluation desCurrent]
+% nonidealCAC_eval    = [evaluation desCurrent]
+
+% idealAbcPID_eval % Avg abs pos error = 2.172 deg
+% idealCAC_eval % Avg abs pos error = 10.15 deg
+% nonidealAbcPID_eval % Avg abs pos error = 3.646 deg
+% nonidealCAC_eval % Avg abs pos error = 10.86 deg
+% Abc (exp) % 4.671 deg % 0.4944 Nm
+% CAC (exp) % 20.63 deg % 2.318 Nm
 
 %RMS:
 int_torque = idealAbcPID_eval(1).signals(2).values(:,2);
@@ -216,16 +213,29 @@ eval_rms(4) = rms(int_torque);
 
 eval_rms
 
-figure,
+%% Results Comparison: Int Torque
+figure('Name','Interaction Analysis','Color',[1 1 1]),
 plot(idealAbcPID_eval(1).time,...
-     idealAbcPID_eval(1).signals(2).values), hold on
-plot(nonidealAbcPID_eval(1).time, nonidealAbcPID_eval(1).signals(2).values(:,2)), grid on
-legend('T_h','T_i (ideal)','T_i (non-ideal)')
+     idealAbcPID_eval(1).signals(2).values(:,1),':',...
+     'LineWidth',1.5,'Color',[0 0 1]), hold on
+plot(idealAbcPID_eval(1).time,...
+     idealAbcPID_eval(1).signals(2).values(:,2),'--',...
+     'LineWidth',1.5,'Color',[0.30 0.80 0.09]), hold on
+
+plot(nonidealAbcPID_eval(1).time,...
+     nonidealAbcPID_eval(1).signals(2).values(:,2),'-.',...
+     'LineWidth',1.5,'Color',[1 0 0]), grid on
+
+ax = gca;
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+legend('T_h (sim)','T_i (ideal)','T_i (non-ideal)','Orientation','horizontal')
 xlabel('time (s)'), ylabel('Torque (N.m)')
-%% Results Comparison
+%Reviewed
+
+%% Results Comparison: Positions
 % load Simulation_ws and evaluation_logs .mat
 close all
-figure('Name','Position Tracking Comparison'),
+figure('Name','Position Tracking Comparison','Color',[1 1 1]),
 
 ax = subplot(3,2,1);
 plot(idealAbcPID_eval(1).time, ...
@@ -258,7 +268,8 @@ plot(idealCAC_eval(1).time, ...
      idealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
 plot(idealCAC_eval(1).time, ...
      idealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
-grid on, title('DSTC (ideal sim)'), legend('\theta_h','\theta_e')
+grid on, title('DSTC (ideal sim)'), 
+legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,4);
@@ -276,29 +287,36 @@ plot(cac_log_eval.time, ...
      cac_log_eval.signals(1).values(:,2),'--','LineWidth',1.5)
 grid on, title('DSTC'), xlabel('time (s)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+%Reviewed
 
+%% Results Comparison: Controllers
+figure('Name','Interaction Torque Comparison','Color',[1 1 1]), % compare int torque:
 
-figure('Name','Interaction Torque Comparison'), % compare int torque:
+ax =subplot(2,2,1);
+plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
+plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--', 'LineWidth',1.3), grid on
+title('ASTC'), ylabel('Position (deg)')
+legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,2,1);
-plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1)), hold on
-plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--'), grid on
-title('ASTC')
-ylabel('Position (deg)')
-subplot(2,2,2)
-plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,1)), hold on
-plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,2),'--'), grid on
+ax =subplot(2,2,2);
+plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,1), 'LineWidth',1), hold on
+plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,2),'--', 'LineWidth',1.3), grid on
 title('DSTC')
-legend('\theta_h','\theta_e')
-subplot(2,2,3)
-plot(abc_log_eval.time, abc_log_eval.signals(2).values), grid on
-xlabel('time (s)'), ylabel('Torque (N.m)')
-subplot(2,2,4)
-plot(cac_log_eval.time, cac_log_eval.signals(2).values), grid on
-legend('T_i')
-xlabel('time (s)')
+legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-%% Kalman Plot
+ax =subplot(2,2,3);
+plot(abc_log_eval.time, abc_log_eval.signals(2).values, 'LineWidth',1), grid on
+xlabel('time (s)'), ylabel('Torque (N.m)'), legend('\bf T_i')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(2,2,4);
+plot(cac_log_eval.time, cac_log_eval.signals(2).values, 'LineWidth',1), grid on
+xlabel('time (s)'), legend('\bf T_i')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+%% Results: Kalman
 close all
 
 %States
@@ -345,10 +363,3 @@ subplot(1,2,2)
 plot(kalmanAccHum.time,...
     rad2deg([kalmanAccExo.signals(2).values kalmanAccExo.signals(1).values]) ), grid on
 xlabel('time (s)'), title('Exo Acceleration')
-
-%% Nelder-Mead algorithm
-nm_window = 2.0;
-alpha = 1.00;
-gamma = 1.60;
-rho   = 0.50;
-sigma = 0.50;
