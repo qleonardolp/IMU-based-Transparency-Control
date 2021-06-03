@@ -223,39 +223,64 @@ plot(nonidealAbcPID_eval(1).time, nonidealAbcPID_eval(1).signals(2).values(:,2))
 legend('T_h','T_i (ideal)','T_i (non-ideal)')
 xlabel('time (s)'), ylabel('Torque (N.m)')
 %% Results Comparison
-figure,
-subplot(3,2,1)
-plot(idealAbcPID_eval(1).time, idealAbcPID_eval(1).signals(1).values(:,2)), hold on
-plot(idealAbcPID_eval(1).time, idealAbcPID_eval(1).signals(1).values(:,3),'--'), grid on
-title('ASTC (ideal sim)')
-subplot(3,2,3)
-plot(nonidealAbcPID_eval(1).time, nonidealAbcPID_eval(1).signals(1).values(:,2)), hold on
-plot(nonidealAbcPID_eval(1).time, nonidealAbcPID_eval(1).signals(1).values(:,3),'--'), grid on
-title('ASTC (sim)')
-ylabel('Position (deg)')
-subplot(3,2,5)
-plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1)), hold on
-plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--'), grid on
-title('ASTC')
-xlabel('time (s)')
+% load Simulation_ws and evaluation_logs .mat
+close all
+figure('Name','Position Tracking Comparison'),
 
-subplot(3,2,2)
-plot(idealCAC_eval(1).time, idealCAC_eval(1).signals(1).values(:,2)), hold on
-plot(idealCAC_eval(1).time, idealCAC_eval(1).signals(1).values(:,3),'--'), grid on
-legend('\theta_h','\theta_e')
-title('DSTC (ideal sim)')
-subplot(3,2,4)
-plot(nonidealCAC_eval(1).time, nonidealCAC_eval(1).signals(1).values(:,2)), hold on
-plot(nonidealCAC_eval(1).time, nonidealCAC_eval(1).signals(1).values(:,3),'--'), grid on
-title('DSTC (sim)')
-subplot(3,2,6)
-plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,1)), hold on
-plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,2),'--'), grid on
-title('DSTC')
-xlabel('time (s)')
+ax = subplot(3,2,1);
+plot(idealAbcPID_eval(1).time, ...
+     idealAbcPID_eval(1).signals(1).values(:,2),'LineWidth',1)
+hold on
+plot(idealAbcPID_eval(1).time, ...
+     idealAbcPID_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
+grid on, title('ASTC (ideal sim)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-figure, % compare int torque:
-subplot(2,2,1)
+ax = subplot(3,2,3);
+plot(nonidealAbcPID_eval(1).time, ...
+     nonidealAbcPID_eval(1).signals(1).values(:,2),'LineWidth',1)
+hold on
+plot(nonidealAbcPID_eval(1).time, ...
+     nonidealAbcPID_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
+grid on, title('ASTC (sim)'), ylabel('Position (deg)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(3,2,5);
+plot(abc_log_eval.time, ...
+     abc_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
+plot(abc_log_eval.time, ...
+     abc_log_eval.signals(1).values(:,2),'--','LineWidth',1.5)
+grid on, title('ASTC'), xlabel('time (s)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(3,2,2);
+plot(idealCAC_eval(1).time, ...
+     idealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
+plot(idealCAC_eval(1).time, ...
+     idealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
+grid on, title('DSTC (ideal sim)'), legend('\theta_h','\theta_e')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(3,2,4);
+plot(nonidealCAC_eval(1).time, ...
+     nonidealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
+plot(nonidealCAC_eval(1).time, ...
+     nonidealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
+grid on, title('DSTC (sim)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(3,2,6);
+plot(cac_log_eval.time, ...
+     cac_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
+plot(cac_log_eval.time, ...
+     cac_log_eval.signals(1).values(:,2),'--','LineWidth',1.5)
+grid on, title('DSTC'), xlabel('time (s)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+
+figure('Name','Interaction Torque Comparison'), % compare int torque:
+
+subplot(2,2,1);
 plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1)), hold on
 plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--'), grid on
 title('ASTC')
