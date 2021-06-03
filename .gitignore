@@ -155,8 +155,9 @@ $RECYCLE.BIN/
 # Mac desktop service store files
 .DS_Store
 
-# My ignored
+# My ignored, VS and Matlab temp files...
 .vs/
 *.slxc
+*.asv
 MATLAB/slprj/
 ACC_BASED_CONTROL/data/slprj/
