@@ -135,18 +135,67 @@ legend(['Z_r(',num2str(ang1),')'],['Z_h(',num2str(ang1),')'],...
        ['Z_r(',num2str(ang2),')'],['Z_h(',num2str(ang2),')'],...
        ['Z_r(',num2str(ang3),')'],['Z_h(',num2str(ang3),')'])
    
-% Limitations (using 25 deg):
-figure, bode(Z_r(ang2)), hold on
-bode(tf([I(Eta(ang2))],[1]),'--k')  % s -> 0
-bode(Z_h(ang2))                     % Des Imp
-bode(tf([Je 0],[1]),'--g')          % Pure Mass Imp
-bode(tf([Ks],[1 0]),'--r')          % Pure SEA Imp
-bode(tf([Ka],[1 0]),'--m')          % Pure Ka Imp
+%%
+close all
+% Limitations (using 25 deg Knee Stiffness):
+figure('Name','Impedance Bode Diagram','Color',[1 1 1]),
+ax = subplot(2,1,1);    % configure Mag
+
+bd_opt = bodeoptions;
+bd_opt.PhaseVisible = 'off';
+bd_opt.Title.String = '';
+bd_opt.XLabel.Color = [1 1 1];  % sumir com o eixo X...
+
+bodeplot(Z_r(ang2), bd_opt); hold on
+bodeplot(tf([I(Eta(ang2))],[1]),'--k',bd_opt)  % s -> 0
+bodeplot(Z_h(ang2), bd_opt)                     % Des Imp
+bodeplot(tf([Je 0],[1]),'--g', bd_opt)          % Pure Mass Imp
+bodeplot(tf([Ks],[1 0]),'--r', bd_opt)          % Pure SEA Imp
+bodeplot(tf([Ka],[1 0]),'--m', bd_opt)          % Pure Ka Imp
+
+ax.FontSize = 12; ax.LineWidth = 0.8; ax.GridAlpha = 0.6;
 grid on
-legend(['Z_r(',num2str(ang2),')'],...
-        'Z_r(s\rightarrow0)',...
-        ['Z_h(',num2str(ang2),')'],...
-        'J_e','K_{sea}','K_a')
+
+ax = subplot(2,1,2);    % configure Phase
+
+bd_opt = bodeoptions;
+bd_opt.MagVisible = 'off';
+bd_opt.Title.String = '';
+bd_opt.XLabel.FontSize = 12;
+
+bodeplot(Z_r(ang2), bd_opt); hold on
+bodeplot(tf([I(Eta(ang2))],[1]),'--k',bd_opt)  % s -> 0
+bodeplot(Z_h(ang2), bd_opt)                     % Des Imp
+bodeplot(tf([Je 0],[1]),'--g', bd_opt)          % Pure Mass Imp
+bodeplot(tf([Ks],[1 0]),'--r', bd_opt)          % Pure SEA Imp
+bodeplot(tf([Ka],[1 0]),'--m', bd_opt)          % Pure Ka Imp
+
+ax = gca;
+ax.FontSize = 12; ax.LineWidth = 0.8; ax.GridAlpha = 0.6;
+grid on
+
+legend('Z_{r}', 'Z_{r}(0)', 'Z_h', 'Z_{J_e}','Z_{K_s}','Z_{K_a}',...
+        'Orientation','horizontal','FontSize',12)
+
+fig = gcf; 
+axes_handle = fig.Children;
+
+axes_handle(3).String(1) = {'Z_{r}'};
+axes_handle(3).String(2) = {'Z_{r}(0)'};
+axes_handle(3).String(3) = {'Z_{h}'};
+axes_handle(3).String(3) = {'Z_{h}'};
+axes_handle(3).String(4) = {'Z_{Je}'};
+axes_handle(3).String(4) = {'Z_{Je}'};
+axes_handle(3).String(5) = {'Z_{Ks}'};
+axes_handle(3).String(5) = {'Z_{Ks}'};
+axes_handle(3).String(6) = {'Z_{Ka}'};
+axes_handle(3).String(6) = {'Z_{Ka}'};
+
+for i = 4:7
+    for k = 1:6
+        axes_handle(i).Children(k).Children.LineWidth = 1.0;
+    end
+end    
     
 % ver efeito de Ka e Je sobre a impedancia...
 
