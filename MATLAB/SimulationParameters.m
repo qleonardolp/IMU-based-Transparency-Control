@@ -317,49 +317,91 @@ xlabel('time (s)'), legend('\bf T_i')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 %% Results: Kalman
-close all
+clc, close all
 
 %States
-figure,
-subplot(2,3,1)
+figure('Name','Kalman Filter States','Color',[1 1 1]),
+ax = subplot(2,3,1);
 plot(kalmanStates.time, ...
-    rad2deg([kalmanStates.signals(2).values(:,2) kalmanStates.signals(2).values(:,1)]) ), grid on
+    rad2deg(kalmanStates.signals(2).values(:,2)),...
+    'LineWidth',1.3), hold on
+plot(kalmanStates.time, ...
+    rad2deg(kalmanStates.signals(2).values(:,1)),'--',...
+    'LineWidth',1.3), grid on
 ylabel('deg'), title('Human Position')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,3,2)
+ax = subplot(2,3,2);
 plot(kalmanStates.time, ...
-    rad2deg([kalmanStates.signals(3).values(:,2) kalmanStates.signals(3).values(:,1)]) ), grid on
+    rad2deg(kalmanStates.signals(3).values(:,2)),...
+    'LineWidth',1.3), hold on
+plot(kalmanStates.time, ...
+    rad2deg(kalmanStates.signals(3).values(:,1)),'--',...
+    'LineWidth',1.3), grid on
 ylabel('deg'), title('Exo Position')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,3,3)
+ax = subplot(2,3,3);
 plot(kalmanStates.time, ...
-    rad2deg([kalmanStates.signals(4).values(:,2) kalmanStates.signals(4).values(:,1)]) ), grid on
+    rad2deg(kalmanStates.signals(4).values(:,2)),...
+    'LineWidth',1.3), hold on
+plot(kalmanStates.time, ...
+    rad2deg(kalmanStates.signals(4).values(:,1)),'--',...
+    'LineWidth',1.3), grid on
 ylabel('deg'), title('Actuator Position')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,3,4)
+ax = subplot(2,3,4);
 plot(kalmanStates.time, ...
-    [kalmanStates.signals(1).values(:,2) kalmanStates.signals(1).values(:,1)] ), grid on
+    kalmanStates.signals(1).values(:,2),...
+    'LineWidth',1.3), hold on
+plot(kalmanStates.time, ...
+    kalmanStates.signals(1).values(:,1),'--',...
+    'LineWidth',1.3), grid on
 ylabel('N.m'), title('Interaction Torque')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,3,5)
+ax = subplot(2,3,5);
 plot(kalmanStates.time, ...
-    rad2deg([kalmanStates.signals(5).values(:,2) kalmanStates.signals(5).values(:,1)]) ), grid on
+    rad2deg(kalmanStates.signals(5).values(:,2)),...
+    'LineWidth',1.3), hold on
+plot(kalmanStates.time, ...
+    rad2deg(kalmanStates.signals(5).values(:,1)),'--',...
+    'LineWidth',1.3), grid on
 ylabel('deg/s'), title('Exo Velocity')
 xlabel('time (s)')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(2,3,6)
+ax = subplot(2,3,6);
 plot(kalmanStates.time, ...
-    rad2deg([kalmanStates.signals(6).values(:,2) kalmanStates.signals(6).values(:,1)]) ), grid on
+    rad2deg(kalmanStates.signals(6).values(:,2)),...
+    'LineWidth',1.0), hold on
+plot(kalmanStates.time, ...
+    rad2deg(kalmanStates.signals(6).values(:,1)),'--',...
+    'LineWidth',1.0), grid on
 ylabel('deg/s'), title('Actuator Velocity')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 %Accelerations
-figure,
-subplot(1,2,1)
+figure('Name','Kalman Angular Accelerations','Color',[1 1 1]),
+ax = subplot(1,2,1);
 plot(kalmanAccHum.time,...
-    rad2deg([kalmanAccHum.signals(2).values kalmanAccHum.signals(1).values]) ), grid on
-xlabel('time (s)'), ylabel('deg/s^2'), title('Human Acceleration')
+    rad2deg(kalmanAccHum.signals(2).values),...
+    'LineWidth',1.3), hold on
+plot(kalmanAccHum.time,...
+    rad2deg(kalmanAccHum.signals(1).values),'--',...
+    'LineWidth',1.3), grid on
+xlabel('time (s)'), ylabel('deg/s^2'), title('Human Leg Acceleration')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-subplot(1,2,2)
+ax = subplot(1,2,2);
 plot(kalmanAccHum.time,...
-    rad2deg([kalmanAccExo.signals(2).values kalmanAccExo.signals(1).values]) ), grid on
-xlabel('time (s)'), title('Exo Acceleration')
+    rad2deg(kalmanAccExo.signals(2).values),...
+    'LineWidth',1.3), hold on
+plot(kalmanAccHum.time,...
+    rad2deg(kalmanAccExo.signals(1).values),'--',...
+    'LineWidth',1.3), grid on
+xlabel('time (s)'), title('Robot Leg Acceleration')
+legend('Sim','Kalman')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+%Reviewed
