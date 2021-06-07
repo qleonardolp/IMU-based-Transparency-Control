@@ -213,6 +213,22 @@ eval_rms(4) = rms(int_torque);
 
 eval_rms
 
+% StdDev pos error:
+pos_error = rad2deg((1/Ka)*idealAbcPID_eval(1).signals(2).values(:,2));
+std_dev_err(1) = std(pos_error);
+pos_error = rad2deg((1/Ka)*idealCAC_eval(1).signals(2).values(:,2));
+std_dev_err(2) = std(abs(pos_error));
+pos_error = rad2deg((1/Ka)*nonidealAbcPID_eval(1).signals(2).values(:,2));
+std_dev_err(3) = std(abs(pos_error));
+pos_error = rad2deg((1/Ka)*nonidealCAC_eval(1).signals(2).values(:,2));
+std_dev_err(4) = std(abs(pos_error));
+pos_error = rad2deg((1/Ka)*abc_log_eval.signals(2).values);
+std_dev_err(5) = std(abs(pos_error));
+pos_error = rad2deg((1/Ka)*cac_log_eval.signals(2).values);
+std_dev_err(6) = std(pos_error);
+
+std_dev_err
+
 %% Results Comparison: Int Torque
 figure('Name','Interaction Analysis','Color',[1 1 1]),
 plot(idealAbcPID_eval(1).time,...
