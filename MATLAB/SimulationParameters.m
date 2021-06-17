@@ -215,7 +215,7 @@ t_end = t_begin+10
 % nonidealAbcPID_eval % Avg abs pos error = 3.646 deg
 % nonidealCAC_eval % Avg abs pos error = 21.07 deg
 % Abc (exp) % 4.671 deg % 0.4944 Nm
-% CAC (exp) % 20.63 deg % 2.318 Nm
+% CAC (exp) % 6.199 deg % 0.6512 Nm
 % Abc KF % 4.1459 +- 4.6201 deg % 0.4193 Nm
 % CAC KF % 22.8277 +- 25.6202 deg % 2.3252 Nm
 
@@ -277,7 +277,7 @@ plot(idealAbcPID_eval(1).time, ...
 hold on
 plot(idealAbcPID_eval(1).time, ...
      idealAbcPID_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
-grid on, title('ASTC (ideal sim)')
+grid on, title('MTC (ideal sim)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax = subplot(3,2,3);
@@ -286,7 +286,7 @@ plot(nonidealAbcPID_eval(1).time, ...
 hold on
 plot(nonidealAbcPID_eval(1).time, ...
      nonidealAbcPID_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
-grid on, title('ASTC (sim)'), ylabel('Position (deg)')
+grid on, title('MTC (sim)'), ylabel('Position (deg)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,5);
@@ -294,7 +294,7 @@ plot(abc_log_eval.time, ...
      abc_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
 plot(abc_log_eval.time, ...
      abc_log_eval.signals(1).values(:,2),'--','LineWidth',1.5)
-grid on, title('ASTC'), xlabel('time (s)')
+grid on, title('MTC'), xlabel('time (s)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,2);
@@ -302,16 +302,16 @@ plot(idealCAC_eval(1).time, ...
      idealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
 plot(idealCAC_eval(1).time, ...
      idealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
-grid on, title('DSTC (ideal sim)'), 
+grid on, title('ATC (ideal sim)'), 
 legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,4);
-plot(nonidealCAC_eval(1).time, ...
-     nonidealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
-plot(nonidealCAC_eval(1).time, ...
-     nonidealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
-grid on, title('DSTC (sim)')
+plot(CAC_kf(1).time, ...
+     CAC_kf(1).signals(1).values(:,2),'LineWidth',1), hold on
+plot(CAC_kf(1).time, ...
+     CAC_kf(1).signals(1).values(:,3),'--','LineWidth',1.5)
+grid on, title('ATC (sim)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,6);
@@ -319,7 +319,7 @@ plot(cac_log_eval.time, ...
      cac_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
 plot(cac_log_eval.time, ...
      cac_log_eval.signals(1).values(:,2),'--','LineWidth',1.5)
-grid on, title('DSTC'), xlabel('time (s)')
+grid on, title('ATC'), xlabel('time (s)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 %Reviewed
 
@@ -348,6 +348,23 @@ ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 ax =subplot(2,2,4);
 plot(cac_log_eval.time, cac_log_eval.signals(2).values, 'LineWidth',1), grid on
 xlabel('time (s)'), legend('\bf T_i')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+%%
+figure('Name','Interaction Torque Comparison','Color',[1 1 1]), % compare int torque:
+
+ax =subplot(2,1,1);
+plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
+plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--', 'LineWidth',1.3), grid on
+title('MTC'), ylabel('Position (deg)')
+legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(2,1,2);
+plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,1), 'LineWidth',1), hold on
+plot(cac_log_eval.time, cac_log_eval.signals(1).values(:,2),'--', 'LineWidth',1.3), grid on
+title('ATC'), xlabel('time (s)'), ylabel('Position (deg)')
+% legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 %% Results: Kalman
