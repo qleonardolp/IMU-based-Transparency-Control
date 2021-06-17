@@ -161,12 +161,18 @@ Ki_acc = 11.560;
 % Ki = 18;
 % Kd = 4.92;
 
+%Abc with Kf
+% Kp = 346.80;
+% Ki = 0;
+% Kd = 4.92;
+
 %% CollocatedAdmittanceControl (CAC)
 epos_Ki = 1.190; 
 epos_Kp = 11.900;
-damping_d = 2.10;
-stiffness_d = 0; % hmm possible
-stiffness_d = 36.7/100*Ks;
+% epos_Ki = 100; 
+% epos_Kp = 50;
+damping_d = 13;
+stiffness_d = 70;
 k_bar = 1 - stiffness_d/Ks;
 stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja);
 
@@ -178,6 +184,14 @@ stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja
 %Non Ideal
 % damping_d = 2.10;
 % stiffness_d = 38.1680;
+
+% CAC without Kf
+% damping_d = 13;
+% stiffness_d = 70;
+
+% CAC with Kf
+% damping_d = 12;
+% stiffness_d = 50;
 
 %% Data
 % abc_data = importdata('abc_sem_ID/2021-03-27-21-59-14.txt');
@@ -193,13 +207,17 @@ t_end = t_begin+10
 % nonidealAbcPID_eval = [evaluation desCurrent]
 % idealCAC_eval       = [evaluation desCurrent]
 % nonidealCAC_eval    = [evaluation desCurrent]
+% AbcPID_kf = [evaluation actutation]
+% CAC_kf = [evaluation actutation1]
 
 % idealAbcPID_eval % Avg abs pos error = 2.172 deg
 % idealCAC_eval % Avg abs pos error = 10.15 deg
 % nonidealAbcPID_eval % Avg abs pos error = 3.646 deg
-% nonidealCAC_eval % Avg abs pos error = 10.86 deg
+% nonidealCAC_eval % Avg abs pos error = 21.07 deg
 % Abc (exp) % 4.671 deg % 0.4944 Nm
 % CAC (exp) % 20.63 deg % 2.318 Nm
+% Abc KF % 4.1459 +- 4.6201 deg % 0.4193 Nm
+% CAC KF % 22.8277 +- 25.6202 deg % 2.3252 Nm
 
 %RMS:
 int_torque = idealAbcPID_eval(1).signals(2).values(:,2);
