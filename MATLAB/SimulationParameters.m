@@ -169,21 +169,19 @@ Ki_acc = 11.560;
 %% CollocatedAdmittanceControl (CAC)
 epos_Ki = 1.190; 
 epos_Kp = 11.900;
-% epos_Ki = 100; 
-% epos_Kp = 50;
-damping_d = 13;
-stiffness_d = 70;
+damping_d = 0.001;
+stiffness_d = 0.7;
 k_bar = 1 - stiffness_d/Ks;
 stiffness_lower = damping_d*(epos_Ki/epos_Kp - damping_d/(Ja*k_bar) - epos_Kp/Ja);
 
 [stiffness_d damping_d]
 %Ideal
-% damping_d = 0.43;
-% stiffness_d = 42.6400;
+% damping_d = 0.03;
+% stiffness_d = .104;
 
 %Non Ideal
-% damping_d = 2.10;
-% stiffness_d = 38.1680;
+% damping_d = 0.001;
+% stiffness_d = 0.7;
 
 % CAC without Kf
 % damping_d = 13;
@@ -205,47 +203,47 @@ t_end = t_begin+10
 % Choose the structure to save the last simulation run data:
 % idealAbcPID_eval    = [evaluation desCurrent]
 % nonidealAbcPID_eval = [evaluation desCurrent]
-% idealCAC_eval       = [evaluation desCurrent]
-% nonidealCAC_eval    = [evaluation desCurrent]
+% idealCAC_eval       = [evaluation actuation2]
+% nonidealCAC_eval    = [evaluation actuation2]
 % AbcPID_kf = [evaluation actutation]
 % CAC_kf = [evaluation actutation1]
 
 % idealAbcPID_eval % Avg abs pos error = 2.172 deg
-% idealCAC_eval % Avg abs pos error = 10.15 deg
+% idealCAC_eval % Avg abs pos error = 4.0601 deg
 % nonidealAbcPID_eval % Avg abs pos error = 3.646 deg
-% nonidealCAC_eval % Avg abs pos error = 21.07 deg
+% nonidealCAC_eval % Avg abs pos error = 5.972 deg
 % Abc (exp) % 4.671 deg % 0.4944 Nm
 % CAC (exp) % 6.199 deg % 0.6512 Nm
 % Abc KF % 4.1459 +- 4.6201 deg % 0.4193 Nm
-% CAC KF % 22.8277 +- 25.6202 deg % 2.3252 Nm
+% CAC KF % x +- dx deg % y Nm
 
 %RMS:
 int_torque = idealAbcPID_eval(1).signals(2).values(:,2);
 eval_rms(1) = rms(int_torque);
-int_torque = idealCAC_eval(1).signals(2).values(:,2);
+int_torque = idealCAC_eval(1).signals(2).values;
 eval_rms(2) = rms(int_torque);
 int_torque = nonidealAbcPID_eval(1).signals(2).values(:,2);
 eval_rms(3) = rms(int_torque);
-int_torque = nonidealCAC_eval(1).signals(2).values(:,2);
+int_torque = nonidealCAC_eval(1).signals(2).values;
 eval_rms(4) = rms(int_torque);
 
 eval_rms
 
 % StdDev pos error:
 pos_error = rad2deg((1/Ka)*idealAbcPID_eval(1).signals(2).values(:,2));
-std_dev_err(1) = std(pos_error);
-pos_error = rad2deg((1/Ka)*idealCAC_eval(1).signals(2).values(:,2));
-std_dev_err(2) = std(abs(pos_error));
+pos_err(1) = mean(abs(pos_error));
+pos_error = rad2deg((1/Ka)*idealCAC_eval(1).signals(2).values);
+pos_err(2) = mean(abs(pos_error));
 pos_error = rad2deg((1/Ka)*nonidealAbcPID_eval(1).signals(2).values(:,2));
-std_dev_err(3) = std(abs(pos_error));
-pos_error = rad2deg((1/Ka)*nonidealCAC_eval(1).signals(2).values(:,2));
-std_dev_err(4) = std(abs(pos_error));
+pos_err(3) = mean(abs(pos_error));
+pos_error = rad2deg((1/Ka)*nonidealCAC_eval(1).signals(2).values);
+pos_err(4) = mean(abs(pos_error));
 pos_error = rad2deg((1/Ka)*abc_log_eval.signals(2).values);
-std_dev_err(5) = std(abs(pos_error));
+pos_err(5) = mean(abs(pos_error));
 pos_error = rad2deg((1/Ka)*cac_log_eval.signals(2).values);
-std_dev_err(6) = std(pos_error);
+pos_err(6) = mean(abs(pos_error));
 
-std_dev_err
+pos_err
 
 %% Results Comparison: Int Torque
 figure('Name','Interaction Analysis','Color',[1 1 1]),
