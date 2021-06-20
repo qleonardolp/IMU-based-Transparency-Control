@@ -297,18 +297,18 @@ ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,2);
 plot(idealCAC_eval(1).time, ...
-     idealCAC_eval(1).signals(1).values(:,2),'LineWidth',1), hold on
+     idealCAC_eval(1).signals(1).values(:,1),'LineWidth',1), hold on
 plot(idealCAC_eval(1).time, ...
-     idealCAC_eval(1).signals(1).values(:,3),'--','LineWidth',1.5)
+     idealCAC_eval(1).signals(1).values(:,2),'--','LineWidth',1.5)
 grid on, title('ATC (ideal sim)'), 
 legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(3,2,4);
-plot(CAC_kf(1).time, ...
-     CAC_kf(1).signals(1).values(:,2),'LineWidth',1), hold on
-plot(CAC_kf(1).time, ...
-     CAC_kf(1).signals(1).values(:,3),'--','LineWidth',1.5)
+plot(nonidealCAC_eval(1).time, ...
+     nonidealCAC_eval(1).signals(1).values(:,1),'LineWidth',1), hold on
+plot(nonidealCAC_eval(1).time, ...
+     nonidealCAC_eval(1).signals(1).values(:,2),'--','LineWidth',1.5)
 grid on, title('ATC (sim)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
@@ -320,6 +320,38 @@ plot(cac_log_eval.time, ...
 grid on, title('ATC'), xlabel('time (s)')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 %Reviewed
+
+%% Controller terms analysis
+%MTC
+figure('Name', 'MTC control terms', 'Color', [1 1 1])
+
+feedforward_sum = AbcPID_kf(2).signals(1).values + ...
+                  AbcPID_kf(2).signals(2).values + ...
+                  AbcPID_kf(2).signals(3).values;
+
+plot(AbcPID_kf(2).time, feedforward_sum,'--',...
+     'LineWidth',1.4), hold on
+plot(AbcPID_kf(2).time, AbcPID_kf(2).signals(4).values,...
+     'LineWidth',1.0), grid on
+
+ax = gca;
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+legend('Feedforward','Feedback')
+xlabel('time (s)'), ylabel('Torque (N.m)')
+
+%ATC
+figure('Name', 'ATC control analysis', 'Color', [1 1 1])
+ax =subplot(2,1,1);
+plot(nonidealCAC_eval(2).time, nonidealCAC_eval(2).signals(1).values,'LineWidth',1.1), hold on
+plot(nonidealCAC_eval(2).time, nonidealCAC_eval(2).signals(2).values,'--', 'LineWidth',1.4), grid on
+legend('T_{ff}','T_{sea}','Orientation','horizontal')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
+
+ax =subplot(2,1,2);
+plot(nonidealCAC_eval(2).time, nonidealCAC_eval(2).signals(3).values,'LineWidth',1.1), hold on
+plot(nonidealCAC_eval(2).time, nonidealCAC_eval(2).signals(4).values,'--', 'LineWidth',1.4), grid on
+legend('vel_{ff}','vel_{adm}','Orientation','horizontal')
+ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 %% Results Comparison: Controllers
 figure('Name','Interaction Torque Comparison','Color',[1 1 1]), % compare int torque:
