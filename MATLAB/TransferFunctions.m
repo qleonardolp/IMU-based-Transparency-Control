@@ -137,6 +137,12 @@ legend(['Z_r(',num2str(ang1),')'],['Z_h(',num2str(ang1),')'],...
    
 %%
 close all
+
+Zr = tf([Kp_acc Ki_acc],[(Je/Ka) 0 1])
+Cv = KI*tf([epos_Kp epos_Ki],[1 0]);
+As = (1 - 10.4/Ks)*tf([1],[10.36 10.4]);
+Num = tf([1 0],[1])*Cv + (Cv*As*Je - Ja)*tf([1 0 0], [1]);  % deducao no caderno
+Zadm = Ka*Num*tf([1], [Ja 0 0])
 % Limitations (using 25 deg Knee Stiffness):
 figure('Name','Impedance Bode Diagram','Color',[1 1 1]),
 ax = subplot(2,1,1);    % configure Mag
@@ -146,7 +152,8 @@ bd_opt.PhaseVisible = 'off';
 bd_opt.Title.String = '';
 bd_opt.XLabel.Color = [1 1 1];  % sumir com o eixo X...
 
-bodeplot(Z_r(ang2), bd_opt); hold on
+bodeplot(Zr, bd_opt); hold on
+bodeplot(Zadm, bd_opt);
 bodeplot(tf([I(Eta(ang2))],[1]),'--k',bd_opt)  % s -> 0
 bodeplot(Z_h(ang2), bd_opt)                     % Des Imp
 bodeplot(tf([Je 0],[1]),'--g', bd_opt)          % Pure Mass Imp
@@ -163,7 +170,8 @@ bd_opt.MagVisible = 'off';
 bd_opt.Title.String = '';
 bd_opt.XLabel.FontSize = 12;
 
-bodeplot(Z_r(ang2), bd_opt); hold on
+bodeplot(Zr, bd_opt); hold on
+bodeplot(Zadm, bd_opt);
 bodeplot(tf([I(Eta(ang2))],[1]),'--k',bd_opt)  % s -> 0
 bodeplot(Z_h(ang2), bd_opt)                     % Des Imp
 bodeplot(tf([Je 0],[1]),'--g', bd_opt)          % Pure Mass Imp
@@ -174,22 +182,24 @@ ax = gca;
 ax.FontSize = 12; ax.LineWidth = 0.8; ax.GridAlpha = 0.6;
 grid on
 
-legend('Z_{r}', 'Z_{r}(0)', 'Z_h', 'Z_{J_e}','Z_{K_s}','Z_{K_a}',...
+legend('Z_{r}', 'Z_{adm}', 'Z_{r}(0)', 'Z_h', 'Z_{J_e}','Z_{K_s}','Z_{K_a}',...
         'Orientation','horizontal','FontSize',12)
 
 fig = gcf; 
 axes_handle = fig.Children;
 
 axes_handle(3).String(1) = {'Z_{r}'};
-axes_handle(3).String(2) = {'Z_{r}(0)'};
-axes_handle(3).String(3) = {'Z_{h}'};
-axes_handle(3).String(3) = {'Z_{h}'};
-axes_handle(3).String(4) = {'Z_{Je}'};
-axes_handle(3).String(4) = {'Z_{Je}'};
-axes_handle(3).String(5) = {'Z_{Ks}'};
-axes_handle(3).String(5) = {'Z_{Ks}'};
-axes_handle(3).String(6) = {'Z_{Ka}'};
-axes_handle(3).String(6) = {'Z_{Ka}'};
+axes_handle(3).String(2) = {'Z_{adm}'};
+axes_handle(3).String(2) = {'Z_{adm}'};
+axes_handle(3).String(3) = {'Z_{r}(0)'};
+axes_handle(3).String(4) = {'Z_{h}'};
+axes_handle(3).String(4) = {'Z_{h}'};
+axes_handle(3).String(5) = {'Z_{Je}'};
+axes_handle(3).String(5) = {'Z_{Je}'};
+axes_handle(3).String(6) = {'Z_{Ks}'};
+axes_handle(3).String(6) = {'Z_{Ks}'};
+axes_handle(3).String(7) = {'Z_{Ka}'};
+axes_handle(3).String(7) = {'Z_{Ka}'};
 
 for i = 4:7
     for k = 1:6
@@ -221,6 +231,7 @@ s_roots = solve(factors(1),s,'MaxDegree',3);
 s1 = latex(simplify(s_roots(1)));
 s2 = latex(simplify(s_roots(2)));
 s3 = latex(simplify(s_roots(3)));
+
 
 %%
 
