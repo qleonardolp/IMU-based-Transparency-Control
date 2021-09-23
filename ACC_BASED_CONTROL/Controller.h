@@ -27,7 +27,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define CURRENT_CONTROL_H
 
 #define	 UDP_ENABLE		(false)
-#define	 AKF_ENABLE		(true)
+#define	 KF_ENABLE		(false)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
@@ -87,8 +87,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		MTW_DIST_EXO	0.0700f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
-#define		J_EQ			0.4700f		// [Kg.m^2]
-#define		B_EQ			60.000f		// [N.m s/rad]
+#define		JACT			0.14e-4f		// [Kg.m^2]	Maxon motor RE40 datasheet
+#define		B_EQ			30.000f		// [N.m s/rad]
 
 // Feedforward-Feedback PI acc-based controller:
 #define		  K_FF			1.0000f		// [dimensionless]
@@ -183,11 +183,11 @@ public:
 			strftime(logfilename, sizeof(logfilename), "./data/%Y-%m-%d-%H-%M-%S.txt", timeinfo);
       strcpy(logger_filename, logfilename);
 
-      strftime(akfLogFileName, sizeof(akfLogFileName), "./data/akf-%Y-%m-%d-%H-%M-%S.txt", timeinfo);
-      akfLogFile = fopen(akfLogFileName, "wt");
-      if (akfLogFile != NULL)
+      strftime(kfLogFileName, sizeof(kfLogFileName), "./data/akf-%Y-%m-%d-%H-%M-%S.txt", timeinfo);
+      kfLogFile = fopen(kfLogFileName, "wt");
+      if (kfLogFile != NULL)
       {
-        fclose(akfLogFile);
+        fclose(kfLogFile);
       }
 
 			logger = fopen(getLogfilename(), "wt");
@@ -244,8 +244,8 @@ public:
 
 		CAC_Pk.setZero();
 		CAC_Pk(0, 0) = pow(0.0023400, 2); // devpad = devpad(vel_hum measured*)
-		CAC_Pk(1, 1) = pow(0.0059438, 2); // devpad = devpad(vel_motor) + Dt*devpad(torque_m/J_EQ)
-		CAC_Pk(2, 2) = pow(0.0000154, 2); // devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+		CAC_Pk(1, 1) = pow(0.0059438, 2); // devpad = devpad(vel_motor) + Dt*devpad(torque_m/JACT)
+		CAC_Pk(2, 2) = pow(0.0000154, 2); // devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/JACT)
 		CAC_Pk(3, 3) = pow(0.0030700, 2); // 2*pi/2048
 		CAC_Pk(4, 4) = pow(0.3203400, 2); // devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
 
@@ -258,8 +258,8 @@ public:
 		// additional uncertainty from the environment
 		CAC_Qk.setZero();
 		CAC_Qk(0, 0) = pow(0.0000234, 2);
-		CAC_Qk(1, 1) = pow(0.0010638, 2); // Dt*devpad(torque_m/J_EQ)
-		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/J_EQ)
+		CAC_Qk(1, 1) = pow(0.0010638, 2); // Dt*devpad(torque_m/JACT)
+		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/JACT)
 		CAC_Qk(3, 3) = pow(0.0000307, 2);
 		CAC_Qk(4, 4) = pow(0.0032034, 2);
 
@@ -282,14 +282,14 @@ public:
 		At(4,1) = int_stiffness/INERTIA_EXO;
 		At(4,2) = -(int_stiffness + STIFFNESS)/INERTIA_EXO;
 		At(4,3) = STIFFNESS/INERTIA_EXO;
-		At(5,2) = STIFFNESS/J_EQ;
+		At(5,2) = STIFFNESS/JACT;
 		At(5,3) = -At(5,2);
-		At(5,5) = -B_EQ/J_EQ;
+		At(5,5) = -B_EQ/JACT;
 
 		Bt(0,0) = -int_stiffness;
 		Bt(1,0) = 1;
 		Bt(4,1) = -1/INERTIA_EXO;
-		Bt(5,2) = GEAR_RATIO*TORQUE_CONST/J_EQ;
+		Bt(5,2) = GEAR_RATIO*TORQUE_CONST/JACT;
 
 		Fk = discretize_A(&At, C_DT);
 		Gk = discretize_B(&At, &Bt, C_DT);
@@ -325,7 +325,7 @@ public:
 		Qk(2,2) = 1e-8f;
 		Qk(3,3) = 1e-7f;
 		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);
-		Qk(5,5) = pow(( 1/J_EQ*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
+		Qk(5,5) = pow(( 1/JACT*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
 
 	}
 
@@ -370,14 +370,6 @@ public:
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m);
-
-	float getPu(){ return J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_d; }
-
-	float getIu(){ return (Ki_adm*damping_d + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS; }
-
-	float getI2u(){ return Ki_adm*stiffness_d / STIFFNESS; }
-
-	float getDu(){ return J_EQ*damping_d / STIFFNESS - J_EQ*(1 - stiffness_d / STIFFNESS); }
 
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
@@ -480,7 +472,7 @@ private:
 	static float torque_m;		// output from 'Cp(s)', actually a Cv(s) controller
 	static float IntInnerC;		// Integrator of the input in Cv(s)
 	static float vel_inner;		// Input velocity to the Inner Loop Controller. It's the k-1 value to be used in the Trapezoidal Integration IntInnerC += (v_k + v_k-1)/2*dt
-	static float IntTorqueM;	// Integrator of the Torque to the Motor, torque_m -> 1/(J_EQ*s) -> vel_motor
+	static float IntTorqueM;	// Integrator of the Torque to the Motor, torque_m -> 1/(JACT*s) -> vel_motor
 	static int   resetInt;
 	// |- Admittance Control:
 	static float torque_ref;	// Reference Torque for A(s).  ? Compensate the lower leg exo mass and dynamics ?
@@ -604,12 +596,16 @@ private:
   	static float kf_vel_exo_hold;
 	static uint8_t downsamplekf;
 
-	FILE *akfLogFile;
-	char akfLogFileName[50];
+	FILE *kfLogFile;
+	char kfLogFileName[50];
 
 	static LowPassFilter2pFloat  kfVelHumFilt;
 	static LowPassFilter2pFloat  kfAccHumFilt;
 	static LowPassFilter2pFloat  kfAccExoFilt;
+	static LowPassFilter2pFloat  AccHumFilt;
+	static LowPassFilter2pFloat  AccExoFilt;
+	static LowPassFilter2pFloat  AccMtrFilt;
+	static LowPassFilter2pFloat  TSeaFilt;
 
 };
 

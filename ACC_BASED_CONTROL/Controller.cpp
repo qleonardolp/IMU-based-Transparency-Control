@@ -112,7 +112,7 @@ float accBasedControl::damping_d = 0.001;
 float accBasedControl::k_bar = 1 - stiffness_d / STIFFNESS;
 float accBasedControl::vel_adm = 0;
 float accBasedControl::vel_adm_last = 0;
-float accBasedControl::kd_min = damping_d*(Ki_adm / Kp_adm - 1/J_EQ*(damping_d / k_bar - Kp_adm));
+float accBasedControl::kd_min = damping_d*(Ki_adm / Kp_adm - 1/JACT*(damping_d / k_bar - Kp_adm));
 float accBasedControl::kd_max = STIFFNESS;
 float accBasedControl::torque_u = 0;
 float accBasedControl::IntTsea = 0;
@@ -163,11 +163,15 @@ float accBasedControl::vel_motor_last(0);
 LowPassFilter2pFloat  accBasedControl::kfVelHumFilt(C_RATE, 7);
 LowPassFilter2pFloat  accBasedControl::kfAccHumFilt(C_RATE, 7);
 LowPassFilter2pFloat  accBasedControl::kfAccExoFilt(C_RATE, 7);
+LowPassFilter2pFloat  accBasedControl::AccHumFilt(RATE, 15);
+LowPassFilter2pFloat  accBasedControl::AccExoFilt(RATE, 15);
+LowPassFilter2pFloat  accBasedControl::AccMtrFilt(RATE, 15);
+LowPassFilter2pFloat  accBasedControl::TSeaFilt(C_RATE, 50);
 
 
 // Control Functions //
 
-void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
+void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// MTC
 {
 	while (Run.load())
 	{
@@ -195,45 +199,36 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
+		vel_motor_filt += 0.30547*(vel_motor - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
+		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
+		vel_motor_last = vel_motor_filt;
+		acc_motor = AccMtrFilt.apply(acc_motor);
+
+#if KF_ENABLE
 		// Assigning the measured states to the Sensor reading Vector
-#ifdef AKF_ENABLE
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
 		//updateIntStiffness();
-#endif
-
+		accbased_comp = INERTIA_EXO*kf_acc_hum;	// human disturbance input
+		torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - kf_vel_exo);
+#else
 		downsample++;
 		if (downsample >= IMU_DELAY){
 			vel_hum = ang_vel[0];
 			vel_exo = ang_vel[1];
 			acc_hum = (vel_hum - vel_hum_last)*RATE;
 			acc_exo = (vel_exo - vel_exo_last)*RATE;
+			acc_hum = AccHumFilt.apply(acc_hum);
+			acc_exo = AccExoFilt.apply(acc_exo);
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
 			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
 		}
+    	accbased_comp = INERTIA_EXO*acc_hum;	// human disturbance input
+		torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 
-    accbased_comp = INERTIA_EXO*kf_acc_hum;		// human disturbance input
-		vel_motor_filt += 0.30547*(vel_motor - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
-		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
-		vel_motor_last = vel_motor_filt;
-
-		// Knee impedance tuning
-		static float I_zz = 0.04374463f;
-		static float Ka = 63*STIFFNESS;
-		static float zeta = 0.06f;
-		float eta = 28.280f; // default value from eta at 40.57 deg, position on which the static tuning works well
-		if (-70 < 180/MY_PI*theta_l && 10 > 180/MY_PI*theta_l)
-		{
-		eta = Ka/(110.00f + 169.30f*(-theta_l)); // try to do with theta_l... on the functions
-		//Kp_acc = -INERTIA_EXO + eta*I_zz;
-		//Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
-		}
-		
-		//torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
-    torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_pos_hum - kf_pos_exo) + Ki_acc*(kf_vel_hum - vel_exo);
-
+#endif
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
 
@@ -365,7 +360,7 @@ void accBasedControl::OmegaControlKF(std::vector<float> &ang_vel, std::condition
 	}
 }
 
-void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
+void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)	// ATC
 {
 	while (Run.load())
 	{
@@ -376,9 +371,9 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		
 		//no sleep: 1600 Hz
-    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
-    //this_thread::sleep_for(milliseconds(7)); // ... 160 Hz
-    //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+		this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+		//this_thread::sleep_for(milliseconds(7)); // ... 160 Hz
+		//this_thread::sleep_for(microseconds(4000)); // ... 270 hz
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -392,44 +387,49 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-    grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
-
-		// Assigning the measured states to the Sensor reading Vector
-#ifdef AKF_ENABLE
-    zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
-		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
-		updateKalmanFilter();
-		//updateIntStiffness();
-#endif
-
-		downsample++;
-		if (downsample >= IMU_DELAY){
-			vel_hum = ang_vel[0];
-			vel_exo = ang_vel[1];
-			acc_hum = (vel_hum - vel_hum_last)*RATE;
-			acc_exo = (vel_exo - vel_exo_last)*RATE;
-			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
-			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
-			downsample = 1;
-		}
+    	grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
 
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
 		float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
 		float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 
-    	torque_sea += LPF_SMF*(STIFFNESS*(theta_c - theta_l) - torque_sea_last);
-      accbased_comp =  Kff_acc*INERTIA_EXO*kf_acc_hum + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
+    	torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));
+
+		
+#if KF_ENABLE
+		// Assigning the measured states to the Sensor reading Vector
+    	zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
+		updateKalmanFilter();
+		//updateIntStiffness();
+		accbased_comp =  Kff_acc*INERTIA_EXO*kf_acc_hum + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - kf_vel_exo);
+#else
+		downsample++;
+		if (downsample >= IMU_DELAY){
+			vel_hum = ang_vel[0];
+			vel_exo = ang_vel[1];
+			acc_hum = (vel_hum - vel_hum_last)*RATE;
+			acc_exo = (vel_exo - vel_exo_last)*RATE;
+			acc_hum = AccHumFilt.apply(acc_hum);
+			acc_exo = AccExoFilt.apply(acc_exo);
+			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
+			downsample = 1;
+		}
+		accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+#endif
 
 		vel_adm = C1*vel_adm + C2*(accbased_comp + grav_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
     	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
-
 		des_tsea_last = accbased_comp + grav_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
 
-		vel_motor = vel_adm+kf_vel_hum;
-		//vel_motor = vel_hum;
-
+#if KF_ENABLE
+		vel_motor = vel_adm + kf_vel_hum;
+#else
+		vel_motor = vel_adm + vel_hum;
+#endif
 		SetEposVelocityLimited(vel_motor);
 
 		auto control_t_end = steady_clock::now();
@@ -472,7 +472,7 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-		CAC_uk << (float)(0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l)) / J_EQ;
+		CAC_uk << (float)(0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l)) / JACT;
 		// Predicting (test without the Control Mtx)	//
 		CAC_xk = CAC_Fk * CAC_xk + CAC_Bk * CAC_uk;
 		CAC_Pk = CAC_Fk * CAC_Pk * CAC_Fk.transpose() + CAC_Qk;
@@ -512,12 +512,12 @@ void accBasedControl::CAdmittanceControlKF(float &velHum, std::condition_variabl
 		}
 		torque_m = Kp_adm*(vel_hum + vel_adm - vel_motor) + Ki_adm*IntInnerC - torque_sea;
 
-		//-> vel_motor = 1/s * torque_m/J_EQ
-		IntTorqueM += (torque_m / J_EQ)*control_t_Dt;
+		//-> vel_motor = 1/s * torque_m/JACT
+		IntTorqueM += (torque_m / JACT)*control_t_Dt;
 		// Integration reset:
 		if (resetInt == 3141592)
 		{
-			IntTorqueM = (torque_m / J_EQ)*control_t_Dt;
+			IntTorqueM = (torque_m / JACT)*control_t_Dt;
 			resetInt = 0;
 		}
 
@@ -636,7 +636,7 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
-    CAC_uk << (float) (0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l))/ J_EQ;
+    CAC_uk << (float) (0.001*actualCurrent * TORQUE_CONST - STIFFNESS*(theta_c - theta_l))/ JACT;
     // Predicting (test without the Control Mtx)	//
     CAC_xk = CAC_Fk * CAC_xk + CAC_Bk * CAC_uk;
 		CAC_Pk = CAC_Fk * CAC_Pk * CAC_Fk.transpose() + CAC_Qk;
@@ -666,19 +666,6 @@ void accBasedControl::CACurrentKF(float &velHum, std::condition_variable &cv, st
 
 	d_torque_sea = (CAC_xk(4, 0) - torque_sea) / C_DT;
 	torque_sea = CAC_xk(4, 0); // Tsea_k-1 <- Tsea_k
-
-	// Acc-based Admittance Control*: ----------------
-	float Pu = J_EQ*stiffness_d / STIFFNESS + (Kp_adm / STIFFNESS - 1)*damping_d;
-	float Iu = (Ki_adm*damping_d + Kp_adm*stiffness_d - stiffness_d*STIFFNESS) / STIFFNESS;
-	float I2u = Ki_adm*stiffness_d / STIFFNESS;
-	k_bar = 1 - stiffness_d / STIFFNESS;
-	float Du = J_EQ*damping_d / STIFFNESS - J_EQ*k_bar;
-
-	IntTsea += C_DT*torque_sea;
-	Int2Tsea += C_DT*IntTsea;
-
-	torque_u = Pu*torque_sea + Iu*IntTsea + I2u*Int2Tsea + Du*d_torque_sea;
-	// -----------------------------------------------
 
     vel_adm = C1*vel_adm + C2*(0 - d_torque_sea);   // 
 
@@ -801,9 +788,20 @@ void accBasedControl::Recorder()
 		fclose(logger);
 	}
 
-#ifdef AKF_ENABLE
+#if KF_ENABLE
 	kalmanLogger();	// logging measurements, control and states
 #endif
+}
+
+void accBasedControl::kalmanLogger()
+{
+	kfLogFile = fopen(kfLogFileName, "a");
+	if(kfLogFile != NULL){
+		fprintf(kfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
+		timestamp, kf_pos_hum, kf_pos_exo, kf_pos_act, kf_vel_exo, kf_vel_act, kf_vel_hum, kf_acc_hum,\
+		kf_acc_exo, kf_torque_int);
+		fclose(kfLogFile);
+	}
 }
 
 void accBasedControl::Run_Logger()
@@ -860,7 +858,7 @@ void accBasedControl::UpdateControlStatus()
     ctrl_word += "\n -> Passivity Constraints <-\n ";
 
 		k_bar = 1 - stiffness_d / STIFFNESS;
-		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_d / k_bar - Kp_adm));
+		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / JACT*(damping_d / k_bar - Kp_adm));
 
 		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
 		break;
@@ -896,7 +894,7 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += "\n -> Passivity Constraints <-\n ";
 
 		k_bar = 1 - stiffness_d / STIFFNESS;
-		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / J_EQ*(damping_d / k_bar + Kp_adm));
+		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / JACT*(damping_d / k_bar + Kp_adm));
 
 		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
 		break;
@@ -1059,16 +1057,5 @@ void accBasedControl::updateIntStiffness()
 	float Err_Ka = int_stiffness*(kf_pos_exo - kf_pos_hum) - torque_sea + (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l) + INERTIA_EXO*kf_acc_exo;
 	if(Err_Ka < 0.00001){
 		//updateStateSpaceModel(int_stiffness);
-	}
-}
-
-void accBasedControl::kalmanLogger()
-{
-	akfLogFile = fopen(akfLogFileName, "a");
-	if(akfLogFile != NULL){
-		fprintf(akfLogFile, "%5.6f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f,%5.4f\n",\
-		timestamp, kf_pos_hum, kf_pos_exo, kf_pos_act, kf_vel_exo, kf_vel_act, kf_vel_hum, kf_acc_hum,\
-		kf_acc_exo, kf_torque_int);
-		fclose(akfLogFile);
 	}
 }
