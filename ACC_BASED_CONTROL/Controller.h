@@ -329,9 +329,6 @@ public:
 
 	}
 
-	// Update Ka
-  	void updateIntStiffness();
-
 	// Kalman Filter loop
 	void updateKalmanFilter();
 

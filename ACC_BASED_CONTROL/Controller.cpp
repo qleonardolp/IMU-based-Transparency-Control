@@ -209,7 +209,6 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		//updateIntStiffness();
 		accbased_comp = INERTIA_EXO*kf_acc_hum;	// human disturbance input
 		torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - kf_vel_exo);
 #else
@@ -362,7 +361,6 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
     	zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		//updateIntStiffness();
 		accbased_comp =  Kff_acc*INERTIA_EXO*kf_acc_hum + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - kf_vel_exo);
 #else
 		downsample++;
@@ -1002,20 +1000,4 @@ void accBasedControl::updateKalmanFilter()
 	kf_acc_exo = kfAccExoFilt.apply(kf_acc_exo);
 	kf_vel_exo = xk(4,0);
 	
-}
-
-void accBasedControl::updateIntStiffness()
-{
-	// Was:
-	//int_stiffness -= 0.005*(kf_pos_exo - kf_pos_hum)/(abs(kf_pos_exo - kf_pos_hum));
-	// Simplifying:
-	if(kf_pos_exo > kf_pos_hum){
-		int_stiffness -= 0.005;
-	} else{
-		int_stiffness += 0.005;
-	}
-	float Err_Ka = int_stiffness*(kf_pos_exo - kf_pos_hum) - torque_sea + (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l) + INERTIA_EXO*kf_acc_exo;
-	if(Err_Ka < 0.00001){
-		//updateStateSpaceModel(int_stiffness);
-	}
 }
