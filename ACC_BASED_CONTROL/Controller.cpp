@@ -176,7 +176,8 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 
 		control_t_begin = steady_clock::now();
 
-    this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+    //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -230,7 +231,8 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		//Ki_acc = 2*zeta*sqrt(eta*Ka*I_zz);
 		}
 		
-		torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
+		//torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - vel_exo);
+    torque_m =  J_EQ*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_pos_hum - kf_pos_exo) + Ki_acc*(kf_vel_hum - vel_exo);
 
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
@@ -374,9 +376,9 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 
 		
 		//no sleep: 1600 Hz
-    //this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
     //this_thread::sleep_for(milliseconds(7)); // ... 160 Hz
-    this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+    //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
 
 		m_epos->sync();	// CAN Synchronization
 
