@@ -26,7 +26,8 @@ Kp_acc = 0.5436;
 Ki_acc = 11.560;
 epos_Ki = 1.190; 
 epos_Kp = 11.900;
-
+Kadm = .104;
+Dadm = 0.03;
 %% User leg natural frequency estimation:
 clc, close all
 % What if...
@@ -253,3 +254,63 @@ s2_adm = s_roots(2);
 s3_adm = s_roots(3);
 
 % fplot(subs(s1_adm, D, Ks/10)) % caution!
+
+%% Impedance/Admittance Transfer Functions Analysis (Loop Shaping, Complementary Stability)
+Kp_acc = 0.54;
+Ki_acc = 11.560;
+Kadm = 25.0;
+Dadm = .14;
+Is = 34.00;
+Id = 0.08;
+
+Kpf = 0.0030;
+Kdf = 0.0005;
+
+% Check Feedforward
+% Kp_acc = 0;
+% Ki_acc = 0;
+
+Je  = W*Le^2; % muito pesado
+% Je = 0.5*Jh;
+
+s = tf('s');
+Cv = (epos_Kp + epos_Ki/s);
+Adm = (1 - Kadm/Ks)*s / (s*Dadm + Kadm);
+
+w_z = 0.1;
+w_p = w_z*1e-3;
+LagComp = (w_p/w_z)*tf([1 w_z],[1 w_p]);
+w_z = 100;
+w_p = w_z*1e1;
+LeadComp = (w_p/w_z)*tf([1 w_z],[1 w_p]);
+% figure,
+% bode(LagComp*LeadComp, LeadComp), grid on
+
+% Das deduções de Zh realizadas em MTC e ATC, e da Zh desejada do usuário:
+% FT do erro de Zh:
+Em = Ki_acc + (Je + Kp_acc)*s %MTC
+Ea = Cv*(Adm*Je*s + 1)        %ATC
+Ei = Je*s + Is/s + Id         %ITC
+Ef = -(Kpf + s*Kdf)*(Ka/s)          %FTC (PD)
+% Ef = -(s*Kpf + s*s*Kdf)*(Ka/s)    %FTC ("Ideal")
+% Ef = -(LeadComp)*(Ka/s)           %FTC (Nao funciona)
+
+
+Zh = Jh*s;
+Zm = Zh - Em;
+Za = Zh - Ea;
+Zi = Zh - Ei;
+Zf = Zh - Ef;
+
+
+% figure,
+% bode(Em, Ea, Ef), grid on
+% legend('Em', 'Ea', 'Ef')
+
+figure,
+bode(Zm, Za, Zi, Zf, Zh), grid on
+legend('Zm', 'Za', 'Zi', 'Zf', 'Zh')
+
+% Condições de Transparência e Passividade
+%MTC: Ki > 0,  0 < Kp < 0.5*Jh - Je => (Je < 0.5*Jh) 
+
