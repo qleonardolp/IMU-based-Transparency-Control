@@ -350,9 +350,6 @@ public:
 	// Controlling tau_m using the Human acceleration feedforward
 	void accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
-	// Controlling through the EPOS Position control
-	void accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
-
 	// Controlling through the EPOS motor speed control
 	void OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 

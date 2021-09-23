@@ -245,46 +245,6 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 	}
 }
 
-void accBasedControl::accBasedPosition(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
-{
-	while (Run.load())
-	{
-		unique_lock<mutex> Lk(m);
-		cv.notify_one();
-
-		control_t_begin = steady_clock::now();
-
-		// try with low values until get confident 1000 Hz
-		this_thread::sleep_for(nanoseconds(1500));
-
-		m_epos->sync();	// CAN Synchronization
-
-		// Positions Measurement:
-		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
-		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
-		torque_sea = STIFFNESS*(theta_c - theta_l);
-
-		// Position Set	//
-		// Using the same gains variables from Speed controller, but loading then from the gains file of the Position controller
-		//theta_m = theta_l + (Kff_V*INERTIA_EXO*acc_hum + Kd_V / C_DT*xk_omg(4, 0) + Kp_V*xk_omg(4, 0)) / STIFFNESS;
-		
-		// using setpoint_filt as encoder steps:
-		//setpoint_filt = (ENCODER_IN * GEAR_RATIO) * theta_m / (2 * MY_PI) + pos0_in;
-		//m_eixo_in->PDOsetPositionSetpoint((int)setpoint_filt);
-		//m_eixo_in->WritePDO01();
-
-		// Motor Velocity to log
-		m_eixo_in->ReadPDO02();
-		vel_motor = 1 / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
-
-		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
-		control_t_Dt = 1e-6*control_t_Dt;
-
-		Run_Logger();
-	}
-}
-
 void accBasedControl::OmegaControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)
 {
 	while (Run.load())
