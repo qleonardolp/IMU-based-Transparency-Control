@@ -78,9 +78,9 @@ ControlSzMtx accBasedControl::Gk;	// Control Matrix
 ControlSzMtx accBasedControl::Bt;	// Continuous time state Control Matrix
 StateSzMtx accBasedControl::Qk;	// Process noise Covariance
 SensorSzMtx accBasedControl::Rk;	// Sensor noise Covariance
-Matrix<float,AKF_SENSOR_DIM,AKF_STATE_DIM> accBasedControl::Ck;	// Sensor Expectations Matrix
-Matrix<float,AKF_SENSOR_DIM,AKF_CTRL_DIM> accBasedControl::Dk;	// Feedthrough Matrix
-Matrix<float,AKF_STATE_DIM,AKF_SENSOR_DIM> accBasedControl::KG;	// Kalman Gain Matrix
+Matrix<float,KF_SENSOR_DIM,KF_STATE_DIM> accBasedControl::Ck;	// Sensor Expectations Matrix
+Matrix<float,KF_SENSOR_DIM,KF_CTRL_DIM> accBasedControl::Dk;	// Feedthrough Matrix
+Matrix<float,KF_STATE_DIM,KF_SENSOR_DIM> accBasedControl::KG;	// Kalman Gain Matrix
 
 float accBasedControl::kf_pos_hum(0);
 float accBasedControl::kf_pos_exo(0);

@@ -26,7 +26,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
-#define	 UDP_ENABLE		(false)
+#define	 UDP_ENABLE		(true)
 #define	 KF_ENABLE		(false)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -52,7 +52,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 
 
-#ifdef UDP_ENABLE
+#if UDP_ENABLE
 #define 	UDP_PORT 		"2324"
 #endif
 
@@ -118,20 +118,20 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		HPF_FC			0.7f	// [Hz]
 #define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
-// AKF dimensions
-#define AKF_STATE_DIM  6
-#define AKF_SENSOR_DIM 6
-#define AKF_CTRL_DIM   3
+// KF dimensions
+#define KF_STATE_DIM  6
+#define KF_SENSOR_DIM 6
+#define KF_CTRL_DIM   3
 #define IMU_DELAY 	   (int)	C_RATE/RATE			// N Samples of the main loop rate
 
 using namespace Eigen;
 
-typedef Matrix<float, AKF_STATE_DIM, 1> StateSzVec;
-typedef Matrix<float, AKF_SENSOR_DIM, 1> SensorSzVec;
-typedef Matrix<float, AKF_CTRL_DIM, 1> ControlSzVec;
-typedef Matrix<float, AKF_STATE_DIM, AKF_STATE_DIM> StateSzMtx;
-typedef Matrix<float, AKF_SENSOR_DIM, AKF_SENSOR_DIM> SensorSzMtx;
-typedef Matrix<float, AKF_STATE_DIM, AKF_CTRL_DIM>	ControlSzMtx;
+typedef Matrix<float, KF_STATE_DIM, 1> StateSzVec;
+typedef Matrix<float, KF_SENSOR_DIM, 1> SensorSzVec;
+typedef Matrix<float, KF_CTRL_DIM, 1> ControlSzVec;
+typedef Matrix<float, KF_STATE_DIM, KF_STATE_DIM> StateSzMtx;
+typedef Matrix<float, KF_SENSOR_DIM, KF_SENSOR_DIM> SensorSzMtx;
+typedef Matrix<float, KF_STATE_DIM, KF_CTRL_DIM>	ControlSzMtx;
 
 class accBasedControl
 {
@@ -413,7 +413,7 @@ public:
 
 private:
 
-#ifdef UDP_ENABLE
+#if UDP_ENABLE
 	WSADATA wsaData;
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
@@ -559,9 +559,9 @@ private:
 	static ControlSzMtx Bt;	// Continuous time state Control Matrix
 	static StateSzMtx Qk;	// Process noise Covariance
 	static SensorSzMtx Rk;	// Sensor noise Covariance
-	static Matrix<float,AKF_SENSOR_DIM,AKF_STATE_DIM> Ck;	// Sensor Expectations Matrix
-	static Matrix<float,AKF_SENSOR_DIM,AKF_CTRL_DIM> Dk;	// Feedthrough Matrix
-	static Matrix<float,AKF_STATE_DIM,AKF_SENSOR_DIM> KG;	// Kalman Gain Matrix	
+	static Matrix<float,KF_SENSOR_DIM,KF_STATE_DIM> Ck;	// Sensor Expectations Matrix
+	static Matrix<float,KF_SENSOR_DIM,KF_CTRL_DIM> Dk;	// Feedthrough Matrix
+	static Matrix<float,KF_STATE_DIM,KF_SENSOR_DIM> KG;	// Kalman Gain Matrix	
 
 	static float kf_pos_hum;
 	static float kf_pos_exo;
