@@ -158,6 +158,7 @@ $RECYCLE.BIN/
 # My ignored, VS and Matlab temp files...
 .vs/
 *.slxc
+*.slx.original
 *.asv
 MATLAB/slprj/
 ACC_BASED_CONTROL/data/slprj/
