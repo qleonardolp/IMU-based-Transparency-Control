@@ -943,21 +943,6 @@ ControlSzMtx accBasedControl::discretize_B(StateSzMtx* A, ControlSzMtx* B, float
 	//return dt*(StateSzMtx::Identity() + A*dt/2 + (A*dt).pow(2)/6 + (A*dt).pow(3)/24 + (A*dt).pow(4)/120)*B;
 }
 
-void accBasedControl::updateStateSpaceModel(float Ka)
-{
-	At(3,0) = Ka/INERTIA_EXO;
-	At(3,1) = -(Ka + STIFFNESS)/INERTIA_EXO;
-
-	Fk = discretize_A(&At, C_DT);
-	Gk = discretize_B(&At, &Bt, C_DT);
-
-	Ck(0,0) = -Ka;
-	Ck(0,1) =  Ka;
-
-	Rk(0,0) = pow(Ka*(2*0.0023400*C_DT), 2);
-	Qk(3,3) = pow((DELTA_T/INERTIA_EXO)*(Ka*0.0023400 + (Ka + STIFFNESS)*2*MY_PI/ENCODER_OUT + STIFFNESS*2*MY_PI/ENCODER_IN), 2);
-}
-
 void accBasedControl::updateKalmanFilter()
 {
 	

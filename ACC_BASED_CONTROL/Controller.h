@@ -332,9 +332,6 @@ public:
 	// Kalman Filter loop
 	void updateKalmanFilter();
 
-	// Update discrete state-space model:
-	void updateStateSpaceModel(float Ka);
-
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
 
