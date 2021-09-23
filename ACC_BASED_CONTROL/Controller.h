@@ -353,9 +353,6 @@ public:
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
-	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControlKF(float &velHum, std::condition_variable &cv, std::mutex &m);
-
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
 

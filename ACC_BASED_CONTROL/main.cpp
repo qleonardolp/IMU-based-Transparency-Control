@@ -485,7 +485,7 @@ int main(int argc, char** argv)
     else if (control_mode == 'p')
       controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'a')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
+      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
 
