@@ -379,6 +379,9 @@ public:
 	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
 	void CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
+	// Basic Impedance Control
+	void ImpedanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
 
@@ -477,6 +480,7 @@ private:
 	static float Kff_V; static float Kp_V; 
 	static float Ki_V; static float Kd_V;
 	static float Kp_acc, Ki_acc, Kff_acc;
+	static float Kp_bic, Kd_bic;
 
 	// |-> Admittance Control <---
 	// |
@@ -553,6 +557,7 @@ private:
 	static float IntAccExo;
 	static uint8_t downsample;
 	static uint8_t downsamplelog;
+	static float IntVelBIC;
 
 	//		STATE MEMORY VECTORS        //
 
