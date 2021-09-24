@@ -328,15 +328,15 @@ int main(int argc, char** argv)
       throw std::runtime_error("quit by user request");
     }
 
-    char control_mode;
+    Mode control_mode;
     int log_time;
 
-    printf("Choose the control mode:\n[p] MTC\n[s] ATC\n[i] ITC\n[a] CAC\n[u] CACu\n");
-    scanf("%c", &control_mode);
-	while (control_mode != 'p' && control_mode != 's' && control_mode != 'i' && control_mode != 'a' && control_mode != 'u')
+    printf("Choose the control mode:\n[0] MTC\n[1] ATC\n[2] ITC\n[3] KTC\n");
+    scanf("%d", &control_mode);
+	while (control_mode > 3 || control_mode < 0)
 	{
-		printf("CHOOSE A PROPER CONTROL MODE: [p]  [s]  [i]  [a]  [u]\n");
-		scanf("%c", &control_mode);
+		printf("CHOOSE A PROPER CONTROL MODE:\n");
+		scanf("%d", &control_mode);
 	}
 
     printf("How long (sec) do you want to record this run? Zero (0) to do not record: ");
@@ -478,16 +478,21 @@ int main(int argc, char** argv)
     std::condition_variable Cv;
     std::mutex Mtx;
 
-    if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 's')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-    else if (control_mode == 'p')
-      controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'i')
-      controller_t = std::thread(&accBasedControl::ImpedanceControl &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'u')
-      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
+    switch (control_mode)
+    {
+      case MTC:
+        controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+        break;
+      case ATC:
+        controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+        break;
+      case ITC:
+        controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+        break;
+      case KTC:
+        controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx)); // MUDAR
+        break;
+    }
 
 	xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
@@ -520,7 +525,7 @@ int main(int argc, char** argv)
         gyros[0] = mtw_hum;
 
         
-        if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's')){
+        if (mtwCallbacks.size() == 2){
             mtw_exo_raw = (float) (gyroData[1].value(2) - imus_ybias[1]);
             mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
             gyros[1] = mtw_exo;

@@ -133,11 +133,13 @@ typedef Matrix<float, KF_STATE_DIM, KF_STATE_DIM> StateSzMtx;
 typedef Matrix<float, KF_SENSOR_DIM, KF_SENSOR_DIM> SensorSzMtx;
 typedef Matrix<float, KF_STATE_DIM, KF_CTRL_DIM>	ControlSzMtx;
 
+enum Mode{MTC, ATC, ITC, KTC};
+
 class accBasedControl
 {
 public:
 	// Class Constructor
-	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, char control_mode, int seconds) : 
+	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, Mode control_mode, int seconds) : 
 		m_control_mode(control_mode)
 	{
 		m_epos = epos;
@@ -150,13 +152,12 @@ public:
 
 		switch (control_mode)
 		{
-		case 'p':
-		case 'i':
-		case 'u':
+		case MTC:
+		case ITC:
+		case KTC:
 			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF, accBasedController
 			break;
-		case 's':
-		case 'a':
+		case ATC:
 			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl or CAdmittanceControl
 			break;
 		default:
@@ -194,19 +195,13 @@ public:
 			if (logger != NULL)
 			{
 				// printing the header into the file first line
-				if (control_mode == 'p'){
+				if (control_mode == MTC){
 					fprintf(logger, "accBasedController [%s]\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/ss]  acc_exo[rad/ss]  theta_c[rad]  theta_l[rad]\n", header_timestamp);
 				}
-				else if (control_mode == 's'){
+				else if (control_mode == ATC){
 					fprintf(logger, "CAdmittanceControl [%s]\ntime[s]  acc_hum[rad/s2]  vel_hum[rad/s]  vel_exo[rad/s]  vel_adm[rad/s]  theta_c[rad]  theta_l[rad]  InvDyn[N.m]  AccBsd[N.m]  vel_motor[rad/s]\n", header_timestamp);
 				}
-				else if (control_mode == 'a'){
-					fprintf(logger, "CAdmittanceControlKF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  T_Sea[N.m]\n", header_timestamp);
-				}
-				else if (control_mode == 'u'){
-					fprintf(logger, "CACurrent [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n", header_timestamp);
-				}
-				else if (control_mode == 'i'){
+				else if (control_mode == ITC){
 					fprintf(logger, "ImpedanceControl [%s]\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/ss]  acc_exo[rad/ss]  theta_c[rad]  theta_l[rad]\n", header_timestamp);
 				}
 				fclose(logger);
@@ -433,11 +428,13 @@ public:
 	{
 		switch (m_control_mode)
 		{
-		case 'p': case 'i': case 'u':
+		case MTC:
+		case ITC:
+		case KTC:
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 			m_eixo_in->WritePDO01();
 			break;
-		case 's': case 'a':
+		case ATC:
 			m_eixo_in->PDOsetVelocitySetpoint(0);
 			m_eixo_in->WritePDO02();
 			break;
@@ -458,7 +455,7 @@ private:
 	static AXIS* m_eixo_in;
 	static AXIS* m_eixo_out;
 	static float m_seconds;
-	char m_control_mode;
+	Mode m_control_mode;
 	static int pos0_out;
 	static int pos0_in;
 

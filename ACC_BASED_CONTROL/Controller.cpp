@@ -587,7 +587,7 @@ void accBasedControl::GainScan()
 {
 	switch (m_control_mode)
 	{
-	case 'p':	// GainScan_accBasedController()
+	case MTC:	// GainScan_accBasedController()
 		gains_values = fopen("gainsAbc.txt", "rt");
 
 		if (gains_values != NULL)
@@ -596,8 +596,8 @@ void accBasedControl::GainScan()
 			fclose(gains_values);
 		}
 		break;
-	case 's':	// GainScan_Velocity()
-		gains_values = fopen("gainsSpeed.txt", "rt");
+	case ATC:	// GainScan_Velocity()
+		gains_values = fopen("gainsSpeed.txt", "rt");		// USAR O NOME DE ARQ CERTO...
 
 		if (gains_values != NULL)
 		{
@@ -605,26 +605,7 @@ void accBasedControl::GainScan()
 			fclose(gains_values);
 		}
 		break;
-	case 'a':	// GainScan_CAC()
-		gains_values = fopen("gainsCAC.txt", "rt");
-
-		if (gains_values != NULL)
-		{
-			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
-			fclose(gains_values);
-		}
-		break;
-	case 'k':
-	case 'u':	// GainScan_CACu()
-		gains_values = fopen("gainsCACu.txt", "rt");
-
-		if (gains_values != NULL)
-		{
-			fscanf(gains_values, "KP %f\nKI %f\nSTF %f\nDAM %f\n", &Kp_adm, &Ki_adm, &stiffness_d, &damping_d);
-			fclose(gains_values);
-		}
-		break;
-	case 'i':
+	case ITC:
 		gains_values = fopen("gainsBIC.txt", "rt");
 
 		if (gains_values != NULL)
@@ -645,25 +626,17 @@ void accBasedControl::Recorder()
 	{
 		switch (m_control_mode)
 		{
-		case 'a':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
-			timestamp, vel_hum, vel_adm, vel_motor, torque_sea);
-			break;
-		case 'p':
+		case MTC:
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor);
 			break;
-		case 's':
+		case ATC:
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor);
 			break;
-		case 'i':
+		case ITC:
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, torque_m);
-			break;
-		case 'u':
-			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.2f  %5d  %5.3f\n",\
-			timestamp, vel_hum, vel_adm, vel_motor, 1000 * setpoint_filt, actualCurrent, torque_sea); // currents in mA
 			break;
 		default:
 			break;
@@ -707,7 +680,7 @@ void accBasedControl::UpdateControlStatus()
 	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 	switch (m_control_mode)
 	{
-	case 'p':
+	case MTC:
 		ctrl_word = " ACC CONTROLLER\n";
 		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_c);
 		ctrl_word += " Setpoint Position: " + (std::string) numbers_str + " | ";
@@ -724,7 +697,7 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
 		ctrl_word += " Int K: " + std::to_string(int_stiffness) + "\n";
 		break;
-	case 's':
+	case ATC:
 		ctrl_word = " SPEED CONTROLLER\n";
 		sprintf(numbers_str, "%+5.3f", vel_motor);
 		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
@@ -745,41 +718,7 @@ void accBasedControl::UpdateControlStatus()
 
 		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
 		break;
-	case 'a':
-	case 'u':
-	case 'k':
-		ctrl_word = " COLLOCATED ADMITTANCE CONTROLLER\n";
-		if (m_control_mode == 'a')
-		{
-			sprintf(numbers_str, "%+5.3f", vel_motor);
-			ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm";
-			sprintf(numbers_str, "%+4d", actualVelocity);
-			ctrl_word += " [" + (std::string) numbers_str + " rpm	";
-			sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
-			ctrl_word += (std::string) numbers_str + " V]\n";
-		}
-		else if (m_control_mode == 'u' || m_control_mode == 'k')
-		{
-			ctrl_word += " Torque: " + std::to_string(torque_m) + " N.m";
-			ctrl_word += " [ " + std::to_string(1000 * setpoint_filt) + " ";
-			ctrl_word += std::to_string(actualCurrent) + " mA]\n";
-		}
-		sprintf(numbers_str, "%5.3f", Kp_adm);
-		ctrl_word += " Kp: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", Ki_adm);
-		ctrl_word += " Ki: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", stiffness_d);
-		ctrl_word += " STF: " + (std::string) numbers_str;
-		sprintf(numbers_str, "%5.3f", damping_d);
-		ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
-		ctrl_word += " T_Sea: " + std::to_string(torque_sea);
-		ctrl_word += " | T_ref: " + std::to_string(torque_ref) + " [N.m]\n";
-		ctrl_word += "\n -> Passivity Constraints <-\n ";
-
-		k_bar = 1 - stiffness_d / STIFFNESS;
-		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / JACT*(damping_d / k_bar + Kp_adm));
-
-		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
+	case ITC:
 		break;
 	default:
 		break;
