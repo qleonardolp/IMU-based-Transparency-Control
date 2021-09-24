@@ -331,11 +331,11 @@ int main(int argc, char** argv)
     char control_mode;
     int log_time;
 
-    printf("Choose the control mode:\n[p] Position\n[s] Speed\n[k] CACuKF\n[a] CAC\n[u] CACu\n");
+    printf("Choose the control mode:\n[p] MTC\n[s] ATC\n[i] ITC\n[a] CAC\n[u] CACu\n");
     scanf("%c", &control_mode);
-	while (control_mode != 'p' && control_mode != 's' && control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
+	while (control_mode != 'p' && control_mode != 's' && control_mode != 'i' && control_mode != 'a' && control_mode != 'u')
 	{
-		printf("CHOOSE A PROPER CONTROL MODE: [p]  [s]  [k]  [a]  [u]\n");
+		printf("CHOOSE A PROPER CONTROL MODE: [p]  [s]  [i]  [a]  [u]\n");
 		scanf("%c", &control_mode);
 	}
 
@@ -484,8 +484,8 @@ int main(int argc, char** argv)
       controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
     else if (control_mode == 'p')
       controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'a')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
+    else if(control_mode == 'i')
+      controller_t = std::thread(&accBasedControl::ImpedanceControl &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
     else if(control_mode == 'u')
       controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
 

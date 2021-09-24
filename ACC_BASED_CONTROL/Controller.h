@@ -151,7 +151,7 @@ public:
 		switch (control_mode)
 		{
 		case 'p':
-		case 'k':
+		case 'i':
 		case 'u':
 			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF, accBasedController
 			break;
@@ -206,8 +206,8 @@ public:
 				else if (control_mode == 'u'){
 					fprintf(logger, "CACurrent [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]  dT_Sea[N.m/s]\n", header_timestamp);
 				}
-				else if (control_mode == 'k'){
-					fprintf(logger, "CACurrentKF [%s]\ntime[s]  vel_hum[rad/s]  vel_adm[rad/s]  vel_motor[rad/s]  SetPt[mA]  I_m[mA]  T_Sea[N.m]\n", header_timestamp);
+				else if (control_mode == 'i'){
+					fprintf(logger, "ImpedanceControl [%s]\ntime[s]  vel_hum[rad/s]  vel_exo[rad/s]  acc_hum[rad/ss]  acc_exo[rad/ss]  theta_c[rad]  theta_l[rad]\n", header_timestamp);
 				}
 				fclose(logger);
 			}
@@ -433,7 +433,7 @@ public:
 	{
 		switch (m_control_mode)
 		{
-		case 'p': case 'k': case 'u':
+		case 'p': case 'i': case 'u':
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 			m_eixo_in->WritePDO01();
 			break;
