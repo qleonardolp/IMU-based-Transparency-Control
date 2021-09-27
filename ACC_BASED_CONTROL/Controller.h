@@ -26,8 +26,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
-#define	 UDP_ENABLE		(true)
-#define	 KF_ENABLE		(false)
+#define	 UDP_ENABLE		1
+#define	 KF_ENABLE		0
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
@@ -52,9 +52,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 
 
-#if UDP_ENABLE
 #define 	UDP_PORT 		"2324"
-#endif
 
 #define		SGVECT_SIZE		11				// Size of the window vector for Savitsky-Golay smoothing and derivative
 #define		LOG_DELAY		4				// Logging downsample
@@ -323,6 +321,7 @@ public:
 		Qk(5,5) = pow(( 1/JACT*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
 
 		// Configure Socket Communication
+    // Trocar printf de erros por um arquivo de log de erros...
 
 		// Initialize Winsock
 		int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
@@ -343,7 +342,7 @@ public:
 				WSACleanup();
 			}
 			else{
-				SOCKET ListenSocket = INVALID_SOCKET;
+				ListenSocket = INVALID_SOCKET;
 				// Create a SOCKET for the server to listen for client connections
 				ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 				if (ListenSocket == INVALID_SOCKET) {
@@ -445,11 +444,11 @@ public:
 
 private:
 
-#if UDP_ENABLE
+
 	WSADATA wsaData;
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
-#endif
+
 
 	static EPOS_NETWORK* m_epos;
 	static AXIS* m_eixo_in;
