@@ -460,6 +460,16 @@ public:
 		default:
 			break;
 		}
+		// shutdown the connection since we're done
+		if (shutdown(ClientSocket, SD_SEND) == SOCKET_ERROR) {
+			printf("shutdown failed with error: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+		}else{
+			// cleanup
+			closesocket(ClientSocket);
+			WSACleanup();
+		}
 	}
 
 private:
