@@ -26,6 +26,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
+#define  DEFAULT_BUFLEN 512
 #define	 UDP_ENABLE		1
 #define	 KF_ENABLE		0
 #include <WinSock2.h>
@@ -350,6 +351,19 @@ public:
 					freeaddrinfo(result);
 					WSACleanup();
 				}
+				else{
+					// Setup the TCP listening socket
+					iResult = bind( ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+					if (iResult == SOCKET_ERROR) {
+						printf("bind failed with error: %d\n", WSAGetLastError());
+						freeaddrinfo(result);
+						closesocket(ListenSocket);
+						WSACleanup();
+					}
+					else{
+						freeaddrinfo(result);
+					}
+				}
 			}
 		}
 
@@ -357,6 +371,9 @@ public:
 
 	// Kalman Filter loop
 	void updateKalmanFilter();
+
+	// Server Communication
+	int UDPServer();
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
@@ -473,6 +490,10 @@ private:
 	static std::atomic<bool> Run;
 	static float control_t_Dt;
 	static std::chrono::system_clock::time_point control_t_begin;
+
+	FILE* server_error_log;
+	static int udp_status;
+	static std::atomic<bool> isConnected;
 
 	//		GAINS		//
 
