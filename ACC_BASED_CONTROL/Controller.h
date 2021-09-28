@@ -376,6 +376,9 @@ public:
 	// Basic Impedance Control
 	void ImpedanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
+	// Kinect Energy Control
+	void KinectEnergyControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
 

@@ -490,7 +490,7 @@ int main(int argc, char** argv)
         controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
         break;
       case KTC:
-        controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx)); // MUDAR
+        controller_t = std::thread(&accBasedControl::KinectEnergyControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
         break;
     }
 

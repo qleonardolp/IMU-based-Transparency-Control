@@ -372,8 +372,9 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		accbased_comp = INERTIA_EXO*kf_acc_hum;	// human disturbance input
-		torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(kf_acc_hum - kf_acc_exo) + Ki_acc*(kf_vel_hum - kf_vel_exo);
+		float v_error = kf_vel_hum - kf_vel_exo;
+		flaot p_error = kf_pos_hum - kf_pos_exo;
+		torque_m = Kd_bic*v_error + Kp_bic*p_error;
 #else
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -391,6 +392,78 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		float v_error = vel_hum - vel_exo;
 		IntVelBIC = update_i(v_error, Kp_bic, (setpoint_filt > CURRENT_MAX), &IntVelBIC);
 		torque_m =  Kd_bic*v_error + IntVelBIC;
+
+#endif
+		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
+		SetEposCurrentLimited(setpoint_filt);
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
+	}
+}
+
+void accBasedControl::KinectEnergyControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// KTC
+{
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+    //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+
+		m_epos->sync();	// CAN Synchronization
+
+		// Positions Measurement:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		
+		torque_sea = STIFFNESS*(theta_c - theta_l);		// tau_s = Ks*(theta_a - theta_e)
+		grav_comp = (LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);	// inverse dynamics, \tau_W = -M g l sin(-\theta_e)
+
+		// Motor Velocity
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+		// Motor Current
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+		vel_motor_filt += 0.30547*(vel_motor - vel_motor_filt);	// SMF for 1000Hz and fc 70Hz
+		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
+		vel_motor_last = vel_motor_filt;
+		acc_motor = AccMtrFilt.apply(acc_motor);
+
+#if KF_ENABLE
+		// Assigning the measured states to the Sensor reading Vector
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
+		updateKalmanFilter();
+		torque_m =  1.00*0.5*(kf_vel_hum*kf_vel_hum - kf_vel_exo*kf_vel_exo) + 0.10*(kf_vel_hum*kf_acc_hum - kf_vel_exo*kf_acc_exo); // Kp*E_err + Kd*dE_err
+#else
+		downsample++;
+		if (downsample >= IMU_DELAY){
+			vel_hum = ang_vel[0];
+			vel_exo = ang_vel[1];
+			acc_hum = (vel_hum - vel_hum_last)*RATE;
+			acc_exo = (vel_exo - vel_exo_last)*RATE;
+			acc_hum = AccHumFilt.apply(acc_hum);
+			acc_exo = AccExoFilt.apply(acc_exo);
+			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
+			downsample = 1;
+		}
+
+		torque_m =  1.00*0.5*(vel_hum*vel_hum - vel_exo*vel_exo) + 0.10*(vel_hum*acc_hum - vel_exo*acc_exo); // Kp*E_err + Kd*dE_err
 
 #endif
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
