@@ -406,12 +406,6 @@ public:
 
 private:
 
-
-	WSADATA wsaData;
-	SOCKET ListenSocket;
-	SOCKET ClientSocket;
-
-
 	static EPOS_NETWORK* m_epos;
 	static AXIS* m_eixo_in;
 	static AXIS* m_eixo_out;
