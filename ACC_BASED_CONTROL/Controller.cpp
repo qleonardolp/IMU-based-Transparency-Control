@@ -37,10 +37,8 @@ AXIS* accBasedControl::m_eixo_out;
 float accBasedControl::m_seconds;
 int   accBasedControl::pos0_out;
 int   accBasedControl::pos0_in;
-int   accBasedControl::udp_status(23);
 atomic<bool> accBasedControl::Run(true);
 atomic<bool> accBasedControl::logging(false);
-atomic<bool> accBasedControl::isConnected(false);
 system_clock::time_point accBasedControl::control_t_begin;
 system_clock::time_point accBasedControl::timestamp_begin;
 float accBasedControl::control_t_Dt = 0.001;				// [s]
@@ -246,7 +244,6 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		// Logging/Sending Data @250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
-			udp_status = UDPServer();
 			Run_Logger();
 			downsamplelog = 1;
 		}
@@ -925,38 +922,4 @@ void accBasedControl::updateKalmanFilter()
 	kf_acc_exo = kfAccExoFilt.apply(kf_acc_exo);
 	kf_vel_exo = xk(4,0);
 	
-}
-
-int accBasedControl::UDPServer()
-{
-	char *hello = "Hello from server";
-
-	if (!isConnected) {
-		if ( listen( ListenSocket, SOMAXCONN ) == SOCKET_ERROR ) {
-			//printf( "Listen failed with error: %ld\n", WSAGetLastError() );
-			//closesocket(ListenSocket);
-			//WSACleanup();
-			return -1;
-		}
-
-		ClientSocket = INVALID_SOCKET;
-		// Accept a client socket
-		ClientSocket = accept(ListenSocket, NULL, NULL);
-		if (ClientSocket == INVALID_SOCKET) {
-			//printf("accept failed: %d\n", WSAGetLastError());
-			//closesocket(ListenSocket);
-			//WSACleanup();
-			return -2;
-		}
-		isConnected = true;
-	}
-
-	auto iSendResult = send(ClientSocket, hello, strlen(hello), 0);
-    if (iSendResult == SOCKET_ERROR) {
-        //printf("send failed: %d\n", WSAGetLastError());
-        closesocket(ClientSocket);
-        WSACleanup();
-         return 1;
-    }
-	return 0;
 }

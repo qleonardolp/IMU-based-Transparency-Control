@@ -26,14 +26,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef CURRENT_CONTROL_H
 #define CURRENT_CONTROL_H
 
-#define  DEFAULT_BUFLEN 512
-#define	 UDP_ENABLE		1
 #define	 KF_ENABLE		0
-#include <WinSock2.h>
-#include <WS2tcpip.h>
 #include <stdio.h>
-
-#pragma comment(lib, "Ws2_32.lib")
 
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
@@ -51,9 +45,6 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <Eigen/Core>
 #include <unsupported/Eigen/MatrixFunctions>
 
-
-
-#define 	UDP_PORT 		"2324"
 
 #define		SGVECT_SIZE		11				// Size of the window vector for Savitsky-Golay smoothing and derivative
 #define		LOG_DELAY		4				// Logging downsample
@@ -321,59 +312,10 @@ public:
 		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);
 		Qk(5,5) = pow(( 1/JACT*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
 
-		// Configure Socket Communication
-    // Trocar printf de erros por um arquivo de log de erros...
-
-		// Initialize Winsock
-		int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-		if (iResult != 0) {
-			printf("WSAStartup failed: %d\n", iResult);
-		}
-		else{
-			struct addrinfo *result = NULL, *ptr = NULL, hints;
-			ZeroMemory(&hints, sizeof (hints));
-			hints.ai_family = AF_INET;
-			hints.ai_socktype = SOCK_STREAM;
-			hints.ai_protocol = IPPROTO_TCP;
-			hints.ai_flags = AI_PASSIVE;
-			// Resolve the local address and port to be used by the server
-			iResult = getaddrinfo(NULL, UDP_PORT, &hints, &result);
-			if (iResult != 0) {
-				printf("getaddrinfo failed: %d\n", iResult);
-				WSACleanup();
-			}
-			else{
-				ListenSocket = INVALID_SOCKET;
-				// Create a SOCKET for the server to listen for client connections
-				ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-				if (ListenSocket == INVALID_SOCKET) {
-					printf("Error at socket(): %ld\n", WSAGetLastError());
-					freeaddrinfo(result);
-					WSACleanup();
-				}
-				else{
-					// Setup the TCP listening socket
-					iResult = bind( ListenSocket, result->ai_addr, (int)result->ai_addrlen);
-					if (iResult == SOCKET_ERROR) {
-						printf("bind failed with error: %d\n", WSAGetLastError());
-						freeaddrinfo(result);
-						closesocket(ListenSocket);
-						WSACleanup();
-					}
-					else{
-						freeaddrinfo(result);
-					}
-				}
-			}
-		}
-
 	}
 
 	// Kalman Filter loop
 	void updateKalmanFilter();
-
-	// Server Communication
-	int UDPServer();
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
@@ -460,16 +402,6 @@ public:
 		default:
 			break;
 		}
-		// shutdown the connection since we're done
-		if (shutdown(ClientSocket, SD_SEND) == SOCKET_ERROR) {
-			printf("shutdown failed with error: %d\n", WSAGetLastError());
-			closesocket(ClientSocket);
-			WSACleanup();
-		}else{
-			// cleanup
-			closesocket(ClientSocket);
-			WSACleanup();
-		}
 	}
 
 private:
@@ -501,9 +433,6 @@ private:
 	static float control_t_Dt;
 	static std::chrono::system_clock::time_point control_t_begin;
 
-	FILE* server_error_log;
-	static int udp_status;
-	static std::atomic<bool> isConnected;
 
 	//		GAINS		//
 
