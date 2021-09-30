@@ -30,7 +30,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Adapted by Leonardo Felipe L. S. dos Santos, 2019-2023 (@qleonardolp) //
 ///////////////////////////////////////////////////////////////////////////
 
+#undef UNICODE
+
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
 #include <WinSock2.h>
+#include <ws2tcpip.h>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+#define DEFAULT_BUFLEN 512
+#define DEFAULT_PORT "2324"
 
 #include <stdexcept>
 #include <iostream>
@@ -51,44 +62,123 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mastercallback.h"
 #include "mtwcallback.h"
 
-#include <xsensdeviceapi.h> // The Xsens device API header 
+#include <xsensdeviceapi.h> // The Xsens device API header
 #include <xsens/xsmutex.h>
 #include "xstypes.h"
 #include <conio.h>
 #include <thread>
 #include <chrono>
 
-#define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
-#define XSENS_FC           60     // IMU cutoff frequency
-#define XSENS_CH           25			// Use radio channel 25 for wireless master.
-#define CALIBRATION_PERIOD 3.0f  // Gyroscope Bias integration period
+#define XSENS_RATE 120          // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
+#define XSENS_FC 60             // IMU cutoff frequency
+#define XSENS_CH 25             // Use radio channel 25 for wireless master.
+#define CALIBRATION_PERIOD 3.0f // Gyroscope Bias integration period
 
 void Habilita_Eixo(int ID);
 
 void Desabilita_Eixo(int ID);
 
-
 /*! \brief Stream insertion operator overload for XsPortInfo */
-std::ostream& operator << (std::ostream& out, XsPortInfo const & p)
+std::ostream &operator<<(std::ostream &out, XsPortInfo const &p)
 {
   out << "Port: " << std::setw(2) << std::right << p.portNumber() << " (" << p.portName().toStdString() << ") @ "
-    << std::setw(7) << p.baudrate() << " Bd"
-    << ", " << "ID: " << p.deviceId().toString().toStdString()
-    ;
+      << std::setw(7) << p.baudrate() << " Bd"
+      << ", "
+      << "ID: " << p.deviceId().toString().toStdString();
   return out;
 }
 
 /*! \brief Stream insertion operator overload for XsDevice */
-std::ostream& operator << (std::ostream& out, XsDevice const & d)
+std::ostream &operator<<(std::ostream &out, XsDevice const &d)
 {
   out << "ID: " << d.deviceId().toString().toStdString() << " (" << d.productCode().toStdString() << ")";
   return out;
 }
 
-
-
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
+
+  WSADATA wsaData;
+  int iResult;
+
+  SOCKET ListenSocket = INVALID_SOCKET;
+  SOCKET ClientSocket = INVALID_SOCKET;
+
+  struct addrinfo *result = NULL;
+  struct addrinfo hints;
+
+  int iSendResult;
+  char recvbuf[DEFAULT_BUFLEN];
+  int recvbuflen = DEFAULT_BUFLEN;
+
+  // Initialize Winsock
+  iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+  if (iResult != 0)
+  {
+    printf("WSAStartup failed with error: %d\n", iResult);
+    return 1;
+  }
+
+  ZeroMemory(&hints, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_UDP;  //IPPROTO_TCP
+  hints.ai_flags = AI_PASSIVE;
+
+  // Resolve the server address and port
+  iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+  if (iResult != 0)
+  {
+    printf("getaddrinfo failed with error: %d\n", iResult);
+    WSACleanup();
+    return 1;
+  }
+
+  // Create a SOCKET for connecting to server
+  ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+  if (ListenSocket == INVALID_SOCKET)
+  {
+    printf("socket failed with error: %ld\n", WSAGetLastError());
+    freeaddrinfo(result);
+    WSACleanup();
+    return 1;
+  }
+
+  // Setup the TCP listening socket
+  iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+  if (iResult == SOCKET_ERROR)
+  {
+    printf("bind failed with error: %d\n", WSAGetLastError());
+    freeaddrinfo(result);
+    closesocket(ListenSocket);
+    WSACleanup();
+    return 1;
+  }
+
+  freeaddrinfo(result);
+
+  iResult = listen(ListenSocket, SOMAXCONN);
+  if (iResult == SOCKET_ERROR)
+  {
+    printf("listen failed with error: %d\n", WSAGetLastError());
+    closesocket(ListenSocket);
+    WSACleanup();
+    return 1;
+  }
+
+  // Accept a client socket
+  ClientSocket = accept(ListenSocket, NULL, NULL);
+  if (ClientSocket == INVALID_SOCKET)
+  {
+    printf("accept failed with error: %d\n", WSAGetLastError());
+    closesocket(ListenSocket);
+    WSACleanup();
+    return 1;
+  }
+
+  // No longer need server socket
+  closesocket(ListenSocket);
+
   QueryPerformanceFrequency(&TICKS_PER_SECOND);
   ticksSampleTime = TICKS_PER_SECOND.QuadPart * SAMPLE_TIME;
 
@@ -133,7 +223,9 @@ int main(int argc, char** argv)
   //printf("\nResetando as falhas.");
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+  while (clock() < endwait)
+  {
+  }
 
   std::cout << "..";
 
@@ -144,7 +236,9 @@ int main(int argc, char** argv)
   std::cout << "..";
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+  while (clock() < endwait)
+  {
+  }
 
   printf("..");
 
@@ -155,7 +249,9 @@ int main(int argc, char** argv)
   std::cout << "..";
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+  while (clock() < endwait)
+  {
+  }
 
   std::cout << "..";
 
@@ -166,12 +262,13 @@ int main(int argc, char** argv)
   std::cout << "..";
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+  while (clock() < endwait)
+  {
+  }
 
   std::cout << "OK" << std::endl;
 
   // ---------------------------------------------  Xsens Awinda Station management  ---------------------------------------------- //
-
 
   /*
 
@@ -189,11 +286,11 @@ int main(int argc, char** argv)
   const int desiredUpdateRate = XSENS_RATE;
   const int desiredRadioChannel = XSENS_CH;
 
-  WirelessMasterCallback wirelessMasterCallback;			// Callback for wireless master
-  std::vector<MtwCallback*> mtwCallbacks;					// Callbacks for mtw devices
+  WirelessMasterCallback wirelessMasterCallback; // Callback for wireless master
+  std::vector<MtwCallback *> mtwCallbacks;       // Callbacks for mtw devices
 
   //std::cout << "Constructing XsControl..." << std::endl;
-  XsControl* control = XsControl::construct();
+  XsControl *control = XsControl::construct();
   if (control == 0)
   {
     std::cout << "Failed to construct XsControl instance." << std::endl;
@@ -285,7 +382,8 @@ int main(int argc, char** argv)
       throw std::runtime_error(error.str());
     }
 
-    std::cout << "Waiting for MTW to wirelessly connect...\n" << std::endl;
+    std::cout << "Waiting for MTW to wirelessly connect...\n"
+              << std::endl;
 
     bool quitOnMTw = false;
     bool waitForConnections = true;
@@ -333,11 +431,11 @@ int main(int argc, char** argv)
 
     printf("Choose the control mode:\n[0] MTC\n[1] ATC\n[2] ITC\n[3] KTC\n");
     scanf("%d", &control_mode);
-	while (control_mode > 3 || control_mode < 0)
-	{
-		printf("CHOOSE A PROPER CONTROL MODE:\n");
-		scanf("%d", &control_mode);
-	}
+    while (control_mode > 3 || control_mode < 0)
+    {
+      printf("CHOOSE A PROPER CONTROL MODE:\n");
+      scanf("%d", &control_mode);
+    }
 
     printf("How long (sec) do you want to record this run? Zero (0) to do not record: ");
     scanf("%d", &log_time);
@@ -405,8 +503,8 @@ int main(int argc, char** argv)
     std::cout << "Calculating Gyroscope Bias, do not move the IMUs!";
 
     float integration_time(0.000f);
-    float imus_ybias[2] = {0,0};
-    float gyro_y_last[2] = {0,0};
+    float imus_ybias[2] = {0, 0};
+    float gyro_y_last[2] = {0, 0};
     float deltaT = 0;
     clock_t bias_startpoint = clock();
     clock_t last_clk = clock();
@@ -418,19 +516,19 @@ int main(int argc, char** argv)
       {
         if (mtwCallbacks[i]->dataAvailable())
         {
-          XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+          XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
 
           gyroData[i] = packet->calibratedGyroscopeData();
 
-          imus_ybias[i] += 0.5*(gyro_y_last[i] + (float)gyroData[i].value(2))*deltaT;
+          imus_ybias[i] += 0.5 * (gyro_y_last[i] + (float)gyroData[i].value(2)) * deltaT;
           gyro_y_last[i] = (float)gyroData[i].value(2);
-          
+
           mtwCallbacks[i]->deleteOldestPacket();
         }
       }
       auto sys_clk = clock();
-      deltaT = (float) (sys_clk - last_clk)/CLOCKS_PER_SEC;
-      integration_time = (float) (sys_clk - bias_startpoint)/CLOCKS_PER_SEC;
+      deltaT = (float)(sys_clk - last_clk) / CLOCKS_PER_SEC;
+      integration_time = (float)(sys_clk - bias_startpoint) / CLOCKS_PER_SEC;
       last_clk = sys_clk;
       // std::cout << "dt " << deltaT << " t_int " << integration_time << std::endl;
     }
@@ -443,7 +541,9 @@ int main(int argc, char** argv)
     epos.sync();
 
     endwait = clock() + 1 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
+    while (clock() < endwait)
+    {
+    }
 
     eixo_out.ReadPDO01();
     eixo_in.ReadPDO01();
@@ -471,8 +571,8 @@ int main(int argc, char** argv)
     float mtw_exo = 0;
     float mtw_hum_raw = 0;
     float mtw_exo_raw = 0;
-    LowPassFilter2pFloat  mtwHumFiltered(XSENS_RATE, XSENS_FC);
-    LowPassFilter2pFloat  mtwExoFiltered(XSENS_RATE, XSENS_FC);
+    LowPassFilter2pFloat mtwHumFiltered(XSENS_RATE, XSENS_FC);
+    LowPassFilter2pFloat mtwExoFiltered(XSENS_RATE, XSENS_FC);
     std::vector<float> gyros(mtwCallbacks.size());
     std::thread controller_t;
     std::condition_variable Cv;
@@ -480,24 +580,24 @@ int main(int argc, char** argv)
 
     switch (control_mode)
     {
-      case MTC:
-        controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-        break;
-      case ATC:
-        controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-        break;
-      case ITC:
-        controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-        break;
-      case KTC:
-        controller_t = std::thread(&accBasedControl::KinectEnergyControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-        break;
+    case MTC:
+      controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+      break;
+    case ATC:
+      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+      break;
+    case ITC:
+      controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+      break;
+    case KTC:
+      controller_t = std::thread(&accBasedControl::KinectEnergyControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+      break;
     }
 
-	xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
+    xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
     while (!_kbhit())
-    {		
+    {
       XsTime::msleep(4);
 
       bool newDataAvailable = false;
@@ -508,7 +608,7 @@ int main(int argc, char** argv)
         if (mtwCallbacks[i]->dataAvailable())
         {
           newDataAvailable = true;
-          XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
+          XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
 
           accData[i] = packet->calibratedAcceleration();
           gyroData[i] = packet->calibratedGyroscopeData();
@@ -520,23 +620,23 @@ int main(int argc, char** argv)
       if (newDataAvailable)
       {
         std::unique_lock<std::mutex> Lck(Mtx);
-        mtw_hum_raw = -(float) (gyroData[0].value(2) - imus_ybias[0]);
+        mtw_hum_raw = -(float)(gyroData[0].value(2) - imus_ybias[0]);
         mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
         gyros[0] = mtw_hum;
 
-        
-        if (mtwCallbacks.size() == 2){
-            mtw_exo_raw = (float) (gyroData[1].value(2) - imus_ybias[1]);
-            mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
-            gyros[1] = mtw_exo;
+        if (mtwCallbacks.size() == 2)
+        {
+          mtw_exo_raw = (float)(gyroData[1].value(2) - imus_ybias[1]);
+          mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
+          gyros[1] = mtw_exo;
         }
 
         Cv.notify_one();
         Cv.wait(Lck);
 
-		auto control_stamp = std::chrono::steady_clock::now();
-		delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
-		delay = 1e-3*delay;
+        auto control_stamp = std::chrono::steady_clock::now();
+        delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
+        delay = 1e-3 * delay;
 
         printer++;
         scan_file++;
@@ -546,20 +646,24 @@ int main(int argc, char** argv)
         freq = (float)CLOCKS_PER_SEC / loop_duration;
       }
 
-      if (scan_file == (int)RATE * 6)  // every 6s reads the gains_values.txt 
+      if (scan_file == (int)RATE * 6) // every 6s reads the gains_values.txt
       {
-		  xsens2Eposcan.GainScan();
-		  scan_file = 0;
+        xsens2Eposcan.GainScan();
+        scan_file = 0;
       }
 
-      if (printer == (int)RATE / 4)   // printing the status @ 4Hz
+      char *hello = "Hello from server, port 2324";
+      iSendResult = send( ClientSocket, hello, strlen(hello), 0 );
+
+      if (printer == (int)RATE / 4) // printing the status @ 4Hz
       {
         system("cls");
-		    xsens2Eposcan.UpdateControlStatus();
+        xsens2Eposcan.UpdateControlStatus();
         std::cout << xsens2Eposcan.ctrl_word;
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
-        std::cout << wirelessMasterCallback.mtw_event << std::endl; 
+        std::cout << wirelessMasterCallback.mtw_event << std::endl;
+        std::cout << iSendResult << std::endl;
         printer = 0;
       }
     }
@@ -573,7 +677,6 @@ int main(int argc, char** argv)
     xsens2Eposcan.~accBasedControl();
     //Desabilita o Eixo
     Desabilita_Eixo(0);
-
 
     std::cout << "Setting config mode..." << std::endl;
     if (!wirelessMasterDevice->gotoConfig())
@@ -591,7 +694,7 @@ int main(int argc, char** argv)
       throw std::runtime_error(error.str());
     }
   }
-  catch (std::exception const & ex)
+  catch (std::exception const &ex)
   {
     std::cout << ex.what() << std::endl;
     std::cout << "****ABORT****" << std::endl;
@@ -606,7 +709,7 @@ int main(int argc, char** argv)
   control->close();
 
   std::cout << "Deleting mtw callbacks..." << std::endl;
-  for (std::vector<MtwCallback*>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i)
+  for (std::vector<MtwCallback *>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i)
   {
     delete (*i);
   }
@@ -615,7 +718,9 @@ int main(int argc, char** argv)
   epos.StopPDOS(1);
 
   endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+  while (clock() < endwait)
+  {
+  }
 
   std::cout << "Successful exit." << std::endl;
   std::cout << "Press [ENTER] to continue." << std::endl;
@@ -623,8 +728,6 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
-
 
 /* EPOS FUNCTIONS */
 
@@ -643,7 +746,9 @@ void Habilita_Eixo(int ID)
     printf("\nENERGIZANDO O MOTOR 2 E HABILITANDO O CONTROLE");
 
     endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
+    while (clock() < endwait)
+    {
+    }
 
     eixo_in.PDOsetControlWord_SwitchOn(true);
     eixo_in.PDOsetControlWord_EnableVoltage(true);
@@ -652,18 +757,17 @@ void Habilita_Eixo(int ID)
     eixo_in.WritePDO01();
 
     endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
+    while (clock() < endwait)
+    {
+    }
 
     eixo_in.PDOsetControlWord_SwitchOn(true);
     eixo_in.PDOsetControlWord_EnableVoltage(true);
     eixo_in.PDOsetControlWord_QuickStop(true);
     eixo_in.PDOsetControlWord_EnableOperation(true);
     eixo_in.WritePDO01();
-
   }
-
 }
-
 
 void Desabilita_Eixo(int ID)
 {
@@ -679,15 +783,14 @@ void Desabilita_Eixo(int ID)
     eixo_in.WritePDO01();
 
     endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
+    while (clock() < endwait)
+    {
+    }
 
     eixo_in.PDOsetControlWord_SwitchOn(false);
     eixo_in.PDOsetControlWord_EnableVoltage(true);
     eixo_in.PDOsetControlWord_QuickStop(true);
     eixo_in.PDOsetControlWord_EnableOperation(false);
     eixo_in.WritePDO01();
-
   }
-
 }
-
