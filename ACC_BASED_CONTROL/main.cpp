@@ -122,7 +122,7 @@ int main(int argc, char **argv)
   ZeroMemory(&hints, sizeof(hints));
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_protocol = IPPROTO_UDP;  //IPPROTO_TCP
+  hints.ai_protocol = IPPROTO_UDP; //IPPROTO_TCP
   hints.ai_flags = AI_PASSIVE;
 
   // Resolve the server address and port
@@ -653,7 +653,7 @@ int main(int argc, char **argv)
       }
 
       char *hello = "Hello from server, port 2324";
-      iSendResult = send( ClientSocket, hello, strlen(hello), 0 );
+      iSendResult = send(ClientSocket, hello, strlen(hello), 0);
 
       if (printer == (int)RATE / 4) // printing the status @ 4Hz
       {
@@ -723,6 +723,21 @@ int main(int argc, char **argv)
   }
 
   std::cout << "Successful exit." << std::endl;
+
+  // shutdown the connection since we're done
+  iResult = shutdown(ClientSocket, SD_SEND);
+  if (iResult == SOCKET_ERROR)
+  {
+    printf("Socket shutdown failed with error: %d\n", WSAGetLastError());
+    closesocket(ClientSocket);
+    WSACleanup();
+    return 1;
+  }
+
+  // cleanup
+  closesocket(ClientSocket);
+  WSACleanup();
+
   std::cout << "Press [ENTER] to continue." << std::endl;
   std::cin.get();
 
