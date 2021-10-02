@@ -35,8 +35,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
-#include <WinSock2.h>
+#include <winsock2.h>
 #include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -116,13 +118,13 @@ int main(int argc, char **argv)
   if (iResult != 0)
   {
     printf("WSAStartup failed with error: %d\n", iResult);
-    return 1;
+    //return 1;
   }
 
   ZeroMemory(&hints, sizeof(hints));
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_protocol = IPPROTO_UDP; //IPPROTO_TCP
+  hints.ai_protocol = IPPROTO_TCP;
   hints.ai_flags = AI_PASSIVE;
 
   // Resolve the server address and port
@@ -131,7 +133,7 @@ int main(int argc, char **argv)
   {
     printf("getaddrinfo failed with error: %d\n", iResult);
     WSACleanup();
-    return 1;
+    //return 1;
   }
 
   // Create a SOCKET for connecting to server
@@ -141,7 +143,7 @@ int main(int argc, char **argv)
     printf("socket failed with error: %ld\n", WSAGetLastError());
     freeaddrinfo(result);
     WSACleanup();
-    return 1;
+    //return 1;
   }
 
   // Setup the TCP listening socket
@@ -152,7 +154,7 @@ int main(int argc, char **argv)
     freeaddrinfo(result);
     closesocket(ListenSocket);
     WSACleanup();
-    return 1;
+    //return 1;
   }
 
   freeaddrinfo(result);
@@ -163,7 +165,7 @@ int main(int argc, char **argv)
     printf("listen failed with error: %d\n", WSAGetLastError());
     closesocket(ListenSocket);
     WSACleanup();
-    return 1;
+    //return 1;
   }
 
   // Accept a client socket
@@ -173,7 +175,7 @@ int main(int argc, char **argv)
     printf("accept failed with error: %d\n", WSAGetLastError());
     closesocket(ListenSocket);
     WSACleanup();
-    return 1;
+    //return 1;
   }
 
   // No longer need server socket
