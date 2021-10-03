@@ -356,6 +356,9 @@ public:
 	// 'Control Word' to show info at the console screen
 	std::string ctrl_word;
 
+	// Update and pass TCP message reference
+	std::vector<float>* TCPMessage(); 
+
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
 

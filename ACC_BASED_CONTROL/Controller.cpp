@@ -241,6 +241,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
+		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
 		// Logging/Sending Data @250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -325,6 +326,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
+		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -401,6 +403,7 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
+		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -473,6 +476,7 @@ void accBasedControl::KinectEnergyControl(std::vector<float> &ang_vel, std::cond
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
+		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -737,8 +741,6 @@ void accBasedControl::Run_Logger()
 {
 	if (logging.load())
 	{
-		timestamp = (float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
-		timestamp = 1e-6*timestamp;
 		if (timestamp < m_seconds)
 			Recorder();
 		else
@@ -749,7 +751,7 @@ void accBasedControl::Run_Logger()
 void accBasedControl::UpdateControlStatus()
 {
 	char numbers_str[20];
-  m_eixo_in->ReadPDO02();
+  	m_eixo_in->ReadPDO02();
 	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
 	switch (m_control_mode)
 	{
@@ -798,6 +800,26 @@ void accBasedControl::UpdateControlStatus()
 	}
 	sprintf(numbers_str, "%4.2f", 1 / control_t_Dt);
   ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n " + std::to_string(downsample) + "\n";
+}
+
+std::vector<float>* accBasedControl::TCPMessage()
+{
+	std::vector<float> v(9);	// 9 floats
+	switch (m_control_mode)
+		{
+		case MTC:
+			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor};
+			break;
+		case ATC:
+			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor};
+			break;
+		case ITC:
+			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, torque_m};
+			break;
+		default:
+			break;
+		}// everything logged in standard units (SI)
+	return &v;
 }
 
 void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)
