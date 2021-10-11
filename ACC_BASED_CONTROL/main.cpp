@@ -431,7 +431,7 @@ int main(int argc, char **argv)
     Mode control_mode;
     int log_time;
 
-    printf("Choose the control mode:\n[0] MTC\n[1] ATC\n[2] ITC\n[3] KTC\n");
+    printf("Choose the control mode:\n[0] MTC\n[1] ATC\n[2] ITC\n[3] STC\n");
     scanf("%d", &control_mode);
     while (control_mode > 3 || control_mode < 0)
     {
@@ -591,8 +591,8 @@ int main(int argc, char **argv)
     case ITC:
       controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
       break;
-    case KTC:
-      controller_t = std::thread(&accBasedControl::KinectEnergyControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
+    case STC:
+      controller_t = std::thread(&accBasedControl::SeaFeedbackControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
       break;
     }
 

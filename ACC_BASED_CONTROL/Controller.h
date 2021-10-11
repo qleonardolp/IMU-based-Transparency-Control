@@ -123,7 +123,7 @@ typedef Matrix<float, KF_STATE_DIM, KF_STATE_DIM> StateSzMtx;
 typedef Matrix<float, KF_SENSOR_DIM, KF_SENSOR_DIM> SensorSzMtx;
 typedef Matrix<float, KF_STATE_DIM, KF_CTRL_DIM>	ControlSzMtx;
 
-enum Mode{MTC, ATC, ITC, KTC};
+enum Mode{MTC, ATC, ITC, STC};
 
 class accBasedControl
 {
@@ -144,7 +144,7 @@ public:
 		{
 		case MTC:
 		case ITC:
-		case KTC:
+		case STC:
 			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF, accBasedController
 			break;
 		case ATC:
@@ -335,8 +335,8 @@ public:
 	// Basic Impedance Control
 	void ImpedanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
-	// Kinect Energy Control
-	void KinectEnergyControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+	// SEA Feedback Control
+	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	// Collocated Admittance Controller using q and tau_e and tau_m
 	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
@@ -397,7 +397,7 @@ public:
 		{
 		case MTC:
 		case ITC:
-		case KTC:
+		case STC:
 			m_eixo_in->PDOsetCurrentSetpoint(0);
 			m_eixo_in->WritePDO01();
 			break;

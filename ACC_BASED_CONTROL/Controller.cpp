@@ -413,7 +413,7 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 	}
 }
 
-void accBasedControl::KinectEnergyControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// KTC
+void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// STC
 {
 	while (Run.load())
 	{
@@ -451,7 +451,9 @@ void accBasedControl::KinectEnergyControl(std::vector<float> &ang_vel, std::cond
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
 		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
 		updateKalmanFilter();
-		torque_m =  1.00*0.5*(kf_vel_hum*kf_vel_hum - kf_vel_exo*kf_vel_exo) + 0.10*(kf_vel_hum*kf_acc_hum - kf_vel_exo*kf_acc_exo); // Kp*E_err + Kd*dE_err
+		float v_error = kf_vel_hum - kf_vel_act;
+		float p_error = kf_pos_hum - kf_pos_act;
+		torque_m = B_EQ*v_error + STIFFNESS*p_error - torque_sea; // pensar no grav_comp!
 #else
 		downsample++;
 		if (downsample >= IMU_DELAY){
@@ -466,7 +468,9 @@ void accBasedControl::KinectEnergyControl(std::vector<float> &ang_vel, std::cond
 			downsample = 1;
 		}
 
-		torque_m =  1.00*0.5*(vel_hum*vel_hum - vel_exo*vel_exo) + 0.10*(vel_hum*acc_hum - vel_exo*acc_exo); // Kp*E_err + Kd*dE_err
+		float v_error = vel_hum - vel_motor_filt;
+		IntVelBIC = update_i(v_error, STIFFNESS, (setpoint_filt > CURRENT_MAX), &IntVelBIC);
+		torque_m =  B_EQ*v_error + IntVelBIC - torque_sea; // pensar no grav_comp!
 
 #endif
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
