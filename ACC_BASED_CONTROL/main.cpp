@@ -657,9 +657,8 @@ int main(int argc, char **argv)
       //char *hello = "Hello from server, port 2324";
       //iSendResult = send(ClientSocket, hello, strlen(hello), 0);
 
-      auto vector_msg = xsens2Eposcan.TCPMessage();
-      //float msg[] = {1,2,3,4,5,6,7,8,9};
-      iSendResult = send(ClientSocket, (const char*)vector_msg, sizeof(vector_msg), 0);
+      auto tcp_msg = xsens2Eposcan.TCPMessage();
+      iSendResult = send(ClientSocket, tcp_msg, strlen(tcp_msg), 0);
 
       if (printer == (int)RATE / 4) // printing the status @ 4Hz
       {

@@ -802,24 +802,26 @@ void accBasedControl::UpdateControlStatus()
   ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n " + std::to_string(downsample) + "\n";
 }
 
-std::vector<float>* accBasedControl::TCPMessage()
+char* accBasedControl::TCPMessage()
 {
-	std::vector<float> v(9);	// 9 floats
 	switch (m_control_mode)
 		{
 		case MTC:
-			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor};
+			sprintf(tcp_message,"%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor);
 			break;
 		case ATC:
-			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor};
+			sprintf(tcp_message,"%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor);
 			break;
 		case ITC:
-			v = {timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, torque_m};
+			sprintf(tcp_message,"%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, torque_m);
 			break;
 		default:
 			break;
 		}// everything logged in standard units (SI)
-	return &v;
+	return tcp_message;
 }
 
 void accBasedControl::SavitskyGolay(float window[], float newest_value, float* first_derivative)

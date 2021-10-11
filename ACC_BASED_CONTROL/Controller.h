@@ -357,7 +357,10 @@ public:
 	std::string ctrl_word;
 
 	// Update and pass TCP message reference
-	std::vector<float>* TCPMessage(); 
+	char* TCPMessage(); 
+
+	// TCP message char vector
+	char tcp_message[250];
 
 	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
 	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
