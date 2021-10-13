@@ -811,7 +811,7 @@ char* accBasedControl::TCPMessage()
 	switch (m_control_mode)
 		{
 		case MTC:
-			sprintf(tcp_message,"%05.3f,%05.3f,%05.3f,%05.3f,%05.3f,%05.3f,%05.3f,%05.3f,%05.3f", \
+			sprintf(tcp_message,"%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor);
 			break;
 		case ATC:

@@ -41,8 +41,10 @@ xlabel('time (s)'), ylabel('deg/s, deg/ss')
 grid on
 
 PORT = 2324;
-echotcpip('on', PORT)           % Tirar na execucao com o Exo
+%echotcpip('on', PORT)           % Tirar na execucao com o Exo
 tcp = tcpip('127.0.0.1',PORT);
+tcp.TransferDelay = 'off';
+tcp.InputBufferSize = 64;
 fopen(tcp);
 tcp.Status
 sendString = "%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n";
@@ -51,23 +53,25 @@ sample_period = 0.05;
 %%
 tic;
 last_toc = toc;
+flushinput(tcp);
 while( true )
-    fprintf(tcp, sendString, rand(1)*ones(9,1)); % Tirar na execução
+    %fprintf(tcp, sendString, rand(1)*ones(9,1)); % Tirar na execução
     if (toc - last_toc) > sample_period
         data = fscanf(tcp, receiveString);
         data(2:end) = rad2deg(data(2:end));
+%         data
 %         addpoints(h1, toc, sin(2*pi*toc));
 %         addpoints(h2, toc, 1.2*sin(2*pi*toc));
 %         addpoints(h3, toc, sin(2*pi*toc)+1);
 %         addpoints(h4, toc, 1.2*sin(2*pi*toc)+1);
         addpoints(h1, toc, data(2));
         addpoints(h2, toc, data(3));
-        addpoints(h3, toc, data(4));
-        addpoints(h4, toc, data(5));
+%         addpoints(h3, toc, data(4));
+%         addpoints(h4, toc, data(5));
         addpoints(h5, toc, data(6));
         addpoints(h6, toc, data(7));
-        addpoints(h7, toc, data(8));
-        addpoints(h8, toc, data(9));
+%         addpoints(h7, toc, data(8));
+%         addpoints(h8, toc, data(9));
         drawnow
         last_toc = toc;
     end

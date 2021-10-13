@@ -157,6 +157,18 @@ int main(int argc, char **argv)
     //return 1;
   }
 
+  BOOL bOptVal = TRUE;
+  int  bOptLen = sizeof(BOOL);
+
+  iResult = setsockopt(ListenSocket, IPPROTO_TCP, TCP_NODELAY, (char*) &bOptVal, bOptLen);
+  if (iResult == SOCKET_ERROR)
+  {
+    printf("setsockopt failed with error: %d\n", WSAGetLastError());
+    closesocket(ListenSocket);
+    WSACleanup();
+    //return 1;
+  }
+
   freeaddrinfo(result);
 
   iResult = listen(ListenSocket, SOMAXCONN);
