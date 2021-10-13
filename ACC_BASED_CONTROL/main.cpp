@@ -640,7 +640,7 @@ int main(int argc, char **argv)
         delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
         delay = 1e-3 * delay;
 
-        printer++;
+        //printer++; dont print
         scan_file++;
 
         loop_duration = clock() - beginning;

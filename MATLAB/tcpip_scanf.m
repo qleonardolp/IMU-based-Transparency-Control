@@ -1,3 +1,3 @@
 while(true)
-    fscanf(t)
+    fscanf(tcp, "%.3f,%.3f\n")
 end
