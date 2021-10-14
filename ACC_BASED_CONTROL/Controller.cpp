@@ -309,10 +309,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 #endif
 
-		vel_adm = C1*vel_adm + C2*(accbased_comp + grav_comp - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+		float des_tsea = accbased_comp + grav_comp;
+		vel_adm = C1*vel_adm + C2*(des_tsea - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
     	//vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
-		des_tsea_last = accbased_comp + grav_comp;
 		torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
+		des_tsea_last = des_tsea;
 
 #if KF_ENABLE
 		vel_motor = vel_adm + kf_vel_hum;
@@ -391,7 +392,7 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		}
 
 		float v_error = vel_hum - vel_exo;
-		IntVelBIC = update_i(v_error, Kp_bic, (setpoint_filt > CURRENT_MAX), &IntVelBIC);
+		IntVelBIC = update_i(v_error, Kp_bic, (IntVelBIC > 1000), &IntVelBIC);
 		torque_m =  Kd_bic*v_error + IntVelBIC;
 
 #endif
@@ -452,7 +453,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		updateKalmanFilter();
 		float v_error = kf_vel_hum - kf_vel_act;
 		float p_error = kf_pos_hum - kf_pos_act;
-		float torque_error =  B_EQ*v_error + STIFFNESS*p_error - (torque_sea + grav_comp);
+		float torque_error =  B_EQ*v_error + STIFFNESS*p_error - (torque_sea - grav_comp);
 		torque_m =  Kp_bic*torque_error + Kd_bic*(torque_error - torque_error_last)/C_DT;
 		torque_error_last = torque_error;
 #else
@@ -470,8 +471,8 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		}
 
 		float v_error = vel_hum - vel_motor_filt;
-		IntVelBIC = update_i(v_error, STIFFNESS, (setpoint_filt > CURRENT_MAX), &IntVelBIC);
-		float torque_error =  B_EQ*v_error + IntVelBIC - (torque_sea + grav_comp);
+		IntVelBIC = update_i(v_error, STIFFNESS,  (IntVelBIC > 1000), &IntVelBIC);
+		float torque_error =  B_EQ*v_error + IntVelBIC - (torque_sea - grav_comp);
 		torque_m =  Kp_bic*torque_error + Kd_bic*(torque_error - torque_error_last)/C_DT;
 		torque_error_last = torque_error;
 

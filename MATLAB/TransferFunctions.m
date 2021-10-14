@@ -283,8 +283,8 @@ LagComp = (w_p/w_z)*tf([1 w_z],[1 w_p]);
 w_z = 100;
 w_p = w_z*1e1;
 LeadComp = (w_p/w_z)*tf([1 w_z],[1 w_p]);
-% figure,
-% bode(LagComp*LeadComp, LeadComp), grid on
+figure,
+bode(LagComp*LeadComp, LeadComp), grid on
 
 % Das deduções de Zh realizadas em MTC e ATC, e da Zh desejada do usuário:
 % FT do erro de Zh:
@@ -313,4 +313,8 @@ legend('Zm', 'Za', 'Zi', 'Zf', 'Zh')
 
 % Condições de Transparência e Passividade
 %MTC: Ki > 0,  0 < Kp < 0.5*Jh - Je => (Je < 0.5*Jh) 
-
+%%
+Kadm = 2.0;
+Dadm = 12;
+C2 = (1 - Kadm/Ks) / (0.0012*Kadm + Dadm)
+C1 = Dadm / (Dadm + Kadm*0.0012)
