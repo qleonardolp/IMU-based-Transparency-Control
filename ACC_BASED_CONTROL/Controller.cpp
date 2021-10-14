@@ -452,7 +452,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		updateKalmanFilter();
 		float v_error = kf_vel_hum - kf_vel_act;
 		float p_error = kf_pos_hum - kf_pos_act;
-		float torque_error =  B_EQ*v_error + STIFFNESS*p_error - (torque_sea - grav_comp);
+		float torque_error =  B_EQ*v_error + STIFFNESS*p_error - (torque_sea + grav_comp);
 		torque_m =  Kp_bic*torque_error + Kd_bic*(torque_error - torque_error_last)/C_DT;
 		torque_error_last = torque_error;
 #else
@@ -471,7 +471,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 
 		float v_error = vel_hum - vel_motor_filt;
 		IntVelBIC = update_i(v_error, STIFFNESS, (setpoint_filt > CURRENT_MAX), &IntVelBIC);
-		float torque_error =  B_EQ*v_error + IntVelBIC - (torque_sea - grav_comp);
+		float torque_error =  B_EQ*v_error + IntVelBIC - (torque_sea + grav_comp);
 		torque_m =  Kp_bic*torque_error + Kd_bic*(torque_error - torque_error_last)/C_DT;
 		torque_error_last = torque_error;
 

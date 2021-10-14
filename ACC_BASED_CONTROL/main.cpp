@@ -147,6 +147,7 @@ int main(int argc, char **argv)
     //return 1;
   }
 
+#if TCP_ENABLE
   // Setup the TCP listening socket
   iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
   if (iResult == SOCKET_ERROR)
@@ -172,7 +173,6 @@ int main(int argc, char **argv)
 
   freeaddrinfo(result);
 
-#if TCP_ENABLE
   iResult = listen(ListenSocket, SOMAXCONN);
   if (iResult == SOCKET_ERROR)
   {
@@ -682,7 +682,7 @@ int main(int argc, char **argv)
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
         std::cout << wirelessMasterCallback.mtw_event << std::endl;
-        std::cout << " " << iSendResult << std::endl;
+        //std::cout << " " << iSendResult << std::endl;
         printer = 0;
       }
     }
