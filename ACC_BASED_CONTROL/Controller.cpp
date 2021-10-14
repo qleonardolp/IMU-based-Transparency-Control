@@ -277,7 +277,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(0.92*LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
@@ -712,6 +712,7 @@ void accBasedControl::Recorder()
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, vel_motor_filt, acc_motor);
 			break;
 		case ATC:
+    case STC:
 			fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
 			timestamp, vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l, torque_sea, vel_motor);
 			break;

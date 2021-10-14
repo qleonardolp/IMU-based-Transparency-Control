@@ -1,5 +1,5 @@
 Kff 1.00
 Kp 0.0
 Ki 0.0
-STF 2.00
-DAM 12
+STF 2.0
+DAM 8.0
