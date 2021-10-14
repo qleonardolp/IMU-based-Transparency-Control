@@ -608,16 +608,11 @@ void accBasedControl::Run_Logger()
 void accBasedControl::UpdateControlStatus()
 {
 	char numbers_str[20];
-  	m_eixo_in->ReadPDO02();
-	actualVelocity = m_eixo_in->PDOgetActualVelocity();  //  [rpm]
+
 	switch (m_control_mode)
 	{
 	case MTC:
-		ctrl_word = " ACC CONTROLLER\n";
-		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_c);
-		ctrl_word += " Setpoint Position: " + (std::string) numbers_str + " | ";
-		sprintf(numbers_str, "%+5.3f", 180 / MY_PI*theta_l);
-		ctrl_word += "Leg Position: " + (std::string) numbers_str + " deg\n";
+		ctrl_word = " MTC CONTROLLER\n";
 		sprintf(numbers_str, "%+5d", actualCurrent);
 		ctrl_word += " Current: " + (std::string) numbers_str + " mA\n";
 		sprintf(numbers_str, "%5.3f", Kff_acc);
@@ -626,37 +621,52 @@ void accBasedControl::UpdateControlStatus()
 		ctrl_word += " Kp: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", Ki_acc);
 		ctrl_word += " Ki: " + (std::string) numbers_str + "\n";
-		ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m\n";
-		ctrl_word += " Int K: " + std::to_string(int_stiffness) + "\n";
 		break;
 	case ATC:
-		ctrl_word = " SPEED CONTROLLER\n";
+		ctrl_word = " ATC CONTROLLER\n";
 		sprintf(numbers_str, "%+5.3f", vel_motor);
-		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm ";
-		sprintf(numbers_str, "%+2.3f", abs(actualVelocity / SPEED_CONST));
-		ctrl_word += "[" + (std::string) numbers_str + " V]\n";
+		ctrl_word += " vel_motor: " + (std::string) numbers_str + " rpm\n";
 		sprintf(numbers_str, "%5.3f", stiffness_d);
 		ctrl_word += " STF: " + (std::string) numbers_str;
 		sprintf(numbers_str, "%5.3f", damping_d);
 		ctrl_word += " DAM: " + (std::string) numbers_str + "\n";
-    ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m " +\
-    std::to_string(180 / MY_PI*theta_l) + " " + std::to_string(180 / MY_PI*theta_c) + "\n";
-		ctrl_word += " InvDyn: " + std::to_string(grav_comp) + " N.m ";
-		ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
-    ctrl_word += "\n -> Passivity Constraints <-\n ";
-
+    	ctrl_word += "\n -> Passivity Constraints <-\n ";
 		k_bar = 1 - stiffness_d / STIFFNESS;
 		kd_min = damping_d*(Ki_adm / Kp_adm - 1 / JACT*(damping_d / k_bar - Kp_adm));
-
-		ctrl_word += std::to_string(kd_min) + " < kd < " + std::to_string(kd_max) + "\n\n";
+		ctrl_word += std::to_string(kd_min) + " < STF_d < " + std::to_string(kd_max) + "\n\n";
 		break;
 	case ITC:
+		ctrl_word = " ITC CONTROLLER\n";
+		sprintf(numbers_str, "%+5d", actualCurrent);
+		ctrl_word += " Current: " + (std::string) numbers_str + " mA\n";
+		sprintf(numbers_str, "%5.3f", Kff_acc);
+		ctrl_word += " Kff: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kp_bic);
+		ctrl_word += " Kp: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kd_bic);
+		ctrl_word += " Kd: " + (std::string) numbers_str + "\n";
+		break;
+	case STC:
+		ctrl_word = " STC CONTROLLER\n";
+		sprintf(numbers_str, "%+5d", actualCurrent);
+		ctrl_word += " Current: " + (std::string) numbers_str + " mA\n";
+		sprintf(numbers_str, "%5.3f", Kff_acc);
+		ctrl_word += " Kff: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kp_bic);
+		ctrl_word += " Kp: " + (std::string) numbers_str;
+		sprintf(numbers_str, "%5.3f", Kd_bic);
+		ctrl_word += " Kd: " + (std::string) numbers_str + "\n";
 		break;
 	default:
 		break;
 	}
-	sprintf(numbers_str, "%4.2f", 1 / control_t_Dt);
-  ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n " + std::to_string(downsample) + "\n";
+	ctrl_word += " T_Sea: " + std::to_string(torque_sea) + " N.m" +\
+ 	" Motor Encoder " + std::to_string(180 / MY_PI*theta_c) +\
+	" Leg Encoder " + std::to_string(180 / MY_PI*theta_l) + "\n";
+	ctrl_word += " InvDyn: " + std::to_string(grav_comp) + " N.m ";
+	ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
+	sprintf(numbers_str, "%4.2f", (1/control_t_Dt) );
+  	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
 }
 
 char* accBasedControl::TCPMessage()
