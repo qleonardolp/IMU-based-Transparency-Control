@@ -337,6 +337,17 @@ public:
 
 	// SEA Feedback Control
 	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+	
+	// Generic Controller
+	void Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+
+	void accFeedforward();
+
+	void Admittance();
+	
+	void Impedance();
+	
+	void SeaFeedback();
 
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
@@ -373,6 +384,9 @@ public:
 
 	// Set Current setpoint on EPOS within safe limits
 	void SetEposCurrentLimited(float current_stp);
+
+	// Set Motor Torque on EPOS with safe limits
+	void SetMotorTorque(float torque_stp);
 
 	// Set Current setpoint on EPOS within safe limits, applying RADS2RPM*GEAR_RATIO
 	void SetEposVelocityLimited(float speed_stp);

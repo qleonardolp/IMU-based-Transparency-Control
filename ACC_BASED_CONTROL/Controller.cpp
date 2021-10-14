@@ -496,6 +496,143 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 	}
 }
 
+void accBasedControl::Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// Generic Controller
+{
+	while (Run.load())
+	{
+		unique_lock<mutex> Lk(m);
+		cv.notify_one();
+
+		control_t_begin = steady_clock::now();
+
+    //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
+    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+
+		m_epos->sync();	// CAN Synchronization
+
+		// Positions Measurement:
+		m_eixo_out->ReadPDO01(); theta_l = ((float)(-m_eixo_out->PDOgetActualPosition() - pos0_out) / ENCODER_OUT) * 2 * MY_PI;				// [rad]
+		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
+		
+		torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));		// tau_s = Ks*(theta_a - theta_e)
+		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+
+		// Motor Velocity
+		m_eixo_in->ReadPDO02();
+		vel_motor = RPM2RADS / GEAR_RATIO * m_eixo_in->PDOgetActualVelocity();
+		// Motor Current
+		m_eixo_in->ReadPDO01();
+		actualCurrent = m_eixo_in->PDOgetActualCurrent();
+
+		vel_motor_filt += 0.1016*(vel_motor - vel_motor_filt);	// SMF for 840Hz and fc 15Hz
+		acc_motor = (vel_motor_filt - vel_motor_last)*C_RATE;
+		vel_motor_last = vel_motor_filt;
+		acc_motor = AccMtrFilt.apply(acc_motor);
+
+#if KF_ENABLE
+		// Assigning the measured states to the Sensor reading Vector
+		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
+		uk << ang_vel[0], grav_comp, 0.001f*actualCurrent; //ok
+		updateKalmanFilter();
+#else
+		downsample++;
+		if (downsample >= IMU_DELAY){
+			vel_hum = ang_vel[0];
+			vel_exo = ang_vel[1];
+			acc_hum = (vel_hum - vel_hum_last)*RATE;
+			acc_exo = (vel_exo - vel_exo_last)*RATE;
+			acc_hum = AccHumFilt.apply(acc_hum);
+			acc_exo = AccExoFilt.apply(acc_exo);
+			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
+			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
+			downsample = 1;
+		}
+#endif
+
+		switch (m_control_mode)
+		{
+		case MTC:
+			accFeedforward();
+			break;
+		case ATC:
+			Admittance();
+			break;
+		case ITC:
+			Impedance();
+			break;
+		case STC:
+			SeaFeedback();
+			break;
+		default:
+			break;
+		}
+
+		auto control_t_end = steady_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
+
+		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		// Logging ~250 Hz
+		downsamplelog++;
+		if(downsamplelog >= LOG_DELAY){
+			Run_Logger();
+			downsamplelog = 1;
+		}
+	}
+}
+
+void accBasedControl::accFeedforward()
+{
+	accbased_comp = INERTIA_EXO*acc_hum;	// human disturbance input
+	torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+	
+	SetMotorTorque(torque_m);
+}
+
+void accBasedControl::Admittance()
+{
+	// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
+	// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
+	float C1 = damping_d / (damping_d + stiffness_d*C_DT);
+	float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
+	
+	accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+	float des_tsea = accbased_comp + abs(grav_comp);
+	vel_adm = C1*vel_adm + C2*(des_tsea - des_tsea_last - (torque_sea - torque_sea_last));   // C2*(Tsea_d_k - Tsea_d_k-1 - (Tsea_k - Tsea_k-1))
+    //vel_adm = C1*vel_adm + C2*(0 - (torque_sea - torque_sea_last));
+	torque_sea_last = torque_sea; 	// Tsea_k-1 <- Tsea_k
+	des_tsea_last = des_tsea;
+
+#if KF_ENABLE
+	vel_motor = vel_adm + kf_vel_hum;
+#else
+	vel_motor = vel_adm + vel_hum;
+#endif
+
+	SetEposVelocityLimited(vel_motor);
+}
+
+void accBasedControl::Impedance()
+{
+	float v_error = vel_hum - vel_exo;
+	IntVelBIC = update_i(v_error, Kp_bic, (IntVelBIC > 1000), &IntVelBIC);
+	torque_m =  Kd_bic*v_error + IntVelBIC;
+
+	SetMotorTorque(torque_m);
+}
+
+void accBasedControl::SeaFeedback()
+{
+	float v_error = vel_hum - vel_motor_filt;
+	IntVelBIC = update_i(v_error, STIFFNESS,  (IntVelBIC > 2000), &IntVelBIC);
+	float des_tsea = B_EQ*v_error + IntVelBIC + abs(grav_comp);
+	float torque_error =  des_tsea - torque_sea;
+	torque_m =  Kp_bic*torque_error + Kd_bic*(torque_error - torque_error_last)/C_DT;
+	torque_error_last = torque_error;
+	
+	SetMotorTorque(torque_m);
+}
+
 void accBasedControl::SetEposVelocityLimited(float speed_stp)
 {
 	int speed_limited = (int) constrain_float(RADS2RPM*GEAR_RATIO*speed_stp, -SPEED_CONST*VOLTAGE_MAX, SPEED_CONST*VOLTAGE_MAX);
@@ -510,6 +647,13 @@ void accBasedControl::SetEposCurrentLimited(float current_stp)
 	m_eixo_in->WritePDO01();
 }
 
+void accBasedControl::SetMotorTorque(float torque_stp)
+{
+	float current_stp = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_stp; 		// in Ampere!
+	actualCurrent = (int) 1000*constrain_float(current_stp, CURRENT_MAX);
+	m_eixo_in->PDOsetCurrentSetpoint(actualCurrent);						// esse argumento é em mA !!!
+	m_eixo_in->WritePDO01();
+}
 
 void accBasedControl::GainScan()
 {
