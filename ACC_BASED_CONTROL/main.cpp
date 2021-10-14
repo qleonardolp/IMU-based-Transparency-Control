@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "2324"
+#define	TCP_ENABLE		0
 
 #include <stdexcept>
 #include <iostream>
@@ -171,6 +172,7 @@ int main(int argc, char **argv)
 
   freeaddrinfo(result);
 
+#if TCP_ENABLE
   iResult = listen(ListenSocket, SOMAXCONN);
   if (iResult == SOCKET_ERROR)
   {
@@ -192,6 +194,7 @@ int main(int argc, char **argv)
 
   // No longer need server socket
   closesocket(ListenSocket);
+#endif
 
   QueryPerformanceFrequency(&TICKS_PER_SECOND);
   ticksSampleTime = TICKS_PER_SECOND.QuadPart * SAMPLE_TIME;
@@ -652,7 +655,7 @@ int main(int argc, char **argv)
         delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
         delay = 1e-3 * delay;
 
-        //printer++; dont print
+        printer++;
         scan_file++;
 
         loop_duration = clock() - beginning;
@@ -666,11 +669,10 @@ int main(int argc, char **argv)
         scan_file = 0;
       }
 
-      //char *hello = "Hello from server, port 2324";
-      //iSendResult = send(ClientSocket, hello, strlen(hello), 0);
-
+#if TCP_ENABLE
       auto tcp_msg = xsens2Eposcan.TCPMessage();
       iSendResult = send(ClientSocket, tcp_msg, strlen(tcp_msg), 0);
+#endif
 
       if (printer == (int)RATE / 4) // printing the status @ 4Hz
       {
@@ -680,7 +682,7 @@ int main(int argc, char **argv)
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
         std::cout << wirelessMasterCallback.mtw_event << std::endl;
-        std::cout << iSendResult << std::endl;
+        std::cout << " " << iSendResult << std::endl;
         printer = 0;
       }
     }

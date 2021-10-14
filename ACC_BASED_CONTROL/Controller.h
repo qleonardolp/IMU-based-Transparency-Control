@@ -145,10 +145,10 @@ public:
 		case MTC:
 		case ITC:
 		case STC:
-			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE); // For CACurrent, CACurrentKF, accBasedController
+			m_eixo_in->VCS_SetOperationMode(CURRENT_MODE);
 			break;
 		case ATC:
-			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE); // For OmegaControl or CAdmittanceControl
+			m_eixo_in->VCS_SetOperationMode(VELOCITY_MODE);
 			break;
 		default:
 			break;
@@ -338,12 +338,6 @@ public:
 	// SEA Feedback Control
 	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
-	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrent(float &velHum, std::condition_variable &cv, std::mutex &m);
-
-	// Collocated Admittance Controller using q and tau_e and tau_m
-	void CACurrentKF(float &velHum, std::condition_variable &cv, std::mutex &m);
-
 	// The method to scan the file with the values to update the gains in runtime
 	void GainScan();
 
@@ -462,10 +456,7 @@ private:
 	static float vel_adm_last;	// [rad/s]
 	static float kd_min;
 	static float kd_max;
-	// |- Acc-based Admittance Control*:
-	static float torque_u;
-	static float IntTsea;
-	static float Int2Tsea;
+
 	// |-------------------------
 
 
@@ -516,7 +507,9 @@ private:
 	static float IntAccExo;
 	static uint8_t downsample;
 	static uint8_t downsamplelog;
+	static float torque_error_last;
 	static float IntVelBIC;
+	static float IntTsea;
 
 	//		STATE MEMORY VECTORS        //
 
