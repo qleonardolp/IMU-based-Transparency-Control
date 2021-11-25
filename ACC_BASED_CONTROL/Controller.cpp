@@ -195,7 +195,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));		// tau_s = Ks*(theta_a - theta_e)
-		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*cos(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Motor Velocity
 		m_eixo_in->ReadPDO02();
@@ -231,6 +231,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		}
     	accbased_comp = INERTIA_EXO*acc_hum;	// human disturbance input
 		torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+		torque_m += abs(grav_comp);
 
 #endif
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
@@ -277,7 +278,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();
 		actualCurrent = m_eixo_in->PDOgetActualCurrent();
 
-		grav_comp  = -(0.92*LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(0.92*LOWERLEGMASS*GRAVITY*L_CG)*cos(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Putting Dt from (Tsea_k - Tsea_k-1)/Dt
 		// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
@@ -355,7 +356,7 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));		// tau_s = Ks*(theta_a - theta_e)
-		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*cos(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Motor Velocity
 		m_eixo_in->ReadPDO02();
@@ -432,7 +433,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));		// tau_s = Ks*(theta_a - theta_e)
-		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*cos(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Motor Velocity
 		m_eixo_in->ReadPDO02();
@@ -515,7 +516,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::condition_var
 		m_eixo_in->ReadPDO01();  theta_c = ((float)(m_eixo_in->PDOgetActualPosition() - pos0_in) / (ENCODER_IN * GEAR_RATIO)) * 2 * MY_PI;	// [rad]
 		
 		torque_sea = TSeaFilt.apply(STIFFNESS*(theta_c - theta_l));		// tau_s = Ks*(theta_a - theta_e)
-		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*sin(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
+		grav_comp  = -(LOWERLEGMASS*GRAVITY*L_CG)*cos(theta_l);			// inverse dynamics, \tau_W = -M g l sin(\theta_e)
 
 		// Motor Velocity
 		m_eixo_in->ReadPDO02();
@@ -585,6 +586,7 @@ void accBasedControl::accFeedforward()
 {
 	accbased_comp = INERTIA_EXO*acc_hum;	// human disturbance input
 	torque_m =  JACT*acc_motor + Kff_acc*accbased_comp + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
+	torque_m += abs(grav_comp);
 	
 	SetMotorTorque(torque_m);
 }
