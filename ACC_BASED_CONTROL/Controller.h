@@ -80,6 +80,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		JACT			0.14e-4f		// [Kg.m^2]	Maxon motor RE40 datasheet
 #define		B_EQ			30.000f		// [N.m s/rad]
 
+// Human Dynamic Parameters: ...
+#define 	J_H				0.5000f	
+#define 	B_H				2.0000f	
+#define 	K_H				40.000f	
+
 // Feedforward-Feedback PI acc-based controller:
 #define		  K_FF			1.0000f		// [dimensionless]
 #define     KP_A			4.5600f     // [Kg.m^2]
@@ -114,6 +119,10 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define KF_CTRL_DIM   3
 #define IMU_DELAY 	   (int)	C_RATE/RATE			// N Samples of the main loop rate
 
+// KF human-based
+#define KFH_STATE_DIM 8
+#define KFH_SENSOR_DIM 5
+
 using namespace Eigen;
 
 typedef Matrix<float, KF_STATE_DIM, 1> StateSzVec;
@@ -122,6 +131,13 @@ typedef Matrix<float, KF_CTRL_DIM, 1> ControlSzVec;
 typedef Matrix<float, KF_STATE_DIM, KF_STATE_DIM> StateSzMtx;
 typedef Matrix<float, KF_SENSOR_DIM, KF_SENSOR_DIM> SensorSzMtx;
 typedef Matrix<float, KF_STATE_DIM, KF_CTRL_DIM>	ControlSzMtx;
+
+// KF human-based
+typedef Matrix<float, KFH_STATE_DIM, 1>  kfhStateVec;
+typedef Matrix<float, KFH_SENSOR_DIM, 1> kfhSensorVec;
+typedef Matrix<float, KFH_STATE_DIM, KFH_STATE_DIM>  kfhStateMtx;
+typedef Matrix<float, KFH_SENSOR_DIM, KFH_SENSOR_DIM> kfhSensorMtx;
+
 
 enum Mode{MTC, ATC, ITC, STC};
 
@@ -198,55 +214,6 @@ public:
 			}
 		}
 
-		//		KALMAN FILTER SETUP		//
-		CAC_xk.setZero();
-		CAC_zk.setZero();
-		CAC_KG.setZero();
-
-		CAC_Fk.setZero();
-		// Row 1
-		CAC_Fk(0, 0) = 1;
-		// Row 2
-		CAC_Fk(1, 1) = 1;
-		// Row 3
-		CAC_Fk(2, 1) = C_DT;
-		CAC_Fk(2, 2) = 1;
-		// Row 4
-		CAC_Fk(3, 3) = 1;
-		// Row 5
-		CAC_Fk(4, 2) = STIFFNESS;
-		CAC_Fk(4, 3) = -STIFFNESS;
-
-		CAC_Bk.setZero();
-		CAC_Bk(1, 0) = C_DT;
-		CAC_Bk(2, 0) = 0.500f * C_DT * C_DT;
-
-		CAC_Hk.setZero();
-		CAC_Hk(0, 0) = 1;
-		CAC_Hk(1, 1) = 1;
-		CAC_Hk(2, 2) = 1;
-		CAC_Hk(3, 3) = 1;
-
-		CAC_Pk.setZero();
-		CAC_Pk(0, 0) = pow(0.0023400, 2); // devpad = devpad(vel_hum measured*)
-		CAC_Pk(1, 1) = pow(0.0059438, 2); // devpad = devpad(vel_motor) + Dt*devpad(torque_m/JACT)
-		CAC_Pk(2, 2) = pow(0.0000154, 2); // devpad = devpad(theta_c) + Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/JACT)
-		CAC_Pk(3, 3) = pow(0.0030700, 2); // 2*pi/2048
-		CAC_Pk(4, 4) = pow(0.3203400, 2); // devpad = Ksea*(devpad(theta_c) + devpad(theta_l))
-
-		CAC_Rk.setZero();
-		CAC_Rk(0, 0) = pow(0.0023400, 2); // MTw Noise x sqrt(Bandwidth) in rad/s, check MTw Technical Specs
-		CAC_Rk(1, 1) = pow(0.0048800, 2); // Considering 7 rpm devpad: 7 * RPM2RADS / GEAR_RATIO
-		CAC_Rk(2, 2) = pow(0.0000100, 2); // 2*pi/(4096*GEAR_RATIO)
-		CAC_Rk(3, 3) = pow(0.0030700, 2); // 2*pi/2048
-
-		// additional uncertainty from the environment
-		CAC_Qk.setZero();
-		CAC_Qk(0, 0) = pow(0.0000234, 2);
-		CAC_Qk(1, 1) = pow(0.0010638, 2); // Dt*devpad(torque_m/JACT)
-		CAC_Qk(2, 2) = pow(0.0000054, 2); // Dt*devpad(vel_motor) + 0.5*Dt^2*devpad(torque_m/JACT)
-		CAC_Qk(3, 3) = pow(0.0000307, 2);
-		CAC_Qk(4, 4) = pow(0.0032034, 2);
 
 		//	Kalman Filter SETUP		//
 		int_stiffness = STIFFNESS/20;
@@ -312,16 +279,41 @@ public:
 		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);
 		Qk(5,5) = pow(( 1/JACT*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
 
+
+		// Human-based Kalman Filter Setup:
+		KFH_xk.setZero();
+		KFH_zk.setZero();
+		KFH_Fk.setZero();
+		KFH_At.setZero();
+		KFH_Gk.setZero();
+		KFH_Bt.setZero();
+		KFH_Ck.setZero();
+		KFH_KG.setZero();
+
+		KFH_Pk = 0.100f*kfhStateMtx::Identity(); // P(k=0)
+		KFH_Qk = 0.007f*kfhStateMtx::Identity();
+		KFH_Rk = 0.010f*kfhSensorMtx::Identity();
+		//...
+
+		//KFH_Fk = discretize_A(&KFH_At, C_DT);
+		//KFH_Gk = discretize_B(&KFH_At, &KFH_Bt, C_DT);
+
 	}
 
 	// Kalman Filter loop
 	void updateKalmanFilter();
 
+	// Human-based Kalman
+	void updateHumKalmanFilter();
+
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
 
 	// Discretize state-space control matrix
-	ControlSzMtx discretize_B(StateSzMtx* A, ControlSzMtx* B, float dt);
+	ControlSzMtx discretize_B(StateSzMtx* A, ControlSzMtx* B, float dt); // pensar em uma forma de usar templates para ficar independente do tipo de variavel
+
+	// Discretize state-space control matrix
+	template <typename T> T discB(kfhStateMtx* A, T* B,  float dt);
 
 	// Kalman Log
 	void kalmanLogger();
@@ -534,18 +526,19 @@ private:
 	float theta_l_vec[SGVECT_SIZE];		// [rad]
 	float theta_c_vec[SGVECT_SIZE];		// [rad]
 
-	//		Kalman Filter		//
+	//		Kalman Filter: human-based model designed with Felix M. Escalante //
 
-	static Matrix<float, 5, 1> CAC_xk;	// State Vector				[vel_hum vel_motor theta_c theta_l torque_sea]
-	static Matrix<float, 4, 1> CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
-	static Matrix<float, 5, 5> CAC_Pk;	// State Covariance Matrix
-	static Matrix<float, 5, 5> CAC_Fk;	// Prediction Matrix
-	static Matrix<float, 5, 1> CAC_Bk;	// Control Matrix (is a vector but called matrix)
-	static Matrix<float, 1, 1> CAC_uk; // Control Vector
-	static Matrix<float, 5, 5> CAC_Qk;	// Process noise Covariance
-	static Matrix<float, 4, 4> CAC_Rk;	// Sensor noise Covariance
-	static Matrix<float, 4, 5> CAC_Hk;	// Sensor Expectations Matrix
-	static Matrix<float, 5, 4> CAC_KG;	// Kalman Gain Matrix
+	static kfhStateVec  KFH_xk;	// State Vector				[....]
+	static kfhSensorVec KFH_zk;	// Sensor reading Vector	[....]
+	static kfhStateMtx  KFH_Pk;	// State Covariance Matrix
+	static kfhStateMtx  KFH_At;	// Prediction Matrix (continuous)
+	static kfhStateMtx  KFH_Fk;	// Prediction Matrix (discrete)
+	static kfhStateVec  KFH_Bt;	// Control Matrix (continuous)
+	static kfhStateVec  KFH_Gk;	// Control Matrix (discrete)
+	static kfhStateMtx  KFH_Qk;	// Process noise Covariance
+	static kfhSensorMtx KFH_Rk;	// Sensor noise Covariance
+	static Matrix<float,KFH_SENSOR_DIM,KFH_STATE_DIM> KFH_Ck;	// Sensor Expectations Matrix
+	static Matrix<float,KFH_STATE_DIM,KFH_SENSOR_DIM> KFH_KG;	// Kalman Gain Matrix
 
 	//	Kalman Filter	//
 	// State vector is  [tau_i x_h x_e x_a \dot{x_e} \dot{x_a}]

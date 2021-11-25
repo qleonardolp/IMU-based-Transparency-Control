@@ -60,18 +60,6 @@ float accBasedControl::Kp_bic(0);
 float accBasedControl::Kd_bic(0);
 
 
-//		CACu Kalman Filter						//
-Matrix<float, 5, 1> accBasedControl::CAC_xk;	// State Vector				[vel_hum vel_adm vel_motor theta_c theta_l torque_sea d_torque_sea]
-Matrix<float, 4, 1> accBasedControl::CAC_zk;	// Sensor reading Vector	[vel_hum vel_motor theta_c theta_l]
-Matrix<float, 5, 5> accBasedControl::CAC_Pk;	// State Covariance Matrix
-Matrix<float, 5, 5> accBasedControl::CAC_Fk;	// Prediction Matrix
-Matrix<float, 5, 1> accBasedControl::CAC_Bk;	// Control Matrix (is a vector but called matrix)
-Matrix<float, 1, 1> accBasedControl::CAC_uk;	// Control Vector
-Matrix<float, 5, 5> accBasedControl::CAC_Qk;	// Process noise Covariance
-Matrix<float, 4, 4> accBasedControl::CAC_Rk;	// Sensor noise Covariance
-Matrix<float, 4, 5> accBasedControl::CAC_Hk;	// Sensor Expectations Matrix
-Matrix<float, 5, 4> accBasedControl::CAC_KG;	// Kalman Gain Matrix
-
 //	Kalman Filter	//
 StateSzVec accBasedControl::xk;	// State Vector
 SensorSzVec accBasedControl::zk;	// Sensor reading Vector
