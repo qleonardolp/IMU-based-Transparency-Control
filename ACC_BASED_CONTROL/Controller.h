@@ -358,6 +358,12 @@ public:
 		KFH_Ck(3,6) = 1.0000f;
 		KFH_Ck(4,7) = 1.0000f;
 
+		// qASGD-KF for IMUs AHRS:
+		qASGD1_Pk.setIdentity();
+		qASGD2_Pk.setIdentity();
+		qASGD1_qk << 1,0,0,0;
+		qASGD2_qk << 1,0,0,0;
+
 	}
 
 	// Kalman Filter loop
@@ -365,6 +371,8 @@ public:
 
 	// Human-based Kalman
 	void updateHumKalmanFilter();
+
+	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc);
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
@@ -642,6 +650,13 @@ private:
 	static LowPassFilter2pFloat  AccExoFilt;
 	static LowPassFilter2pFloat  AccMtrFilt;
 	static LowPassFilter2pFloat  TSeaFilt;
+
+	// qASGD Kalman for AHRS: 
+	// (WANG, Li; ZHANG, Zheng; SUN, Ping. Quaternion-based Kalman filter for AHRS using an adaptive-step gradient descent algorithm.)
+	static Vector4f qASGD1_qk;
+	static Matrix4f qASGD1_Pk;
+	static Vector4f qASGD2_qk;
+	static Matrix4f qASGD2_Pk;
 
 };
 

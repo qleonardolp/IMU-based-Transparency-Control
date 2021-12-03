@@ -86,6 +86,12 @@ kfhSensorMtx accBasedControl::KFH_Rk;	// Sensor noise Covariance
 Matrix<float,KFH_SENSOR_DIM,KFH_STATE_DIM> accBasedControl::KFH_Ck;	// Sensor Expectations Matrix
 Matrix<float,KFH_STATE_DIM,KFH_SENSOR_DIM> accBasedControl::KFH_KG;	// Gain Matrix
 
+// qASGD-KF for IMUs AHRS:
+Vector4f accBasedControl::qASGD1_qk;
+Matrix4f accBasedControl::qASGD1_Pk;
+Vector4f accBasedControl::qASGD2_qk;
+Matrix4f accBasedControl::qASGD2_Pk;
+
 float accBasedControl::kf_pos_hum(0);
 float accBasedControl::kf_pos_exo(0);
 float accBasedControl::kf_pos_act(0);
@@ -984,5 +990,86 @@ void accBasedControl::updateHumKalmanFilter()
 	// Update
 	KFH_xk = KFH_xk + KFH_KG * (KFH_zk - KFH_Ck*KFH_xk);
 	KFH_Pk = (kfhStateMtx::Identity() - KFH_KG*KFH_Ck)*KFH_Pk;
+	
+}
+
+void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
+{
+	//Vector4f a_b(0, acc.normalized()(0), acc.normalized()(1), acc.normalized()(2));
+
+	float q0 = qASGD1_qk(0);
+	float q1 = qASGD1_qk(1);
+	float q2 = qASGD1_qk(2);
+	float q3 = qASGD1_qk(3);
+
+	/* 
+	Matrix3f Rot = Matrix3f::Identity();
+
+	Rot(0,0) = (q0*q0 + q1*q1 - q2*q2 - q3*q3);
+	Rot(0,1) = 2*(q1*q2 - q0*q3);
+	Rot(0,2) = 2*(q1*q3 + q0*q2);
+	Rot(1,0) = 2*(q1*q2 + q0*q3);
+	Rot(1,1) = (q0*q0 - q1*q1 + q2*q2 - q3*q3);
+	Rot(1,2) = 2*(q2*q3 - q0*q1);
+	Rot(2,0) = 2*(q1*q3 - q0*q2);
+	Rot(2,1) = 2*(q2*q3 + q0*q1);
+	Rot(2,2) = (q0*q0 - q1*q1 - q2*q2 - q3*q3); 
+	*/
+
+	Vector3f F_obj = Vector3f::Zero();
+	//F_obj = Rot.transpose()*Vector3f(0,0,1) - acc.normalized();
+
+	// De maneira simplificada podemos fazer apenas:
+	// g = [0 0 1]^T, portanto so nos interessa a ultima coluna de C^T:
+	Vector3f Z_c = Vector3f::Zero();
+	Z_c << 2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), (q0*q0 - q1*q1 - q2*q2 - q3*q3);
+	F_obj = Z_c - acc.normalized();	// Eq.23
+
+	Matrix<float,3,4> Jq;
+	Jq << -2*q2, 2*q3, -2*q0, 2*q1, 
+		   2*q1, 2*q0,  2*q3, 2*q2, 
+		   2*q0,-2*q1, -2*q2, 2*q3;
+	
+	Vector4f GradF;
+	GradF = Jq.transpose()*F_obj;	// Eq.25
+
+	float mi0 = 0.001;
+	float Beta = 1.00;
+	float omg_norm = gyro.norm();
+	float Ts = DELTA_T;
+
+	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
+
+	Vector4f z_k;
+	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
+
+	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+	Matrix4f R = Matrix4f::Identity()*5.476e-6;
+	Matrix4f H = Matrix4f::Identity();
+
+	Matrix4f OmG = Matrix4f::Zero();
+	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
+		 gyro(0), 0, gyro(2), -gyro(1),
+		 gyro(1), -gyro(2), 0, gyro(0),
+		 gyro(2), gyro(1), -gyro(0), 0;
+
+	OmG = 0.5*OmG;
+
+	Matrix4f Psi;
+	Psi = (1 - ((omg_norm*Ts)**2)/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+
+	// Projection:
+	qASGD1_qk = Psi*qASGD1_qk;
+	qASGD1_Pk = Psi*qASGD1_Pk*Psi.transpose() + Q;
+
+	// Kalman Gain
+	Matrix4f Kg;
+	FullPivLU<Matrix4f> TotalCovariance(H * qASGD1_Pk * H.transpose() + R);
+	if (TotalCovariance.isInvertible()){
+		Kg = qASGD1_Pk * H.transpose() * TotalCovariance.inverse();
+	}
+	// Update
+	qASGD1_qk = qASGD1_qk + Kg * (z_k - H*qASGD1_qk);
+	qASGD1_Pk = (Matrix4f::Identity() - Kg*H)*qASGD1_Pk;
 	
 }
