@@ -75,6 +75,17 @@ Matrix<float,KF_SENSOR_DIM,KF_STATE_DIM> accBasedControl::Ck;	// Sensor Expectat
 Matrix<float,KF_SENSOR_DIM,KF_CTRL_DIM> accBasedControl::Dk;	// Feedthrough Matrix
 Matrix<float,KF_STATE_DIM,KF_SENSOR_DIM> accBasedControl::KG;	// Kalman Gain Matrix
 
+
+kfhStateVec  accBasedControl::KFH_xk;	// State Vector				[dTr Tr dTi Ti dpr pr dph ph Terr]
+kfhSensorVec accBasedControl::KFH_zk;	// Sensor reading Vector	[Tr Ti pr dph ph]
+kfhStateMtx  accBasedControl::KFH_Pk;	// State Covariance Matrix
+kfhStateMtx  accBasedControl::KFH_Fk;	// Transition Matrix (discrete)
+kfhStateVec  accBasedControl::KFH_Gk;	// Control Matrix (discrete)
+kfhStateMtx  accBasedControl::KFH_Qk;	// Process noise Covariance
+kfhSensorMtx accBasedControl::KFH_Rk;	// Sensor noise Covariance
+Matrix<float,KFH_SENSOR_DIM,KFH_STATE_DIM> accBasedControl::KFH_Ck;	// Sensor Expectations Matrix
+Matrix<float,KFH_STATE_DIM,KFH_SENSOR_DIM> accBasedControl::KFH_KG;	// Gain Matrix
+
 float accBasedControl::kf_pos_hum(0);
 float accBasedControl::kf_pos_exo(0);
 float accBasedControl::kf_pos_act(0);
