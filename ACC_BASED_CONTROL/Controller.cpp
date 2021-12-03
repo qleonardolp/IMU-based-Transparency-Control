@@ -828,7 +828,7 @@ void accBasedControl::UpdateControlStatus()
 	sprintf(numbers_str, "%4.2f", (1/control_t_Dt) );
   	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
 	Vector3f euler;
-	euler = quat2euler(qASGD1_qk)*(180 / MY_PI);
+	euler = quat2euler(&qASGD1_qk)*(180 / MY_PI);
 	ctrl_word += "Euler: " + std::to_string(euler(0)) + " " + std::to_string(euler(1)) + " " + std::to_string(euler(2)) + "\n";
 }
 
@@ -1082,18 +1082,18 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 
 }
 
-Vector3f accBasedControl::quat2euler(Vector4f quat)
+Vector3f accBasedControl::quat2euler(Vector4f* quat)
 {
-	float q0 = quat(0);
-	float q1 = quat(1);
-	float q2 = quat(2);
-	float q3 = quat(3);
+	float q0 = (*quat)(0);
+	float q1 = (*quat)(1);
+	float q2 = (*quat)(2);
+	float q3 = (*quat)(3);
 
 	Vector3f euler;
 
-	euler(0) = atan2(2*q2*q3 + 2*q0*q1, q3*q3 - q2*q2 - q1*q1 + q0*q0);
-	euler(1) = -asin(2*q1*q3 - 2*q0*q2);
-	euler(2) = atan2(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
+	euler(0) = atan2f(2*q2*q3 + 2*q0*q1, q3*q3 - q2*q2 - q1*q1 + q0*q0);
+	euler(1) = -asinf(2*q1*q3 - 2*q0*q2);
+	euler(2) = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
 
 	return euler;
 }

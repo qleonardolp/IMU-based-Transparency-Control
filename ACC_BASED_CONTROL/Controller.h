@@ -376,7 +376,7 @@ public:
 	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc);
 
 	// Convert Quaternion in Euler Angles (rad)
-	Vector3f quat2euler(Vector4f quat);
+	Vector3f quat2euler(Vector4f* quat);
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
