@@ -509,7 +509,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 		unique_lock<mutex> Lk(m);
 		cv.notify_one();
 
-		control_t_begin = steady_clock::now();
+		control_t_begin = system_clock::now();
 
     //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
     //this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
@@ -553,14 +553,15 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
 
-      Vector3f acc;
+	      float Dt = (float) IMU_DELAY*control_t_Dt;
+		  Vector3f acc;
 		  Vector3f gyro;
 		  acc << imus[0], imus[1], imus[2];
 		  gyro << imus[3], imus[4], imus[5];
-		  updateqASGD1Kalman(gyro, acc);
+		  updateqASGD1Kalman(gyro, acc, Dt);
 		  acc << imus[6], imus[7], imus[8];
 		  gyro << imus[9], imus[10], imus[11];
-		  updateqASGD2Kalman(gyro, acc);
+		  updateqASGD2Kalman(gyro, acc, Dt);
 		}
 #endif
 
@@ -582,17 +583,17 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			break;
 		}
 
-		auto control_t_end = steady_clock::now();
-		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
-		control_t_Dt = 1e-6*control_t_Dt;
-
-		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
-		// Logging ~250 Hz
+		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		downsamplelog++;
-		if(downsamplelog >= LOG_DELAY){
+		if(downsamplelog >= LOG_DELAY){ // Logging ~250 Hz
 			Run_Logger();
 			downsamplelog = 1;
 		}
+		
+		std::this_thread::sleep_until(control_t_begin + microseconds(100)); // forcando a rodar @10 kHz
+		auto control_t_end = system_clock::now();
+		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
+		control_t_Dt = 1e-6*control_t_Dt;
 	}
 }
 
@@ -1006,7 +1007,7 @@ void accBasedControl::updateHumKalmanFilter()
 	
 }
 
-void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
+void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
 	//Vector4f a_b(0, acc.normalized()(0), acc.normalized()(1), acc.normalized()(2));
 
@@ -1096,7 +1097,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 
 }
 
-void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
+void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
 	float q0 = qASGD2_qk(0);
 	float q1 = qASGD2_qk(1);
@@ -1121,7 +1122,8 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 	float mi0 = 0.001;
 	float Beta = 1.00;
 	float omg_norm = gyro.norm();
-	float Ts = DELTA_T;
+	//float Ts = DELTA_T;
+	float Ts = constrain_float(Dt, 1.00e-6, 0.010);
 
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 

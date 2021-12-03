@@ -376,8 +376,8 @@ public:
 	void updateHumKalmanFilter();
 
 	// Update method for qASGD AHRS Kalman Filer
-	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc);
-	void updateqASGD2Kalman(Vector3f gyro, Vector3f acc);
+	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt);
+	void updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt);
 
 	// Convert Quaternion in Euler Angles (rad)
 	Vector3f quat2euler(Vector4f* quat);
