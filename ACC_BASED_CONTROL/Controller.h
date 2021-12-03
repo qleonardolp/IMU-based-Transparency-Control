@@ -372,7 +372,11 @@ public:
 	// Human-based Kalman
 	void updateHumKalmanFilter();
 
+	// Update method for qASGD AHRS Kalman Filer
 	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc);
+
+	// Convert Quaternion in Euler Angles (rad)
+	Vector3f quat2euler(Vector4f quat);
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
@@ -399,7 +403,7 @@ public:
 	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 	
 	// Generic Controller
-	void Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
+	void Controller(std::vector<float> &ang_vel, std::vector<float> &imus, std::condition_variable &cv, std::mutex &m);
 
 	void accFeedforward();
 

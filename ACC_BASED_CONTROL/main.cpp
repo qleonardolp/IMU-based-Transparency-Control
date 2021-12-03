@@ -591,10 +591,12 @@ int main(int argc, char **argv)
     LowPassFilter2pFloat mtwHumFiltered(XSENS_RATE, XSENS_FC);
     LowPassFilter2pFloat mtwExoFiltered(XSENS_RATE, XSENS_FC);
     std::vector<float> gyros(mtwCallbacks.size());
+    std::vector<float> imus(12);
     std::thread controller_t;
     std::condition_variable Cv;
     std::mutex Mtx;
 
+/*
     switch (control_mode)
     {
     case MTC:
@@ -610,6 +612,8 @@ int main(int argc, char **argv)
       controller_t = std::thread(&accBasedControl::SeaFeedbackControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
       break;
     }
+*/
+    controller_t = std::thread(&accBasedControl::Controller, &xsens2Eposcan, std::ref(gyros), std::ref(imus), std::ref(Cv), std::ref(Mtx));
 
     xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
 
@@ -641,11 +645,26 @@ int main(int argc, char **argv)
         mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
         gyros[0] = mtw_hum;
 
+        imus[0] = accData[0].value(0);
+        imus[1] = accData[0].value(1);
+        imus[2] = accData[0].value(2);
+        imus[3] = gyroData[0].value(0);
+        imus[4] = gyroData[0].value(1);
+        imus[5] = gyroData[0].value(2);
+
         if (mtwCallbacks.size() == 2)
         {
           mtw_exo_raw = (float)(gyroData[1].value(2) - imus_ybias[1]);
           mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
           gyros[1] = mtw_exo;
+
+          int c = 6;
+          imus[0+c] = accData[1].value(0);
+          imus[1+c] = accData[1].value(1);
+          imus[2+c] = accData[1].value(2);
+          imus[3+c] = gyroData[1].value(0);
+          imus[4+c] = gyroData[1].value(1);
+          imus[5+c] = gyroData[1].value(2);
         }
 
         Cv.notify_one();
