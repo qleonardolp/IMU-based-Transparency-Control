@@ -1064,7 +1064,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 	OmG = 0.5*OmG;
 
 	Matrix4f Psi;
-	Psi = (1 - ((omg_norm*Ts)**2)/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+	Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
