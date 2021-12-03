@@ -374,9 +374,13 @@ public:
 
 	// Update method for qASGD AHRS Kalman Filer
 	void updateqASGD1Kalman(Vector3f gyro, Vector3f acc);
+	void updateqASGD2Kalman(Vector3f gyro, Vector3f acc);
 
 	// Convert Quaternion in Euler Angles (rad)
 	Vector3f quat2euler(Vector4f* quat);
+
+	// Convert Difference Quaternion in Euler Angles (rad)
+	Vector3f quatDelta2euler(Vector4f* quat_r, Vector4f* quat_m);
 
 	// Discretize state-space transition matrix
 	StateSzMtx discretize_A(StateSzMtx* A, float dt);
