@@ -563,7 +563,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 		switch (m_control_mode)
 		{
 		case MTC:
-			accFeedforward();
+			//accFeedforward(); // descomentar aqui para rodar o Controle por Acc
 			break;
 		case ATC:
 			Admittance();
