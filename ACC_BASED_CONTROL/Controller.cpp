@@ -1055,7 +1055,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
 
-	//Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 	Matrix4f R = Matrix4f::Identity()*5.476e-6;
 	Matrix4f H = Matrix4f::Identity();
 
@@ -1077,8 +1077,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Vector4f Q;
-	Q = -0.5*Ts*Xi*(Vector3f::Ones()*sqrtf(5.476e-6));
+	Q = 0.5*Ts*Xi*(Matrix4f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
@@ -1128,7 +1127,7 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
 
-	//Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 	Matrix4f R = Matrix4f::Identity()*5.476e-6;
 	Matrix4f H = Matrix4f::Identity();
 
@@ -1150,8 +1149,7 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Vector4f Q;
-	Q = -0.5*Ts*Xi*(Vector3f::Ones()*sqrtf(5.476e-6));
+	Q = 0.5*Ts*Xi*(Matrix4f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD2_qk = Psi*qASGD2_qk;
