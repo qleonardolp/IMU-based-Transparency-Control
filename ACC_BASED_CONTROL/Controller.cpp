@@ -1055,7 +1055,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
 
-	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+	//Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 	Matrix4f R = Matrix4f::Identity()*5.476e-6;
 	Matrix4f H = Matrix4f::Identity();
 
@@ -1069,6 +1069,16 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 
 	Matrix4f Psi;
 	Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+
+	// Process noise covariance update (Eq. 19):
+	Matrix<float,4,3> Xi;
+	Xi << q0, q3, -q2,
+	     -q3, q0,  q1,
+		  q2, -q1, q0,
+		 -q1, -q2, -q3; 
+
+	Vector4f Q;
+	Q = -0.5*Ts*Xi*(Vector3f::Ones()*sqrtf(5.476e-6));
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
@@ -1118,7 +1128,7 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
 
-	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+	//Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 	Matrix4f R = Matrix4f::Identity()*5.476e-6;
 	Matrix4f H = Matrix4f::Identity();
 
@@ -1132,6 +1142,16 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 
 	Matrix4f Psi;
 	Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+
+	// Process noise covariance update (Eq. 19):
+	Matrix<float,4,3> Xi;
+	Xi << q0, q3, -q2,
+	     -q3, q0,  q1,
+		  q2, -q1, q0,
+		 -q1, -q2, -q3; 
+
+	Vector4f Q;
+	Q = -0.5*Ts*Xi*(Vector3f::Ones()*sqrtf(5.476e-6));
 
 	// Projection:
 	qASGD2_qk = Psi*qASGD2_qk;

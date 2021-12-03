@@ -645,12 +645,13 @@ int main(int argc, char **argv)
         mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
         gyros[0] = mtw_hum;
 
-        imus[0] = accData[0].value(0);
+        // Adotando orientacao com o nome/led da IMU para fora da perna
+        imus[0] = accData[0].value(2);
         imus[1] = accData[0].value(1);
-        imus[2] = accData[0].value(2);
-        imus[3] = gyroData[0].value(0);
+        imus[2] = accData[0].value(0);
+        imus[3] = gyroData[0].value(2);
         imus[4] = gyroData[0].value(1);
-        imus[5] = gyroData[0].value(2);
+        imus[5] = gyroData[0].value(0);
 
         if (mtwCallbacks.size() == 2)
         {
@@ -659,12 +660,12 @@ int main(int argc, char **argv)
           gyros[1] = mtw_exo;
 
           int c = 6;
-          imus[0+c] = accData[1].value(0);
+          imus[0+c] = accData[1].value(2);
           imus[1+c] = accData[1].value(1);
-          imus[2+c] = accData[1].value(2);
-          imus[3+c] = gyroData[1].value(0);
+          imus[2+c] = accData[1].value(0);
+          imus[3+c] = gyroData[1].value(2);
           imus[4+c] = gyroData[1].value(1);
-          imus[5+c] = gyroData[1].value(2);
+          imus[5+c] = gyroData[1].value(0);
         }
 
         Cv.notify_one();
