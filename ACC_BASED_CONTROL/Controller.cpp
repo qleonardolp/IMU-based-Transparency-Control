@@ -589,8 +589,8 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			Run_Logger();
 			downsamplelog = 1;
 		}
-
-		std::this_thread::sleep_until(control_t_begin + microseconds(200)); // forcando a rodar @ 5kHz
+    // forcando a rodar @ 5kHz.. nao funcionou, largar de usar C_RATE/C_DT
+		std::this_thread::sleep_until(control_t_begin + microseconds(100));
 		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
@@ -830,7 +830,7 @@ void accBasedControl::UpdateControlStatus()
 	" Leg Encoder " + std::to_string(180 / MY_PI*theta_l) + "\n";
 	ctrl_word += " InvDyn: " + std::to_string(grav_comp) + " N.m ";
 	ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
-	sprintf(numbers_str, "%4.2f", (1/control_t_Dt) );
+	sprintf(numbers_str, "%.2f", (1/control_t_Dt) );
   	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
 	Vector3f euler;
 	//euler = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
