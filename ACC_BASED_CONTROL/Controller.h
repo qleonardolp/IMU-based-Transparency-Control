@@ -99,8 +99,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //#define     C_RATE    840.00
 //#define     C_DT      0.0012
 
-#define     C_RATE    6200.00
-#define     C_DT      0.00016
+#define     C_RATE    5000.00
+#define     C_DT      0.00020
 
 #define   RATE        125.0f		// [Hz]	IMUs update rate
 #define		DELTA_T			0.008f 		// [s]

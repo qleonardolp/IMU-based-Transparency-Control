@@ -589,8 +589,8 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			Run_Logger();
 			downsamplelog = 1;
 		}
-		
-		std::this_thread::sleep_until(control_t_begin + microseconds(100)); // forcando a rodar @10 kHz
+
+		std::this_thread::sleep_until(control_t_begin + microseconds(200)); // forcando a rodar @ 5kHz
 		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
