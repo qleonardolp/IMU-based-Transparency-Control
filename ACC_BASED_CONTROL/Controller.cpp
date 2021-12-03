@@ -512,7 +512,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 		control_t_begin = steady_clock::now();
 
     //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
-    this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
+    //this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
 
 		m_epos->sync();	// CAN Synchronization
 
@@ -535,15 +535,6 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 		vel_motor_last = vel_motor_filt;
 		acc_motor = AccMtrFilt.apply(acc_motor);
 
-		Vector3f acc;
-		Vector3f gyro;
-		acc << imus[0], imus[1], imus[2];
-		gyro << imus[3], imus[4], imus[5];
-		updateqASGD1Kalman(gyro, acc);
-		acc << imus[6], imus[7], imus[8];
-		gyro << imus[9], imus[10], imus[11];
-		updateqASGD2Kalman(gyro, acc);
-
 #if KF_ENABLE
 		// Assigning the measured states to the Sensor reading Vector
 		zk << kf_torque_int, ang_vel[0], theta_l, theta_c*GEAR_RATIO, ang_vel[1], vel_motor*GEAR_RATIO;
@@ -561,6 +552,15 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			vel_hum_last = vel_hum;				// VelHum_k-1 <- VelHum_k
 			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
+
+      Vector3f acc;
+		  Vector3f gyro;
+		  acc << imus[0], imus[1], imus[2];
+		  gyro << imus[3], imus[4], imus[5];
+		  updateqASGD1Kalman(gyro, acc);
+		  acc << imus[6], imus[7], imus[8];
+		  gyro << imus[9], imus[10], imus[11];
+		  updateqASGD2Kalman(gyro, acc);
 		}
 #endif
 
@@ -832,7 +832,8 @@ void accBasedControl::UpdateControlStatus()
 	sprintf(numbers_str, "%4.2f", (1/control_t_Dt) );
   	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
 	Vector3f euler;
-	euler = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
+	//euler = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
+  	euler = quat2euler(&qASGD2_qk)*(180 / MY_PI);
 	ctrl_word += "Euler: " + std::to_string(euler(0)) + " " + std::to_string(euler(1)) + " " + std::to_string(euler(2)) + "\n";
 }
 
@@ -1077,7 +1078,7 @@ void accBasedControl::updateqASGD1Kalman(Vector3f gyro, Vector3f acc)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Q = 0.5*Ts*Xi*(Matrix4f::Identity()*5.476e-6)*Xi.transpose();
+	Q = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
@@ -1149,7 +1150,7 @@ void accBasedControl::updateqASGD2Kalman(Vector3f gyro, Vector3f acc)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Q = 0.5*Ts*Xi*(Matrix4f::Identity()*5.476e-6)*Xi.transpose();
+	Q = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD2_qk = Psi*qASGD2_qk;

@@ -96,8 +96,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define     KP_F			1.5310f     // [dimensionless]
 #define     KD_F			0.0200f     // [s]
 
-#define     C_RATE    840.00
-#define     C_DT      0.0012
+//#define     C_RATE    840.00
+//#define     C_DT      0.0012
+
+#define     C_RATE    6200.00
+#define     C_DT      0.00016
 
 #define   RATE        125.0f		// [Hz]	IMUs update rate
 #define		DELTA_T			0.008f 		// [s]
