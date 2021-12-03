@@ -68,6 +68,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		VOLTAGE_MAX		21.600f		// Max tensao de saida Vcc = 0.9*24V fornecida pela EPOS 24/5
 #define		TORQUE_CONST	0.0603f		// Constante de torque do motor RE40	[N.m/A]
 #define		SPEED_CONST		158.00f		// Constante de velocidade do motor RE40 [rpm/V]
+#define		CM_CONST		0.00287f	// [N.m s/rad]
+#define		JACT			0.14e-4f	// [Kg.m^2]	Maxon motor RE40 datasheet
 
 #define     GRAVITY         9.8066f		// [m/s^2]
 #define		LOWERLEGMASS	4.7421f		// [Kg] Definido pelo fit usando o torque SEA em 2020-12-19, ver exo_mass_measurement.m para mais detalhes
@@ -77,13 +79,13 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		MTW_DIST_EXO	0.0700f		// [m]
 
 // According to W. M. Dos Santos and A. A. G. Siqueira in 10.1109/BIOROB.2014.6913851 (DOI)
-#define		JACT			0.14e-4f		// [Kg.m^2]	Maxon motor RE40 datasheet
+#define		J_EQ			0.4700f		// [Kg.m^2]
 #define		B_EQ			30.000f		// [N.m s/rad]
 
 // Human Dynamic Parameters: ...
-#define 	J_H				0.5000f	
-#define 	B_H				2.0000f	
-#define 	K_H				40.000f	
+#define 	J_H				0.1500f	
+#define 	B_H				4.0000f	
+#define 	K_H				400.00f	
 
 // Feedforward-Feedback PI acc-based controller:
 #define		  K_FF			1.0000f		// [dimensionless]
@@ -120,7 +122,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define IMU_DELAY 	   (int)	C_RATE/RATE			// N Samples of the main loop rate
 
 // KF human-based
-#define KFH_STATE_DIM 8
+#define KFH_STATE_DIM 9
 #define KFH_SENSOR_DIM 5
 
 using namespace Eigen;
@@ -214,9 +216,21 @@ public:
 			}
 		}
 
+		float Nr = GEAR_RATIO;
+		float Cm = CM_CONST;
+		float Ks = STIFFNESS;
+		float Jr = INERTIA_EXO;
+		float Jw = J_EQ;
+		float Br = B_EQ;
+		float BR = (Br/Nr) + Nr*Cm;
+		float Ka = Ks/20;
+		float Ba = 0.300;
+		float Jh = J_H;
+		float Bh = B_H;
+		float Kh = K_H;
+		float Ts = C_DT;
 
 		//	Kalman Filter SETUP		//
-		int_stiffness = STIFFNESS/20;
 		xk.setZero();
 		zk.setZero();
 		uk.setZero();
@@ -228,75 +242,121 @@ public:
 		Dk.setZero();
 		KG.setZero();
 
-		At(0,4) = int_stiffness;
+		At(0,4) = Ka;
 		At(2,4) = 1;
 		At(3,5) = 1;
-		At(4,1) = int_stiffness/INERTIA_EXO;
-		At(4,2) = -(int_stiffness + STIFFNESS)/INERTIA_EXO;
-		At(4,3) = STIFFNESS/INERTIA_EXO;
-		At(5,2) = STIFFNESS/JACT;
+		At(4,1) = Ka/Jr;
+		At(4,2) = -(Ka + Ks)/Jr;
+		At(4,3) = Ks/Jr;
+		At(5,2) = Ks/Jw;
 		At(5,3) = -At(5,2);
-		At(5,5) = -B_EQ/JACT;
+		At(5,5) = -Br/Jw;
 
-		Bt(0,0) = -int_stiffness;
+		Bt(0,0) = -Ka;
 		Bt(1,0) = 1;
-		Bt(4,1) = -1/INERTIA_EXO;
-		Bt(5,2) = GEAR_RATIO*TORQUE_CONST/JACT;
+		Bt(4,1) = -1/Jr;
+		Bt(5,2) = Nr/Jw*TORQUE_CONST;
 
-		Fk = discretize_A(&At, C_DT);
-		Gk = discretize_B(&At, &Bt, C_DT);
+		Fk = discretize_A(&At, Ts);
+		Gk = discretize_B(&At, &Bt, Ts);
 
 		Ck(0,0) = 1;
 		Ck(2,2) = 1;
-		Ck(3,3) = GEAR_RATIO;
+		Ck(3,3) = Nr;
 		Ck(4,4) = 1;
-		Ck(5,5) = GEAR_RATIO;
+		Ck(5,5) = Nr;
 
 		Dk(1,0) = 1;
 
 		// Setup Covariances
 		Pk = 1e-2f*StateSzMtx::Identity();
 
-		const float mtwCov = 5.476e-6;	// MTw Noise x sqrt(Bandwidth) in rad/s
+		float mtwCov = 5.476e-6;	// MTw Noise x sqrt(Bandwidth) in rad/s
 		Rk.setIdentity();
-		Rk(0,0) = pow( (70*int_stiffness*2*8*sqrt(mtwCov)*C_DT) ,2);
+		Rk(0,0) = pow( (70*Ka*2*8*sqrt(mtwCov)*Ts) ,2);
 		Rk(1,1) = 64*mtwCov; 
 		Rk(2,2) = pow(143*2*MY_PI/ENCODER_OUT, 2); // 7% of 2048
-		Rk(3,3) = pow(2*MY_PI/(ENCODER_IN*GEAR_RATIO), 2);
+		Rk(3,3) = pow(2*MY_PI/(ENCODER_IN*Nr), 2);
 		Rk(4,4) =  64*mtwCov;
-		Rk(5,5) = pow(2*RPM2RADS/GEAR_RATIO, 2);
+		Rk(5,5) = pow(2*RPM2RADS/Nr, 2);
 		// IMU error upon int_torque:
-		Rk(0,1) = pow(8*sqrt(mtwCov)*C_DT, 2);
+		Rk(0,1) = pow(8*sqrt(mtwCov)*Ts, 2);
 		Rk(0,2) = Rk(0,1);
 		// IMU error upon exo position:
 		Rk(2,1) = Rk(0,1);
 
 		Qk.setIdentity();
-		Qk(0,0) = pow( (int_stiffness*2*8*sqrt(mtwCov)*C_DT) ,2);
+		Qk(0,0) = pow( (Ka*2*8*sqrt(mtwCov)*Ts) ,2);
 		Qk(1,1) = 1e-6f; // input vector add noise to the transition equation
 		Qk(2,2) = 1e-8f;
 		Qk(3,3) = 1e-7f;
-		Qk(4,4) = pow(( 1/INERTIA_EXO*(int_stiffness*(1e-7f) + (int_stiffness + STIFFNESS)*(1e-8f) + STIFFNESS*(1e-7f)) ), 2);
-		Qk(5,5) = pow(( 1/JACT*(STIFFNESS*1e-8f + STIFFNESS*1e-7f + B_EQ*1e-3f) ), 2);
+		Qk(4,4) = pow(( 1/Jr*(Ka*(1e-7f) + (Ka + Ks)*(1e-8f) + Ks*(1e-7f)) ), 2);
+		Qk(5,5) = pow(( 1/Jw*(Ks*1e-8f + Ks*1e-7f + Br*1e-3f) ), 2);
 
 
 		// Human-based Kalman Filter Setup:
 		KFH_xk.setZero();
 		KFH_zk.setZero();
 		KFH_Fk.setZero();
-		KFH_At.setZero();
 		KFH_Gk.setZero();
-		KFH_Bt.setZero();
 		KFH_Ck.setZero();
 		KFH_KG.setZero();
 
+		// TODO: Ajustar
 		KFH_Pk = 0.100f*kfhStateMtx::Identity(); // P(k=0)
 		KFH_Qk = 0.007f*kfhStateMtx::Identity();
 		KFH_Rk = 0.010f*kfhSensorMtx::Identity();
 		//...
 
-		//KFH_Fk = discretize_A(&KFH_At, C_DT);
-		//KFH_Gk = discretize_B(&KFH_At, &KFH_Bt, C_DT);
+		// "Modelo Joelho Expandido":
+		kfhStateMtx A = kfhStateMtx::Zero();
+		kfhStateVec B = kfhStateVec::Zero();
+
+		// linha1
+		A(0,1) = -((Ks*(Jr + Jw))/(Jw*Jr)); 
+		A(0,3) = (Ks/Jr);
+		A(0,4) = ((Ks*Br)/(Jr)); 
+		// linha2
+		A(1,0) = 1.0000f;
+		// linha3
+		A(2,1) = (((Ka*Jr)-(Br*Ba))/(Jr*Jr)); 
+		A(2,2) = -((Ba*(Jh+Jr))/(Jr*Jh));
+		A(2,3) = (((Ba*Bh -Ka*Jh)/(Jh*Jh))-((Ka*Jr -Br*Ba)/(Jr*Jr)));
+		A(2,4) = -(((Br*(Ka*Jr -Br*Ba))/(Jr*Jr)) + ((Ba*Ks)/Jr));
+		A(2,6) = (((Ba*Kh)/(Jh))-((Bh*(Ba*Bh - Ka*Jh))/(Jh*Jh)));
+		A(2,7) = -(((Ba*Bh - Ka*Jh)*Kh)/(Jh*Jh));
+		// linha4
+		A(3,2) = 1.0000f;
+		// linha5
+		A(4,1) =  (1/Jr); 
+		A(4,3) = -(1/Jr);
+		A(4,4) = -(Br/Jr);
+		// linha6
+		A(5,0) = -1/Ks; 
+		// linha7
+		A(6,3) =  (1/Jh);
+		A(6,6) = -(Bh/Jh);
+		A(6,7) = -(Kh/Jh);
+		// linha8
+		A(7,6) = 1.0000f;
+		// linha9
+		A(8,1) = -1.0000f;
+
+
+		B(0,0) = ((Ks*Cm)/(Jw));
+		B(2,0) = ((Ba*Ks)/(Jr*Nr));
+		B(5,0) = 1/Nr;
+
+		// Discretizacao 4 Ord
+		KFH_Fk = kfhStateMtx::Identity() + A*Ts + (A*Ts).pow(2)/2 + (A*Ts).pow(3)/6 + (A*Ts).pow(4)/24;
+		KFH_Gk = (kfhStateMtx::Identity() + A*Ts/2 + (A*Ts).pow(2)/6 + (A*Ts).pow(3)/24 + (A*Ts).pow(4)/120)*B*Ts;
+
+		// Sensor reading Vector zk: [Tr Ti pr dph ph]
+		KFH_Ck(0,1) = 1.0000f;
+		KFH_Ck(1,3) = 1.0000f;
+		KFH_Ck(2,5) = 1.0000f;
+		KFH_Ck(3,6) = 1.0000f;
+		KFH_Ck(4,7) = 1.0000f;
 
 	}
 
@@ -313,7 +373,7 @@ public:
 	ControlSzMtx discretize_B(StateSzMtx* A, ControlSzMtx* B, float dt); // pensar em uma forma de usar templates para ficar independente do tipo de variavel
 
 	// Discretize state-space control matrix
-	template <typename T> T discB(kfhStateMtx* A, T* B,  float dt);
+	template <typename T> T discB(kfhStateMtx* A, T* B,  float dt){}
 
 	// Kalman Log
 	void kalmanLogger();
@@ -528,12 +588,10 @@ private:
 
 	//		Kalman Filter: human-based model designed with Felix M. Escalante //
 
-	static kfhStateVec  KFH_xk;	// State Vector				[....]
-	static kfhSensorVec KFH_zk;	// Sensor reading Vector	[....]
+	static kfhStateVec  KFH_xk;	// State Vector				[dTr Tr dTi Ti dpr pr dph ph Terr]
+	static kfhSensorVec KFH_zk;	// Sensor reading Vector	[Tr Ti pr dph ph]
 	static kfhStateMtx  KFH_Pk;	// State Covariance Matrix
-	static kfhStateMtx  KFH_At;	// Prediction Matrix (continuous)
-	static kfhStateMtx  KFH_Fk;	// Prediction Matrix (discrete)
-	static kfhStateVec  KFH_Bt;	// Control Matrix (continuous)
+	static kfhStateMtx  KFH_Fk;	// Transition Matrix (discrete)
 	static kfhStateVec  KFH_Gk;	// Control Matrix (discrete)
 	static kfhStateMtx  KFH_Qk;	// Process noise Covariance
 	static kfhSensorMtx KFH_Rk;	// Sensor noise Covariance

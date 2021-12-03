@@ -105,7 +105,7 @@ float accBasedControl::damping_d = 0.001;
 float accBasedControl::k_bar = 1 - stiffness_d / STIFFNESS;
 float accBasedControl::vel_adm = 0;
 float accBasedControl::vel_adm_last = 0;
-float accBasedControl::kd_min = damping_d*(Ki_adm / Kp_adm - 1/JACT*(damping_d / k_bar - Kp_adm));
+float accBasedControl::kd_min = STIFFNESS/10;
 float accBasedControl::kd_max = STIFFNESS;
 float accBasedControl::IntTsea = 0;
 
@@ -950,5 +950,28 @@ void accBasedControl::updateKalmanFilter()
 	kf_acc_exo = (xk(4,0) - kf_vel_exo)/C_DT;
 	kf_acc_exo = kfAccExoFilt.apply(kf_acc_exo);
 	kf_vel_exo = xk(4,0);
+	
+}
+
+void accBasedControl::updateHumKalmanFilter()
+{
+	// Prediction
+	KFH_xk = KFH_Fk*KFH_xk + KFH_Gk*vel_motor;
+	KFH_Pk = KFH_Fk*KFH_Pk*KFH_Fk.transpose() + KFH_Qk;
+
+	// Kalman Gain
+	FullPivLU<kfhSensorMtx> TotalCovariance(KFH_Ck * KFH_Pk * KFH_Ck.transpose() + KFH_Rk);
+	if (TotalCovariance.isInvertible()){
+		KFH_KG = KFH_Pk * KFH_Ck.transpose() * TotalCovariance.inverse();
+	}
+
+	// remover essas var locais para globais com os sensores...
+	float torque_int = 0.1234;
+	float pos_hum = 0.5678;
+
+	KFH_zk << torque_sea, torque_int, theta_l, vel_hum, pos_hum;
+	// Update
+	KFH_xk = KFH_xk + KFH_KG * (KFH_zk - KFH_Ck*KFH_xk);
+	KFH_Pk = (kfhStateMtx::Identity() - KFH_KG*KFH_Ck)*KFH_Pk;
 	
 }
