@@ -89,8 +89,6 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	GradF = Jq.transpose()*F_obj;	// Eq.25
 
 	float Ts = 0.0000;
-	float mi0 = 0.001;
-	float Beta = 1.00;
 	float omg_norm = gyro.norm();
 
 #if FIXED_DT
@@ -99,7 +97,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Ts = constrain_float(Dt, 1.00e-6, 0.020);
 #endif
 
-	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
+	float mi = MI0 + BETA*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
@@ -167,8 +165,6 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	GradF = Jq.transpose()*F_obj;	// Eq.25
 
 	float Ts = 0.0000;
-	float mi0 = 0.001;
-	float Beta = 1.00;
 	float omg_norm = gyro.norm();
 
 #if FIXED_DT
@@ -177,7 +173,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Ts = constrain_float(Dt, 1.00e-6, 0.020);
 #endif
 
-	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
+	float mi = MI0 + BETA*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
