@@ -59,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "EPOS_NETWORK.h"
 #include "generalheader.h"
 #include "Controller.h"
+#include "qASGD_KF.h"
 #include "LowPassFilter2p.h"
 
 #include "findClosestUpdateRate.h"
@@ -71,11 +72,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <conio.h>
 #include <thread>
 #include <chrono>
+#include <Eigen/Core>
 
 #define XSENS_RATE 120          // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
 #define XSENS_FC 60             // IMU cutoff frequency
 #define XSENS_CH 25             // Use radio channel 25 for wireless master.
 #define CALIBRATION_PERIOD 3.0f // Gyroscope Bias integration period
+
+using namespace Eigen;
 
 void Habilita_Eixo(int ID);
 
@@ -572,6 +576,7 @@ int main(int argc, char **argv)
     eixo_out.ReadPDO01();
     eixo_in.ReadPDO01();
     accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, log_time);
+    qASGDKF ahrs(log_time);
 
     std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
 
@@ -615,14 +620,14 @@ int main(int argc, char **argv)
 */
     controller_t = std::thread(&accBasedControl::Controller, &xsens2Eposcan, std::ref(gyros), std::ref(imus), std::ref(Cv), std::ref(Mtx));
 
-    xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
+    xsens2Eposcan.set_timestamp_begin(std::chrono::system_clock::now());
 
     while (!_kbhit())
     {
       XsTime::msleep(4);
 
       bool newDataAvailable = false;
-      mtw_data_stamp = std::chrono::steady_clock::now();
+      mtw_data_stamp = std::chrono::system_clock::now();
 
       for (size_t i = 0; i < mtwCallbacks.size(); ++i)
       {
@@ -668,10 +673,19 @@ int main(int argc, char **argv)
           imus[5+c] = gyroData[1].value(0);
         }
 
+		    Vector3f acc;
+		    Vector3f gyro;
+		    acc << imus[0], imus[1], imus[2];
+		    gyro << imus[3], imus[4], imus[5];
+		    ahrs.updateqASGD1Kalman(gyro, acc, (1/freq));
+		    acc << imus[6], imus[7], imus[8];
+		    gyro << imus[9], imus[10], imus[11];
+		    ahrs.updateqASGD2Kalman(gyro, acc, (1/freq));
+
         Cv.notify_one();
         Cv.wait(Lck);
 
-        auto control_stamp = std::chrono::steady_clock::now();
+        auto control_stamp = std::chrono::system_clock::now();
         delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
         delay = 1e-3 * delay;
 
@@ -698,6 +712,8 @@ int main(int argc, char **argv)
       {
         system("cls");
         xsens2Eposcan.UpdateControlStatus();
+        Vector3f euler = ahrs.quat2euler(1)*(180 / MY_PI);
+        printf("\n Roll: %s, Pitch: %s, Yaw: %s\n", std::to_string(euler(0)), std::to_string(euler(1)), std::to_string(euler(2)) );
         std::cout << xsens2Eposcan.ctrl_word;
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
@@ -714,6 +730,8 @@ int main(int argc, char **argv)
 
     //Zera o comando do motor
     xsens2Eposcan.~accBasedControl();
+
+    ahrs.~qASGDKF();
     //Desabilita o Eixo
     Desabilita_Eixo(0);
 

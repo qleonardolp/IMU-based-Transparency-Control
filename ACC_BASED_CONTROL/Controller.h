@@ -23,11 +23,10 @@ FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER 
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef CURRENT_CONTROL_H
-#define CURRENT_CONTROL_H
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 
 #define	 KF_ENABLE		0
-#include <stdio.h>
 
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
@@ -184,7 +183,7 @@ public:
 
 		if (seconds > 0)
 		{
-			timestamp_begin = std::chrono::steady_clock::now();
+			timestamp_begin = std::chrono::system_clock::now();
 			logging = true;
 			time_t rawtime;
 			struct tm* timeinfo;
@@ -671,4 +670,4 @@ private:
 
 };
 
-#endif // !CURRENT_CONTROL_H
+#endif // !CONTROLLER_H

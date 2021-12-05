@@ -188,7 +188,7 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		unique_lock<mutex> Lk(m);
 		cv.notify_one();
 
-		control_t_begin = steady_clock::now();
+		control_t_begin = system_clock::now();
 
     //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
     this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
@@ -242,11 +242,11 @@ void accBasedControl::accBasedController(std::vector<float> &ang_vel, std::condi
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
 
-		auto control_t_end = steady_clock::now();
+		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		// Logging/Sending Data @250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -263,7 +263,7 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 		unique_lock<std::mutex> Lk(m);
 		cv.notify_one();
 
-		control_t_begin = steady_clock::now();
+		control_t_begin = system_clock::now();
 
 		
 		//no sleep: 1600 Hz
@@ -328,11 +328,11 @@ void accBasedControl::CAdmittanceControl(std::vector<float> &ang_vel, std::condi
 #endif
 		SetEposVelocityLimited(vel_motor);
 
-		auto control_t_end = steady_clock::now();
+		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -349,7 +349,7 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		unique_lock<mutex> Lk(m);
 		cv.notify_one();
 
-		control_t_begin = steady_clock::now();
+		control_t_begin = system_clock::now();
 
     //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
     this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
@@ -405,11 +405,11 @@ void accBasedControl::ImpedanceControl(std::vector<float> &ang_vel, std::conditi
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
 
-		auto control_t_end = steady_clock::now();
+		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -426,7 +426,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		unique_lock<mutex> Lk(m);
 		cv.notify_one();
 
-		control_t_begin = steady_clock::now();
+		control_t_begin = system_clock::now();
 
     //this_thread::sleep_for(microseconds(4000)); // ... 270 hz
     this_thread::sleep_for(nanoseconds(700)); // ... 840 Hz
@@ -488,11 +488,11 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 		setpoint_filt = 1 / (TORQUE_CONST * GEAR_RATIO)* torque_m; // now in Ampere!
 		SetEposCurrentLimited(setpoint_filt);
 
-		auto control_t_end = steady_clock::now();
+		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;
 
-		timestamp = 1e-6*(float)duration_cast<microseconds>(steady_clock::now() - timestamp_begin).count();
+		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		// Logging ~250 Hz
 		downsamplelog++;
 		if(downsamplelog >= LOG_DELAY){
@@ -553,6 +553,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			vel_exo_last = vel_exo;				// VelExo_k-1 <- VelExo_k
 			downsample = 1;
 
+		  /*
 	      float Dt = (float) IMU_DELAY*control_t_Dt;
 		  Vector3f acc;
 		  Vector3f gyro;
@@ -562,6 +563,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 		  acc << imus[6], imus[7], imus[8];
 		  gyro << imus[9], imus[10], imus[11];
 		  updateqASGD2Kalman(gyro, acc, Dt);
+		  */
 		}
 #endif
 
@@ -585,7 +587,7 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 
 		timestamp = 1e-6*(float)duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 		downsamplelog++;
-		if(downsamplelog >= LOG_DELAY){ // Logging ~250 Hz
+		if(downsamplelog >= LOG_DELAY){ // Logging 1/4 freq Hz
 			Run_Logger();
 			downsamplelog = 1;
 		}
@@ -832,10 +834,10 @@ void accBasedControl::UpdateControlStatus()
 	ctrl_word += " AccBased: " + std::to_string(accbased_comp) + " N.m\n";
 	sprintf(numbers_str, "%.2f", (1/control_t_Dt) );
   	ctrl_word += " EPOS Rate: " + (std::string) numbers_str + " Hz\n";
-	Vector3f euler;
+	//Vector3f euler;
 	//euler = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
-  	euler = quat2euler(&qASGD2_qk)*(180 / MY_PI);
-	ctrl_word += "Euler: " + std::to_string(euler(0)) + " " + std::to_string(euler(1)) + " " + std::to_string(euler(2)) + "\n";
+  	//euler = quat2euler(&qASGD2_qk)*(180 / MY_PI);
+	//ctrl_word += "Euler: " + std::to_string(euler(0)) + " " + std::to_string(euler(1)) + " " + std::to_string(euler(2)) + "\n";
 }
 
 char* accBasedControl::TCPMessage()
