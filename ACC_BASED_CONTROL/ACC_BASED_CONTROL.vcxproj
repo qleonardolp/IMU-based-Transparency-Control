@@ -21,6 +21,7 @@
     <ClInclude Include="mtwcallback.h" />
     <ClInclude Include="mastercallback.h" />
     <ClInclude Include="nixnet.h" />
+    <ClInclude Include="qASGD_KF.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Controller.cpp" />
@@ -29,6 +30,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mastercallback.cpp" />
     <ClCompile Include="mtwcallback.cpp" />
+    <ClCompile Include="qASGD_KF.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -682,6 +682,7 @@ int main(int argc, char **argv)
 		    acc << imus[6], imus[7], imus[8];
 		    gyro << imus[9], imus[10], imus[11];
 		    ahrs.updateqASGD2Kalman(gyro, acc, (1/freq));
+        ahrs.Recorder();
 
         Cv.notify_one();
         Cv.wait(Lck);
@@ -714,8 +715,11 @@ int main(int argc, char **argv)
         system("cls");
         xsens2Eposcan.UpdateControlStatus();
         Vector3f euler = ahrs.quat2euler(1)*(180 / MY_PI);
-        printf("\n Roll: %s, Pitch: %s, Yaw: %s\n", std::to_string(euler(0)), std::to_string(euler(1)), std::to_string(euler(2)) );
         std::cout << xsens2Eposcan.ctrl_word;
+        float roll = euler(0);
+        float pitch = euler(1);
+        float yaw = euler(2);
+        printf("\n Roll: %.4f, Pitch: %.4f, Yaw: %.4f\n", euler(0), euler(1), euler(2));
         printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
         // display MTW events, showing if one of the IMUs got disconnected:
         std::cout << wirelessMasterCallback.mtw_event << std::endl;

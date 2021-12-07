@@ -57,6 +57,9 @@
     <ClInclude Include="LowPassFilter2p.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="qASGD_KF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="findClosestUpdateRate.cpp">
@@ -75,6 +78,9 @@
       <Filter>Source Files\eposcan</Filter>
     </ClCompile>
     <ClCompile Include="LowPassFilter2p.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="qASGD_KF.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
