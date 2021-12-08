@@ -45,7 +45,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #define		IMU_RATE	120.0f		// [Hz]	IMUs update rate
 #define		DELTA_T		(1/IMU_RATE) 	// [s]
-#define		FIXED_DT	1
+#define		FIXED_DT	0
 #define		MI0			0.010
 #define		BETA		10.00
 
