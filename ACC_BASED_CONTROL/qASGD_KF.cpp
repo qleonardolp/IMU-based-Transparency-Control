@@ -32,12 +32,12 @@ void qASGDKF::Recorder()
 	{
     timestamp = (float)1e-6*duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
     /*
-		fprintf(logger, "%5.6f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f  %5.3f\n",\
+		fprintf(logger, "%5.6f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n",\
 						timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
 								   qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
     */
     Vector3f euler = quat2euler(1)*(180 / MY_PI);
-    fprintf(logger, "%5.6f  %5.5f  %5.5f  %5.5f\n", timestamp, euler(0), euler(1), euler(2));
+    fprintf(logger, "%5.6f,%5.5f,%5.5f,%5.5f\n", timestamp, euler(0), euler(1), euler(2));
 		fclose(logger);
 	}
 }
