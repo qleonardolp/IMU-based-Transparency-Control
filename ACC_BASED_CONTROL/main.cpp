@@ -702,6 +702,7 @@ int main(int argc, char **argv)
       if (scan_file == (int)RATE * 6) // every 6s reads the gains_values.txt
       {
         xsens2Eposcan.GainScan();
+        ahrs.GainScan();
         scan_file = 0;
       }
 

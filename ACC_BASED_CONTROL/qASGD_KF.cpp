@@ -102,7 +102,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Ts = constrain_float(Dt, 1.00e-6, 0.020);
 #endif
 
-	float mi = MI0 + BETA*Ts*omg_norm; // Eq.29
+	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
@@ -178,7 +178,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Ts = constrain_float(Dt, 1.00e-6, 0.020);
 #endif
 
-	float mi = MI0 + BETA*Ts*omg_norm; // Eq.29
+	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
@@ -300,4 +300,15 @@ Vector3f qASGDKF::quatDelta2euler(Vector4f* quat_r, Vector4f* quat_m)
 	euler(2) = atan2f(2*q(1)*q(2) + 2*q(0)*q(3), q(1)*q(1) + q(0)*q(0) - q(3)*q(3) - q(2)*q(2));
 
 	return euler;
+}
+
+void qASGDKF::GainScan()
+{
+	FILE* pFile = fopen("ASGDparam.txt", "rt");
+
+	if (pFile != NULL)
+	{
+		fscanf(pFile, "mi0 %f\nbeta %f\n", &mi0, &Beta);
+		fclose(pFile);
+	}
 }

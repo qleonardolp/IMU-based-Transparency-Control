@@ -87,6 +87,9 @@ public:
 		qASGD2_Pk.setIdentity();
 		qASGD1_qk << 1,0,0,0;
 		qASGD2_qk << 1,0,0,0;
+
+		mi0 = MI0;
+		Beta = BETA;
 	}
 
 	// Update method for qASGD AHRS Kalman Filer
@@ -103,8 +106,11 @@ public:
 	// Saturation method
 	float constrain_float(float val, float min, float max);
 
-	// Log method
+	// Log method:
 	void Recorder();
+
+	// Read parameters from file:
+	void GainScan();
 
 	// Class Destructor
 	~qASGDKF(){	}
@@ -116,12 +122,16 @@ private:
 	char logger_filename[40];
 	float timestamp;
 	system_clock::time_point timestamp_begin;
+
 	// qASGD Kalman for AHRS: 
 	// (WANG, Li; ZHANG, Zheng; SUN, Ping. Quaternion-based Kalman filter for AHRS using an adaptive-step gradient descent algorithm.)
 	Vector4f qASGD1_qk;
 	Matrix4f qASGD1_Pk;
 	Vector4f qASGD2_qk;
 	Matrix4f qASGD2_Pk;
+
+	float mi0;
+	float Beta;
 
 	// Get the log file name
 	char* getLogfilename(){return logger_filename;}
