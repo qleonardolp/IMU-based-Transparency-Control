@@ -58,6 +58,7 @@ public:
 	// Class Constructor
 	qASGDKF(int seconds) : log_seconds(seconds)
 	{
+		logging = false;
 		//Criar arguivo de log com cabecalho:
 		if (log_seconds > 0)
 		{
@@ -87,6 +88,11 @@ public:
 		qASGD2_Pk.setIdentity();
 		qASGD1_qk << 1,0,0,0;
 		qASGD2_qk << 1,0,0,0;
+
+		H = Matrix4f::Identity();
+		R = Matrix4f::Identity()*1e-5;
+		Q1 = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
+		Q2 = Q1;
 
 		mi0 = MI0;
 		Beta = BETA;
@@ -129,6 +135,10 @@ private:
 	Matrix4f qASGD1_Pk;
 	Vector4f qASGD2_qk;
 	Matrix4f qASGD2_Pk;
+
+	Matrix4f Q1, Q2;
+	Matrix4f R;
+	Matrix4f H;
 
 	float mi0;
 	float Beta;

@@ -27,18 +27,20 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 void qASGDKF::Recorder()
 {
-	logger = fopen(getLogfilename(), "a");
-	if (logger != NULL)
-	{
-    timestamp = (float)1e-6*duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
-    /*
-		fprintf(logger, "%5.6f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n",\
-						timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
-								   qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
-    */
-    Vector3f euler = quat2euler(1)*(180 / MY_PI);
-    fprintf(logger, "%5.6f,%5.5f,%5.5f,%5.5f\n", timestamp, euler(0), euler(1), euler(2));
-		fclose(logger);
+	if(logging.load()){
+		logger = fopen(getLogfilename(), "a");
+		if (logger != NULL)
+		{
+		timestamp = (float)1e-6*duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
+		/*
+			fprintf(logger, "%5.6f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n",\
+							timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
+									qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
+		*/
+		Vector3f euler = quat2euler(1)*(180 / MY_PI);
+		fprintf(logger, "%5.6f,%5.5f,%5.5f,%5.5f\n", timestamp, euler(0), euler(1), euler(2));
+			fclose(logger);
+		}
 	}
 }
 
@@ -99,17 +101,13 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 #if FIXED_DT
 	Ts = DELTA_T;
 #else
-	Ts = constrain_float(Dt, 1.00e-6, 0.020);
+	Ts = constrain_float(Dt, 1.00e-6, 0.050);
 #endif
 
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
-
-	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
-	Matrix4f R = Matrix4f::Identity()*5.476e-6;
-	Matrix4f H = Matrix4f::Identity();
 
 	Matrix4f OmG = Matrix4f::Zero();
 	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
@@ -129,11 +127,11 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Q = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
+	Q1 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
-	qASGD1_Pk = Psi*qASGD1_Pk*Psi.transpose() + Q;
+	qASGD1_Pk = Psi*qASGD1_Pk*Psi.transpose() + Q1;
 
 	// Kalman Gain
 	Matrix4f Kg;
@@ -175,17 +173,13 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 #if FIXED_DT
 	Ts = DELTA_T;
 #else
-	Ts = constrain_float(Dt, 1.00e-6, 0.020);
+	Ts = constrain_float(Dt, 1.00e-6, 0.050);
 #endif
 
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
-
-	Matrix4f Q = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
-	Matrix4f R = Matrix4f::Identity()*5.476e-6;
-	Matrix4f H = Matrix4f::Identity();
 
 	Matrix4f OmG = Matrix4f::Zero();
 	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
@@ -205,11 +199,11 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Q = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
+	Q2 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD2_qk = Psi*qASGD2_qk;
-	qASGD2_Pk = Psi*qASGD2_Pk*Psi.transpose() + Q;
+	qASGD2_Pk = Psi*qASGD2_Pk*Psi.transpose() + Q2;
 
 	// Kalman Gain
 	Matrix4f Kg;
