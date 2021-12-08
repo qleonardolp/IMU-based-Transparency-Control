@@ -38,7 +38,7 @@ void qASGDKF::Recorder()
 									qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
 		*/
 		Vector3f euler = quat2euler(1)*(180 / MY_PI);
-		fprintf(logger, "%5.6f,%5.5f,%5.5f,%5.5f\n", timestamp, euler(0), euler(1), euler(2));
+		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f\n", timestamp, euler(0), euler(1), euler(2));
 			fclose(logger);
 		}
 	}
@@ -57,7 +57,6 @@ float qASGDKF::constrain_float(float val, float min, float max)
 
 void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
-	//Vector4f a_b(0, acc.normalized()(0), acc.normalized()(1), acc.normalized()(2));
 
 	float q0 = qASGD1_qk(0);
 	float q1 = qASGD1_qk(1);
@@ -118,8 +117,9 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	OmG = 0.5*OmG;
 
 	Matrix4f Psi;
-	Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
-
+	//Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+  Psi = Matrix4f::Identity() + Ts*OmG + (Ts*OmG)*(Ts*OmG)/2;
+  
 	// Process noise covariance update (Eq. 19):
 	Matrix<float,4,3> Xi;
 	Xi << q0, q3, -q2,
@@ -127,7 +127,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 		  q2, -q1, q0,
 		 -q1, -q2, -q3; 
 
-	Q1 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
+	//Q1 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
 
 	// Projection:
 	qASGD1_qk = Psi*qASGD1_qk;
@@ -142,6 +142,8 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	// Update
 	qASGD1_qk = qASGD1_qk + Kg * (z_k - H*qASGD1_qk);
 	qASGD1_Pk = (Matrix4f::Identity() - Kg*H)*qASGD1_Pk;
+  
+  //qASGD1_qk = Psi*z_k;
 
 }
 
