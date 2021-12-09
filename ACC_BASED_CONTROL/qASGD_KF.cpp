@@ -136,6 +136,22 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	//Fusion, see Ref [2], eq. 23, section III.C
 	qASGD1_qk = (1 - Gamma)*q_int + Gamma*z_k;
 	qASGD1_qk = qASGD1_qk.normalized();
+
+	// Remove Yaw:
+	q0 = qASGD1_qk[0];
+	q1 = qASGD1_qk[1];
+	q2 = qASGD1_qk[2];
+	q3 = qASGD1_qk[3];
+	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
+	Vector4f q_yaw = Vector4f(cosf(-yaw/2), 0, 0, sinf(-yaw/2));
+	Matrix4f Qy;
+	Qy << q_yaw(0), -q_yaw(1), -q_yaw(2), -q_yaw(3),
+		  q_yaw(1),  q_yaw(0), -q_yaw(3),  q_yaw(2),
+		  q_yaw(2),  q_yaw(3),  q_yaw(0), -q_yaw(1),
+		  q_yaw(3), -q_yaw(2),  q_yaw(1),  q_yaw(0);
+		  
+	qASGD1_qk = Qy*qASGD1_qk;
+	qASGD1_qk = qASGD1_qk.normalized();
 }
 
 void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
