@@ -23,6 +23,17 @@ FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER 
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+-- Obtain attitude quaternion:
+    -- Quaternion-based Attitude estimation using ASGD algorithm
+    -- Refs: 
+    -- [1]: Quaternion-based Kalman filter for AHRS using an adaptive-step gradient descent algorithm, 
+    --      Wang, Li and Zhang, Zheng and Sun, Ping, International Journal of Advanced Robotic Systems, 2015
+    -- [2]: Estimation of IMU and MARG orientation using a gradient descent algorithm,
+    --      Madgwick, Sebastian OH and Harrison, Andrew JL and Vaidyanathan, Ravi, international Conference on Rehabilitation Robotics, 2011
+    -- [3]: "How to integrate Quaternions", Ashwin Narayan (www.ashwinnarayan.com/post/how-to-integrate-quaternions/)
+*/
+
 #ifndef QASGDKF_H
 #define QASGDKF_H
 
@@ -46,8 +57,9 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		IMU_RATE	120.0f		// [Hz]	IMUs update rate
 #define		DELTA_T		(1/IMU_RATE) 	// [s]
 #define		FIXED_DT	0
-#define		MI0			0.010
-#define		BETA		10.00
+#define		MI0			0.0100f
+#define		BETA		10.000f
+#define		RHO			0.0330f
 
 using namespace Eigen;
 using namespace std::chrono;
@@ -96,6 +108,7 @@ public:
 
 		mi0 = MI0;
 		Beta = BETA;
+		Rho = RHO;
 	}
 
 	// Update method for qASGD AHRS Kalman Filer
@@ -142,6 +155,7 @@ private:
 
 	float mi0;
 	float Beta;
+	float Rho;
 
 	// Get the log file name
 	char* getLogfilename(){return logger_filename;}

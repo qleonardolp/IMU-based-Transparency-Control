@@ -57,6 +57,12 @@ float qASGDKF::constrain_float(float val, float min, float max)
 
 void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
+	/*
+	-- Quaternion-based Attitude estimation using ASGD algorithm:
+	-- [1]: Quaternion-based Kalman filter for AHRS using an adaptive-step gradient descent algorithm (2015)
+	-- [2]: Estimation of IMU and MARG orientation using a gradient descent algorithm (2011)
+	-- [3]: "How to integrate Quaternions", Ashwin Narayan (www.ashwinnarayan.com/post/how-to-integrate-quaternions/)
+	*/
 
 	float q0 = qASGD1_qk(0);
 	float q1 = qASGD1_qk(1);
@@ -103,48 +109,33 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Ts = constrain_float(Dt, 1.00e-6, 0.050);
 #endif
 
-	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
+	float mi_t = Beta*omg_norm;
+	float mi = mi0 + mi_t*Ts; // Eq.29
+	float Gamma = Rho/(mi_t + Rho); // Ref [2], eq. 22 and 25
 
 	Vector4f z_k;
 	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
+	z_k = z_k.normalized();
 
-	Matrix4f OmG = Matrix4f::Zero();
-	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
-		 gyro(0), 0, gyro(2), -gyro(1),
-		 gyro(1), -gyro(2), 0, gyro(0),
-		 gyro(2), gyro(1), -gyro(0), 0;
+	// Integrate the quaternion orientation over time using quaternion exponential definition
+	// Consider Exp(q) = e^w*e^v = e^w*( cos(|v|) + v/|v|*sin(|v|) ), where q = w + v = w + xi + yj + zk
+	Matrix4f ProdConj;
+	ProdConj << z_k(0),-z_k(1),-z_k(2), -z_k(3),
+			    z_k(1), z_k(0), z_k(3), -z_k(2), 
+				z_k(2),-z_k(3), z_k(0),  z_k(1), 
+				z_k(3), z_k(2),-z_k(1),  z_k(0);
+	
+	Vector4f omg_q;
+	float omg_vec_norm = 0.5*Ts*omg_norm;
+	omg_q(0) = cosf(omg_vec_norm);
+	omg_q(1) = 0.5*Ts*gyro(0)*sinf(omg_vec_norm)/omg_vec_norm;
+	omg_q(2) = 0.5*Ts*gyro(1)*sinf(omg_vec_norm)/omg_vec_norm;
+	omg_q(3) = 0.5*Ts*gyro(2)*sinf(omg_vec_norm)/omg_vec_norm;
 
-	OmG = 0.5*OmG;
-
-	Matrix4f Psi;
-	//Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
-  Psi = Matrix4f::Identity() + Ts*OmG + (Ts*OmG)*(Ts*OmG)/2;
-  
-	// Process noise covariance update (Eq. 19):
-	Matrix<float,4,3> Xi;
-	Xi << q0, q3, -q2,
-	     -q3, q0,  q1,
-		  q2, -q1, q0,
-		 -q1, -q2, -q3; 
-
-	//Q1 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
-
-	// Projection:
-	qASGD1_qk = Psi*qASGD1_qk;
-	qASGD1_Pk = Psi*qASGD1_Pk*Psi.transpose() + Q1;
-
-	// Kalman Gain
-	Matrix4f Kg;
-	FullPivLU<Matrix4f> TotalCovariance(H * qASGD1_Pk * H.transpose() + R);
-	if (TotalCovariance.isInvertible()){
-		Kg = qASGD1_Pk * H.transpose() * TotalCovariance.inverse();
-	}
-	// Update
-	qASGD1_qk = qASGD1_qk + Kg * (z_k - H*qASGD1_qk);
-	qASGD1_Pk = (Matrix4f::Identity() - Kg*H)*qASGD1_Pk;
-  
-  //qASGD1_qk = Psi*z_k;
-
+	Vector4f q_int = ProdConj*omg_q;
+	//Fusion, see Ref [2], eq. 23, section III.C
+	qASGD1_qk = (1 - Gamma)*q_int + Gamma*z_k;
+	qASGD1_qk = qASGD1_qk.normalized();
 }
 
 void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
@@ -216,6 +207,8 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	// Update
 	qASGD2_qk = qASGD2_qk + Kg * (z_k - H*qASGD2_qk);
 	qASGD2_Pk = (Matrix4f::Identity() - Kg*H)*qASGD2_Pk;
+
+	//qASGD2_qk = Psi*z_k; // integracao de z_k cru
 }
 
 Vector3f qASGDKF::quat2euler(Vector4f* quat)
@@ -304,7 +297,7 @@ void qASGDKF::GainScan()
 
 	if (pFile != NULL)
 	{
-		fscanf(pFile, "mi0 %f\nbeta %f\n", &mi0, &Beta);
+		fscanf(pFile, "mi0 %f\nbeta %f\nrho %f\n", &mi0, &Beta, &Rho);
 		fclose(pFile);
 	}
 }
