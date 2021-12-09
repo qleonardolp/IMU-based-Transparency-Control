@@ -69,7 +69,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	float q2 = qASGD1_qk(2);
 	float q3 = qASGD1_qk(3);
 
-	/* 
+	/*
 	Matrix3f Rot = Matrix3f::Identity();
 
 	Rot(0,0) = (q0*q0 + q1*q1 - q2*q2 - q3*q3);

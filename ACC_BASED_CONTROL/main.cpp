@@ -596,6 +596,12 @@ int main(int argc, char **argv)
     float mtw_exo_raw = 0;
     LowPassFilter2pFloat mtwHumFiltered(XSENS_RATE, XSENS_FC);
     LowPassFilter2pFloat mtwExoFiltered(XSENS_RATE, XSENS_FC);
+    LowPassFilter2pFloat Filt[12];
+    for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
+    {
+      Filt[i].set_cutoff_frequency(XSENS_RATE, 7);
+    }
+
     std::vector<float> gyros(mtwCallbacks.size());
     std::vector<float> imus(12);
     std::thread controller_t;
@@ -652,12 +658,12 @@ int main(int argc, char **argv)
         gyros[0] = mtw_hum;
 
         // Para orientacao com o nome/led da IMU para fora da perna usar (2), (1), (0)...
-        imus[0] = accData[0].value(0);
-        imus[1] = accData[0].value(1);
-        imus[2] = accData[0].value(2);
-        imus[3] = gyroData[0].value(0);
-        imus[4] = gyroData[0].value(1);
-        imus[5] = gyroData[0].value(2);
+        imus[0] = Filt[0].apply(accData[0].value(0));
+        imus[1] = Filt[1].apply(accData[0].value(1));
+        imus[2] = Filt[2].apply(accData[0].value(2));
+        imus[3] = Filt[3].apply(gyroData[0].value(0));
+        imus[4] = Filt[4].apply(gyroData[0].value(1));
+        imus[5] = Filt[5].apply(gyroData[0].value(2));
 
         if (mtwCallbacks.size() == 2)
         {
