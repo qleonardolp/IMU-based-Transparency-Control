@@ -37,7 +37,7 @@ void qASGDKF::Recorder()
 							timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
 									qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
 		*/
-		Vector3f euler = quat2euler(1)*(180 / MY_PI);
+		Vector3f euler = quat2euler(2)*(180 / MY_PI);
 		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f\n", timestamp, euler(0), euler(1), euler(2));
 			fclose(logger);
 		}
@@ -189,6 +189,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 
 	Vector4f z_k;
 	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
+	z_k = z_k.normalized();
 
 	Matrix4f OmG = Matrix4f::Zero();
 	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
@@ -223,8 +224,24 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	// Update
 	qASGD2_qk = qASGD2_qk + Kg * (z_k - H*qASGD2_qk);
 	qASGD2_Pk = (Matrix4f::Identity() - Kg*H)*qASGD2_Pk;
+	qASGD2_qk = qASGD2_qk.normalized();
 
 	//qASGD2_qk = Psi*z_k; // integracao de z_k cru
+	// Remove Yaw:
+	q0 = qASGD2_qk[0];
+	q1 = qASGD2_qk[1];
+	q2 = qASGD2_qk[2];
+	q3 = qASGD2_qk[3];
+	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
+	Vector4f q_yaw = Vector4f(cosf(-yaw/2), 0, 0, sinf(-yaw/2));
+	Matrix4f Qy;
+	Qy << q_yaw(0), -q_yaw(1), -q_yaw(2), -q_yaw(3),
+		  q_yaw(1),  q_yaw(0), -q_yaw(3),  q_yaw(2),
+		  q_yaw(2),  q_yaw(3),  q_yaw(0), -q_yaw(1),
+		  q_yaw(3), -q_yaw(2),  q_yaw(1),  q_yaw(0);
+		  
+	qASGD2_qk = Qy*qASGD2_qk;
+	qASGD2_qk = qASGD2_qk.normalized();
 }
 
 Vector3f qASGDKF::quat2euler(Vector4f* quat)

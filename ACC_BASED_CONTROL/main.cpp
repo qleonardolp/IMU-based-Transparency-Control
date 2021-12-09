@@ -721,7 +721,7 @@ int main(int argc, char **argv)
       {
         system("cls");
         xsens2Eposcan.UpdateControlStatus();
-        Vector3f euler = ahrs.quat2euler(1)*(180 / MY_PI);
+        Vector3f euler = ahrs.quat2euler(2)*(180 / MY_PI);
         std::cout << xsens2Eposcan.ctrl_word;
         float roll = euler(0);
         float pitch = euler(1);
