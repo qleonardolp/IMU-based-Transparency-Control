@@ -599,7 +599,7 @@ int main(int argc, char **argv)
     LowPassFilter2pFloat Filt[12];
     for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
     {
-      Filt[i].set_cutoff_frequency(XSENS_RATE, 30);
+      Filt[i].set_cutoff_frequency(XSENS_RATE, 16);
     }
 
     std::vector<float> gyros(mtwCallbacks.size());

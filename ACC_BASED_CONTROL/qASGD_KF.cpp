@@ -35,8 +35,9 @@ void qASGDKF::Recorder()
 
 		Vector3f euler1 = quat2euler(1)*(180 / MY_PI);
 		Vector3f euler2 = quat2euler(2)*(180 / MY_PI);
-		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
-				timestamp, euler1(0), euler1(1), euler1(2), euler2(0), euler2(1), euler2(2));
+    Vector3f DelAng = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
+		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+				timestamp, euler1(0), euler1(1), euler2(0), euler2(1), DelAng(0));
 			fclose(logger);
 		}
 	}
