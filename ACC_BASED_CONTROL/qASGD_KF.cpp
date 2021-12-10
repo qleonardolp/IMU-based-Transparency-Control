@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////
-// Leonardo Felipe Lima Santos dos Santos, 2019     ///
+// Leonardo Felipe Lima Santos dos Santos, 2022     ///
 // leonardo.felipe.santos@usp.br	_____ ___  ___   //
 // github/bitbucket qleonardolp		| |  | . \/   \  //
 ////////////////////////////////	| |   \ \   |_|  //
@@ -32,11 +32,7 @@ void qASGDKF::Recorder()
 		if (logger != NULL)
 		{
 		timestamp = (float)1e-6*duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
-		/*
-			fprintf(logger, "%5.6f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n",\
-							timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
-									qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
-		*/
+
 		Vector3f euler1 = quat2euler(1)*(180 / MY_PI);
 		Vector3f euler2 = quat2euler(2)*(180 / MY_PI);
 		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
@@ -110,7 +106,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
-	z_k = z_k.normalized();
+	z_k.normalize();
 
 	Matrix4f OmG = Matrix4f::Zero();
 	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
@@ -144,13 +140,13 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	// Update (H is Identity)
 	qASGD1_qk = qASGD1_qk + Kg * (z_k - qASGD1_qk);
 	qASGD1_Pk = (Matrix4f::Identity() - Kg)*qASGD1_Pk;
-	qASGD1_qk = qASGD1_qk.normalized();
+	qASGD1_qk.normalize();
 
 	// Remove Yaw: Rotate the quaternion by a quaternion with -(yaw):
-	q0 = qASGD1_qk[0];
-	q1 = qASGD1_qk[1];
-	q2 = qASGD1_qk[2];
-	q3 = qASGD1_qk[3];
+	q0 = qASGD1_qk(0);
+	q1 = qASGD1_qk(1);
+	q2 = qASGD1_qk(2);
+	q3 = qASGD1_qk(3);
 
 	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
 	Matrix4f Qy = Matrix4f::Identity()*cosf(-yaw/2);
@@ -160,7 +156,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Qy(3,0) = -Qy(0,3);
 
 	qASGD1_qk = Qy*qASGD1_qk;
-	qASGD1_qk = qASGD1_qk.normalized();
+	qASGD1_qk.normalize();
 }
 
 void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
@@ -195,7 +191,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
 	Vector4f z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
-	z_k = z_k.normalized();
+	z_k.normalize();
 
 	Matrix4f OmG = Matrix4f::Zero();
 	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
@@ -229,13 +225,13 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	// Update (H is Identity)
 	qASGD2_qk = qASGD2_qk + Kg * (z_k - qASGD2_qk);
 	qASGD2_Pk = (Matrix4f::Identity() - Kg)*qASGD2_Pk;
-	qASGD2_qk = qASGD2_qk.normalized();
+	qASGD2_qk.normalize();
 
 	// Remove Yaw: Rotate the quaternion by a quaternion with -(yaw):
-	q0 = qASGD2_qk[0];
-	q1 = qASGD2_qk[1];
-	q2 = qASGD2_qk[2];
-	q3 = qASGD2_qk[3];
+	q0 = qASGD2_qk(0);
+	q1 = qASGD2_qk(1);
+	q2 = qASGD2_qk(2);
+	q3 = qASGD2_qk(3);
 
 	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
 	Matrix4f Qy = Matrix4f::Identity()*cosf(-yaw/2);
@@ -245,7 +241,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Qy(3,0) = -Qy(0,3);
 
 	qASGD2_qk = Qy*qASGD2_qk;
-	qASGD2_qk = qASGD2_qk.normalized();
+	qASGD2_qk.normalize();
 }
 
 Vector3f qASGDKF::quat2euler(Vector4f* quat)

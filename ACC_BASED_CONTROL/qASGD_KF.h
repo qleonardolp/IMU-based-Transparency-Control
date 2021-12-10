@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////
-// Leonardo Felipe Lima Santos dos Santos, 2021     ///
+// Leonardo Felipe Lima Santos dos Santos, 2022     ///
 // leonardo.felipe.santos@usp.br	_____ ___  ___   //
 // github/bitbucket qleonardolp		| |  | . \/   \  //
 ////////////////////////////////	| |   \ \   |_|  //
@@ -143,19 +143,10 @@ private:
 	system_clock::time_point timestamp_begin;
 
 	// qASGD Kalman for AHRS: 
-	// (WANG, Li; ZHANG, Zheng; SUN, Ping. Quaternion-based Kalman filter for AHRS using an adaptive-step gradient descent algorithm.)
-	Vector4f qASGD1_qk;
-	Matrix4f qASGD1_Pk;
-	Vector4f qASGD2_qk;
-	Matrix4f qASGD2_Pk;
-
-	Matrix4f Q1, Q2;
-	Matrix4f R;
-	Matrix4f H;
-
-	float mi0;
-	float Beta;
-	float Rho;
+	Vector4f qASGD1_qk, qASGD2_qk;
+	Matrix4f qASGD1_Pk, qASGD2_Pk;
+	Matrix4f Q1, Q2, R, H;
+	float mi0, Beta, Rho;
 
 	// Get the log file name
 	char* getLogfilename(){return logger_filename;}
