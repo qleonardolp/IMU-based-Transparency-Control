@@ -599,7 +599,7 @@ int main(int argc, char **argv)
     LowPassFilter2pFloat Filt[12];
     for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
     {
-      Filt[i].set_cutoff_frequency(XSENS_RATE, 7);
+      Filt[i].set_cutoff_frequency(XSENS_RATE, 30);
     }
 
     std::vector<float> gyros(mtwCallbacks.size());
@@ -671,13 +671,12 @@ int main(int argc, char **argv)
           mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
           gyros[1] = mtw_exo;
 
-          int c = 6;
-          imus[0+c] = accData[1].value(0);
-          imus[1+c] = accData[1].value(1);
-          imus[2+c] = accData[1].value(2);
-          imus[3+c] = gyroData[1].value(0);
-          imus[4+c] = gyroData[1].value(1);
-          imus[5+c] = gyroData[1].value(2);
+          imus[6] = Filt[6].apply(accData[1].value(0));
+          imus[7] = Filt[7].apply(accData[1].value(1));
+          imus[8] = Filt[8].apply(accData[1].value(2));
+          imus[9] = Filt[9].apply(gyroData[1].value(0));
+          imus[10] = Filt[10].apply(gyroData[1].value(1));
+          imus[11] = Filt[11].apply(gyroData[1].value(2));
         }
 
 		    Vector3f acc;

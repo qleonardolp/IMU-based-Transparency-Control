@@ -37,8 +37,10 @@ void qASGDKF::Recorder()
 							timestamp, qASGD1_qk[0], qASGD1_qk[1], qASGD1_qk[2], qASGD1_qk[3], \
 									qASGD2_qk[0], qASGD2_qk[1], qASGD2_qk[2], qASGD2_qk[3]);
 		*/
-		Vector3f euler = quat2euler(2)*(180 / MY_PI);
-		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f\n", timestamp, euler(0), euler(1), euler(2));
+		Vector3f euler1 = quat2euler(1)*(180 / MY_PI);
+		Vector3f euler2 = quat2euler(2)*(180 / MY_PI);
+		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+				timestamp, euler1(0), euler1(1), euler1(2), euler2(0), euler2(1), euler2(2));
 			fclose(logger);
 		}
 	}
@@ -83,98 +85,18 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	Rot(2,2) = (q0*q0 - q1*q1 - q2*q2 - q3*q3); 
 	*/
 
-	Vector3f F_obj = Vector3f::Zero();
-	//F_obj = Rot.transpose()*Vector3f(0,0,1) - acc.normalized();
-
 	// De maneira simplificada podemos fazer apenas:
 	// g = [0 0 1]^T, portanto so nos interessa a ultima coluna de C^T:
-	Vector3f Z_c = Vector3f::Zero();
-	Z_c << 2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), (q0*q0 - q1*q1 - q2*q2 - q3*q3);
-	F_obj = Z_c - acc.normalized();	// Eq.23
+	Vector3f Zc = Vector3f::Zero();
+	Zc << 2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), (q0*q0 - q1*q1 - q2*q2 - q3*q3);
+	Vector3f F_obj = Zc - acc.normalized();	// Eq.23
 
 	Matrix<float,3,4> Jq;
 	Jq << -2*q2, 2*q3, -2*q0, 2*q1, 
 		   2*q1, 2*q0,  2*q3, 2*q2, 
 		   2*q0,-2*q1, -2*q2, 2*q3;
 	
-	Vector4f GradF;
-	GradF = Jq.transpose()*F_obj;	// Eq.25
-
-	float Ts = 0.0000;
-	float omg_norm = gyro.norm();
-
-#if FIXED_DT
-	Ts = DELTA_T;
-#else
-	Ts = constrain_float(Dt, 1.00e-6, 0.050);
-#endif
-
-	float mi_t = Beta*omg_norm;
-	float mi = mi0 + mi_t*Ts; // Eq.29
-	float Gamma = Rho/(mi_t + Rho); // Ref [2], eq. 22 and 25
-
-	Vector4f z_k;
-	z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
-	z_k = z_k.normalized();
-
-	// Integrate the quaternion orientation over time using quaternion exponential definition
-	// Consider Exp(q) = e^w*e^v = e^w*( cos(|v|) + v/|v|*sin(|v|) ), where q = w + v = w + xi + yj + zk
-	Matrix4f ProdConj;
-	ProdConj << z_k(0),-z_k(1),-z_k(2), -z_k(3),
-			    z_k(1), z_k(0), z_k(3), -z_k(2), 
-				z_k(2),-z_k(3), z_k(0),  z_k(1), 
-				z_k(3), z_k(2),-z_k(1),  z_k(0);
-	
-	Vector4f omg_q;
-	float omg_vec_norm = 0.5*Ts*omg_norm;
-	omg_q(0) = cosf(omg_vec_norm);
-	omg_q(1) = 0.5*Ts*gyro(0)*sinf(omg_vec_norm)/omg_vec_norm;
-	omg_q(2) = 0.5*Ts*gyro(1)*sinf(omg_vec_norm)/omg_vec_norm;
-	omg_q(3) = 0.5*Ts*gyro(2)*sinf(omg_vec_norm)/omg_vec_norm;
-
-	Vector4f q_int = ProdConj*omg_q;
-	//Fusion, see Ref [2], eq. 23, section III.C
-	qASGD1_qk = (1 - Gamma)*q_int + Gamma*z_k;
-	qASGD1_qk = qASGD1_qk.normalized();
-
-	// Remove Yaw:
-	q0 = qASGD1_qk[0];
-	q1 = qASGD1_qk[1];
-	q2 = qASGD1_qk[2];
-	q3 = qASGD1_qk[3];
-	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
-	Vector4f q_yaw = Vector4f(cosf(-yaw/2), 0, 0, sinf(-yaw/2));
-	Matrix4f Qy;
-	Qy << q_yaw(0), -q_yaw(1), -q_yaw(2), -q_yaw(3),
-		  q_yaw(1),  q_yaw(0), -q_yaw(3),  q_yaw(2),
-		  q_yaw(2),  q_yaw(3),  q_yaw(0), -q_yaw(1),
-		  q_yaw(3), -q_yaw(2),  q_yaw(1),  q_yaw(0);
-		  
-	qASGD1_qk = Qy*qASGD1_qk;
-	qASGD1_qk = qASGD1_qk.normalized();
-}
-
-void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
-{
-	float q0 = qASGD2_qk(0);
-	float q1 = qASGD2_qk(1);
-	float q2 = qASGD2_qk(2);
-	float q3 = qASGD2_qk(3);
-
-	Vector3f F_obj = Vector3f::Zero();
-	Vector3f Z_c = Vector3f::Zero();
-	// De maneira simplificada podemos fazer apenas:
-	// g = [0 0 1]^T, portanto so nos interessa a ultima coluna de C^T:
-	Z_c << 2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), (q0*q0 - q1*q1 - q2*q2 - q3*q3);
-	F_obj = Z_c - acc.normalized();	// Eq.23
-
-	Matrix<float,3,4> Jq;
-	Jq << -2*q2, 2*q3, -2*q0, 2*q1, 
-		   2*q1, 2*q0,  2*q3, 2*q2, 
-		   2*q0,-2*q1, -2*q2, 2*q3;
-	
-	Vector4f GradF;
-	GradF = Jq.transpose()*F_obj;	// Eq.25
+	Vector4f GradF = Jq.transpose()*F_obj;	// Eq.25
 
 	float Ts = 0.0000;
 	float omg_norm = gyro.norm();
@@ -187,8 +109,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 
 	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
 
-	Vector4f z_k;
-	z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
+	Vector4f z_k = qASGD1_qk - mi*GradF.normalized(); // Eq.24
 	z_k = z_k.normalized();
 
 	Matrix4f OmG = Matrix4f::Zero();
@@ -199,8 +120,92 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 
 	OmG = 0.5*OmG;
 
-	Matrix4f Psi;
-	Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+	Matrix4f Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
+
+	// Process noise covariance update (Eq. 19):
+	Matrix<float,4,3> Xi;
+	Xi << q0, q3, -q2,
+	     -q3, q0,  q1,
+		  q2, -q1, q0,
+		 -q1, -q2, -q3; 
+
+	Q1 = 0.5*Ts*Xi*(Matrix3f::Identity()*5.476e-6)*Xi.transpose();
+
+	// Projection:
+	qASGD1_qk = Psi*qASGD1_qk;
+	qASGD1_Pk = Psi*qASGD1_Pk*Psi.transpose() + Q1;
+
+	// Kalman Gain (H is Identity)
+	Matrix4f Kg;
+	FullPivLU<Matrix4f> TotalCovariance(qASGD1_Pk + R);
+	if (TotalCovariance.isInvertible()){
+		Kg = qASGD1_Pk * TotalCovariance.inverse();
+	}
+	// Update (H is Identity)
+	qASGD1_qk = qASGD1_qk + Kg * (z_k - qASGD1_qk);
+	qASGD1_Pk = (Matrix4f::Identity() - Kg)*qASGD1_Pk;
+	qASGD1_qk = qASGD1_qk.normalized();
+
+	// Remove Yaw: Rotate the quaternion by a quaternion with -(yaw):
+	q0 = qASGD1_qk[0];
+	q1 = qASGD1_qk[1];
+	q2 = qASGD1_qk[2];
+	q3 = qASGD1_qk[3];
+
+	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
+	Matrix4f Qy = Matrix4f::Identity()*cosf(-yaw/2);
+	Qy(0,3) = -sinf(-yaw/2);
+	Qy(1,2) =  Qy(0,3);
+	Qy(2,1) = -Qy(0,3);
+	Qy(3,0) = -Qy(0,3);
+
+	qASGD1_qk = Qy*qASGD1_qk;
+	qASGD1_qk = qASGD1_qk.normalized();
+}
+
+void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
+{
+	float q0 = qASGD2_qk(0);
+	float q1 = qASGD2_qk(1);
+	float q2 = qASGD2_qk(2);
+	float q3 = qASGD2_qk(3);
+
+	// De maneira simplificada podemos fazer apenas:
+	// g = [0 0 1]^T, portanto so nos interessa a ultima coluna de C^T:
+	Vector3f Zc = Vector3f::Zero();
+	Zc << 2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), (q0*q0 - q1*q1 - q2*q2 - q3*q3);
+	Vector3f F_obj = Zc - acc.normalized();	// Eq.23
+
+	Matrix<float,3,4> Jq;
+	Jq << -2*q2, 2*q3, -2*q0, 2*q1, 
+		   2*q1, 2*q0,  2*q3, 2*q2, 
+		   2*q0,-2*q1, -2*q2, 2*q3;
+	
+	Vector4f GradF = Jq.transpose()*F_obj;	// Eq.25
+
+	float Ts = 0.0000;
+	float omg_norm = gyro.norm();
+
+#if FIXED_DT
+	Ts = DELTA_T;
+#else
+	Ts = constrain_float(Dt, 1.00e-6, 0.050);
+#endif
+
+	float mi = mi0 + Beta*Ts*omg_norm; // Eq.29
+
+	Vector4f z_k = qASGD2_qk - mi*GradF.normalized(); // Eq.24
+	z_k = z_k.normalized();
+
+	Matrix4f OmG = Matrix4f::Zero();
+	OmG << 0, -gyro(0), -gyro(1), -gyro(2),
+		 gyro(0), 0, gyro(2), -gyro(1),
+		 gyro(1), -gyro(2), 0, gyro(0),
+		 gyro(2), gyro(1), -gyro(0), 0;
+
+	OmG = 0.5*OmG;
+
+	Matrix4f Psi = (1 - ((omg_norm*Ts)*(omg_norm*Ts))/8)*Matrix4f::Identity() + 0.5*Ts*OmG;
 
 	// Process noise covariance update (Eq. 19):
 	Matrix<float,4,3> Xi;
@@ -215,31 +220,30 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	qASGD2_qk = Psi*qASGD2_qk;
 	qASGD2_Pk = Psi*qASGD2_Pk*Psi.transpose() + Q2;
 
-	// Kalman Gain
+	// Kalman Gain (H is Identity)
 	Matrix4f Kg;
-	FullPivLU<Matrix4f> TotalCovariance(H * qASGD2_Pk * H.transpose() + R);
+	FullPivLU<Matrix4f> TotalCovariance(qASGD2_Pk + R);
 	if (TotalCovariance.isInvertible()){
-		Kg = qASGD2_Pk * H.transpose() * TotalCovariance.inverse();
+		Kg = qASGD2_Pk * TotalCovariance.inverse();
 	}
-	// Update
-	qASGD2_qk = qASGD2_qk + Kg * (z_k - H*qASGD2_qk);
-	qASGD2_Pk = (Matrix4f::Identity() - Kg*H)*qASGD2_Pk;
+	// Update (H is Identity)
+	qASGD2_qk = qASGD2_qk + Kg * (z_k - qASGD2_qk);
+	qASGD2_Pk = (Matrix4f::Identity() - Kg)*qASGD2_Pk;
 	qASGD2_qk = qASGD2_qk.normalized();
 
-	//qASGD2_qk = Psi*z_k; // integracao de z_k cru
-	// Remove Yaw:
+	// Remove Yaw: Rotate the quaternion by a quaternion with -(yaw):
 	q0 = qASGD2_qk[0];
 	q1 = qASGD2_qk[1];
 	q2 = qASGD2_qk[2];
 	q3 = qASGD2_qk[3];
+
 	float yaw = atan2f(2*q1*q2 + 2*q0*q3, q1*q1 + q0*q0 - q3*q3 - q2*q2);
-	Vector4f q_yaw = Vector4f(cosf(-yaw/2), 0, 0, sinf(-yaw/2));
-	Matrix4f Qy;
-	Qy << q_yaw(0), -q_yaw(1), -q_yaw(2), -q_yaw(3),
-		  q_yaw(1),  q_yaw(0), -q_yaw(3),  q_yaw(2),
-		  q_yaw(2),  q_yaw(3),  q_yaw(0), -q_yaw(1),
-		  q_yaw(3), -q_yaw(2),  q_yaw(1),  q_yaw(0);
-		  
+	Matrix4f Qy = Matrix4f::Identity()*cosf(-yaw/2);
+	Qy(0,3) = -sinf(-yaw/2);
+	Qy(1,2) =  Qy(0,3);
+	Qy(2,1) = -Qy(0,3);
+	Qy(3,0) = -Qy(0,3);
+
 	qASGD2_qk = Qy*qASGD2_qk;
 	qASGD2_qk = qASGD2_qk.normalized();
 }
