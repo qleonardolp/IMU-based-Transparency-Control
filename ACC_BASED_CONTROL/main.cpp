@@ -657,13 +657,13 @@ int main(int argc, char **argv)
         mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
         gyros[0] = mtw_hum;
 
-        // Para orientacao com o nome/led da IMU para fora da perna usar (2), (1), (0)...
-        imus[0] = Filt[0].apply(accData[0].value(0));
-        imus[1] = Filt[1].apply(accData[0].value(1));
-        imus[2] = Filt[2].apply(accData[0].value(2));
-        imus[3] = Filt[3].apply(gyroData[0].value(0));
-        imus[4] = Filt[4].apply(gyroData[0].value(1));
-        imus[5] = Filt[5].apply(gyroData[0].value(2));
+        // Para orientacao com o nome/led da IMU para fora da perna usar (2), (-1), (0)...
+        imus[0] = Filt[0].apply(accData[0].value(2));
+        imus[1] = Filt[1].apply(-accData[0].value(1));
+        imus[2] = Filt[2].apply(accData[0].value(0));
+        imus[3] = Filt[3].apply(gyroData[0].value(2));
+        imus[4] = Filt[4].apply(-gyroData[0].value(1));
+        imus[5] = Filt[5].apply(gyroData[0].value(0));
 
         if (mtwCallbacks.size() == 2)
         {
@@ -671,12 +671,12 @@ int main(int argc, char **argv)
           mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
           gyros[1] = mtw_exo;
 
-          imus[6] = Filt[6].apply(accData[1].value(0));
-          imus[7] = Filt[7].apply(accData[1].value(1));
-          imus[8] = Filt[8].apply(accData[1].value(2));
-          imus[9] = Filt[9].apply(gyroData[1].value(0));
-          imus[10] = Filt[10].apply(gyroData[1].value(1));
-          imus[11] = Filt[11].apply(gyroData[1].value(2));
+          imus[6] = Filt[6].apply(accData[1].value(2));
+          imus[7] = Filt[7].apply(-accData[1].value(1));
+          imus[8] = Filt[8].apply(accData[1].value(0));
+          imus[9] = Filt[9].apply(gyroData[1].value(2));
+          imus[10] = Filt[10].apply(-gyroData[1].value(1));
+          imus[11] = Filt[11].apply(gyroData[1].value(0));
         }
 
 		    Vector3f acc;
