@@ -120,7 +120,10 @@ public:
 	Vector3f quat2euler(int id);
 
 	// Convert Difference Quaternion in Euler Angles (rad)
-	Vector3f quatDelta2euler(Vector4f* quat_r, Vector4f* quat_m);
+	Vector3f quatDelta2euler();
+
+	// Angular relative velocity vector in Earth Frame (NED):
+	Vector3f RelOmegaNED();
 
 	// Saturation method
 	float constrain_float(float val, float min, float max);
@@ -147,6 +150,9 @@ private:
 	Matrix4f qASGD1_Pk, qASGD2_Pk;
 	Matrix4f Q1, Q2, R, H;
 	float mi0, Beta, Rho;
+
+	Vector3f acc1, acc2;
+	Vector3f gyro1, gyro2;
 
 	// Get the log file name
 	char* getLogfilename(){return logger_filename;}

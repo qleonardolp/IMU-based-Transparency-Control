@@ -35,9 +35,10 @@ void qASGDKF::Recorder()
 
 		Vector3f euler1 = quat2euler(1)*(180 / MY_PI);
 		Vector3f euler2 = quat2euler(2)*(180 / MY_PI);
-    Vector3f DelAng = quatDelta2euler(&qASGD1_qk, &qASGD2_qk)*(180 / MY_PI);
-		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
-				timestamp, euler1(0), euler1(1), euler2(0), euler2(1), DelAng(0));
+    	Vector3f DelAng = quatDelta2euler()*(180 / MY_PI);
+    	Vector3f RelVelocity = RelOmegaNED()*(180 / MY_PI);
+		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
+				timestamp, euler1(0), euler1(1), euler2(0), euler2(1), DelAng(0), RelVelocity(0));
 			fclose(logger);
 		}
 	}
@@ -67,6 +68,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	float q1 = qASGD1_qk(1);
 	float q2 = qASGD1_qk(2);
 	float q3 = qASGD1_qk(3);
+	gyro1 = gyro;
 
 	/*
 	Matrix3f Rot = Matrix3f::Identity();
@@ -166,6 +168,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	float q1 = qASGD2_qk(1);
 	float q2 = qASGD2_qk(2);
 	float q3 = qASGD2_qk(3);
+	gyro2 = gyro;
 
 	// De maneira simplificada podemos fazer apenas:
 	// g = [0 0 1]^T, portanto so nos interessa a ultima coluna de C^T:
@@ -297,17 +300,17 @@ Vector3f qASGDKF::quat2euler(int id)
 }
 
 
-Vector3f qASGDKF::quatDelta2euler(Vector4f* quat_r, Vector4f* quat_m)
+Vector3f qASGDKF::quatDelta2euler()
 {
-	float qr0 = (*quat_r)(0);
-	float qr1 = (*quat_r)(1);
-	float qr2 = (*quat_r)(2);
-	float qr3 = (*quat_r)(3);
+	float qr0 = qASGD1_qk[0];
+	float qr1 = qASGD1_qk[1];
+	float qr2 = qASGD1_qk[2];
+	float qr3 = qASGD1_qk[3];
 	// q_m conjugate (*q_m):
-	float qm0 =  (*quat_m)(0);
-	float qm1 = -(*quat_m)(1);
-	float qm2 = -(*quat_m)(2);
-	float qm3 = -(*quat_m)(3);
+	float qm0 =  qASGD2_qk[0];
+	float qm1 = -qASGD2_qk[1];
+	float qm2 = -qASGD2_qk[2];
+	float qm3 = -qASGD2_qk[3];
 
 	Vector3f euler;
 	Vector4f q;
@@ -324,6 +327,49 @@ Vector3f qASGDKF::quatDelta2euler(Vector4f* quat_r, Vector4f* quat_m)
 
 	return euler;
 }
+
+Vector3f qASGDKF::RelOmegaNED()
+{
+	float q0 = qASGD1_qk(0);
+	float q1 = qASGD1_qk(1);
+	float q2 = qASGD1_qk(2);
+	float q3 = qASGD1_qk(3);
+
+	Matrix3f Rot = Matrix3f::Identity();
+
+	Rot(0,0) = (q0*q0 + q1*q1 - q2*q2 - q3*q3);
+	Rot(0,1) = 2*(q1*q2 - q0*q3);
+	Rot(0,2) = 2*(q1*q3 + q0*q2);
+	Rot(1,0) = 2*(q1*q2 + q0*q3);
+	Rot(1,1) = (q0*q0 - q1*q1 + q2*q2 - q3*q3);
+	Rot(1,2) = 2*(q2*q3 - q0*q1);
+	Rot(2,0) = 2*(q1*q3 - q0*q2);
+	Rot(2,1) = 2*(q2*q3 + q0*q1);
+	Rot(2,2) = (q0*q0 - q1*q1 - q2*q2 - q3*q3); 
+
+	Vector3f Omega1 = Rot*gyro1;
+
+	q0 = qASGD2_qk(0);
+	q1 = qASGD2_qk(1);
+	q2 = qASGD2_qk(2);
+	q3 = qASGD2_qk(3);
+
+	Rot(0,0) = (q0*q0 + q1*q1 - q2*q2 - q3*q3);
+	Rot(0,1) = 2*(q1*q2 - q0*q3);
+	Rot(0,2) = 2*(q1*q3 + q0*q2);
+	Rot(1,0) = 2*(q1*q2 + q0*q3);
+	Rot(1,1) = (q0*q0 - q1*q1 + q2*q2 - q3*q3);
+	Rot(1,2) = 2*(q2*q3 - q0*q1);
+	Rot(2,0) = 2*(q1*q3 - q0*q2);
+	Rot(2,1) = 2*(q2*q3 + q0*q1);
+	Rot(2,2) = (q0*q0 - q1*q1 - q2*q2 - q3*q3); 
+
+	Vector3f Omega2 = Rot*gyro2;
+
+	return Omega2 - Omega1;
+
+}
+
 
 void qASGDKF::GainScan()
 {
