@@ -302,15 +302,15 @@ Vector3f qASGDKF::quat2euler(int id)
 
 Vector3f qASGDKF::quatDelta2euler()
 {
-	float qr0 = qASGD1_qk[0];
-	float qr1 = qASGD1_qk[1];
-	float qr2 = qASGD1_qk[2];
-	float qr3 = qASGD1_qk[3];
+	float qr0 = qASGD2_qk[0];
+	float qr1 = qASGD2_qk[1];
+	float qr2 = qASGD2_qk[2];
+	float qr3 = qASGD2_qk[3];
 	// q_m conjugate (*q_m):
-	float qm0 =  qASGD2_qk[0];
-	float qm1 = -qASGD2_qk[1];
-	float qm2 = -qASGD2_qk[2];
-	float qm3 = -qASGD2_qk[3];
+	float qm0 =  qASGD1_qk[0];
+	float qm1 = -qASGD1_qk[1];
+	float qm2 = -qASGD1_qk[2];
+	float qm3 = -qASGD1_qk[3];
 
 	Vector3f euler;
 	Vector4f q;

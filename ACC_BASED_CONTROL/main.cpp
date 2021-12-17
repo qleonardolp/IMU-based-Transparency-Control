@@ -599,7 +599,7 @@ int main(int argc, char **argv)
     LowPassFilter2pFloat Filt[12];
     for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
     {
-      Filt[i].set_cutoff_frequency(XSENS_RATE, 16);
+      Filt[i].set_cutoff_frequency(XSENS_RATE, 8);
     }
 
     std::vector<float> gyros(mtwCallbacks.size());
@@ -608,23 +608,6 @@ int main(int argc, char **argv)
     std::condition_variable Cv;
     std::mutex Mtx;
 
-/*
-    switch (control_mode)
-    {
-    case MTC:
-      controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-      break;
-    case ATC:
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-      break;
-    case ITC:
-      controller_t = std::thread(&accBasedControl::ImpedanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-      break;
-    case STC:
-      controller_t = std::thread(&accBasedControl::SeaFeedbackControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-      break;
-    }
-*/
     controller_t = std::thread(&accBasedControl::Controller, &xsens2Eposcan, std::ref(gyros), std::ref(imus), std::ref(Cv), std::ref(Mtx));
 
     xsens2Eposcan.set_timestamp_begin(std::chrono::system_clock::now());

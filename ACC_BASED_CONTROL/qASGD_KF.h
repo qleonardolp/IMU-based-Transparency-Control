@@ -54,12 +54,12 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		RADS2RPM	(30/MY_PI)		// rad/s to rpm 
 #define		RPM2RADS	(MY_PI/30)		// rpm to rad/s
 
-#define		IMU_RATE	135.0f		// [Hz]	IMUs update rate
+#define		IMU_RATE	130.0f		// [Hz]	IMUs update rate
 #define		DELTA_T		(1/IMU_RATE) 	// [s]
 #define		FIXED_DT	0
-#define		MI0			0.0100f
-#define		BETA		10.000f
-#define		RHO			0.0330f
+#define		MI0			0.10000f
+#define		BETA		1.14000f
+#define		RHO			0.00017f
 
 using namespace Eigen;
 using namespace std::chrono;
