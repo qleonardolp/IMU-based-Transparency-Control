@@ -98,24 +98,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 //#define     C_RATE    840.00
 //#define     C_DT      0.0012
 
-#define     C_RATE    5000.00
-#define     C_DT      0.00020
-
-#define   RATE        125.0f		// [Hz]	IMUs update rate
-#define		DELTA_T			0.008f 		// [s]
-
-// -> Low Pass Filtering <- //
-#define    LPF_FC          70.0f		// [Hz] Low Pass Filter Frequency Cutoff
-// Low Pass Filter Smoothing Factor
-#define		LPF_SMF         (float) ( DELTA_T / (DELTA_T + 1 /(2*MY_PI*LPF_FC)) )
 // ------------------------ //
-
-// Filtered Derivative using Gain and Feedback Integrator
-#define		CUTOFF			20.000f
-
-// High Pass Filter for Gyroscopes Bias
-#define		HPF_FC			0.7f	// [Hz]
-#define		HPF_SMF			(float) (1 / (2*MY_PI*HPF_FC*DELTA_T + 1) )
 
 // KF dimensions
 #define KF_STATE_DIM  6
@@ -149,7 +132,7 @@ class accBasedControl
 {
 public:
 	// Class Constructor
-	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, Mode control_mode, int seconds) : 
+	accBasedControl(EPOS_NETWORK* epos, AXIS* eixo_in, AXIS* eixo_out, Mode control_mode, int seconds, float xsens_rate) : 
 		m_control_mode(control_mode)
 	{
 		m_epos = epos;
@@ -157,8 +140,18 @@ public:
 		m_eixo_out = eixo_out;
 		m_seconds = seconds;
 
+		m_epos->sync();
+
+		m_eixo_out->ReadPDO01();
 		pos0_out = -m_eixo_out->PDOgetActualPosition();
+		m_eixo_in->ReadPDO01();
 		pos0_in = m_eixo_in->PDOgetActualPosition();
+
+		imu_rate = xsens_rate;
+#define RATE	  imu_rate	// [Hz]	IMUs update rate
+#define DELTA_T   (1/RATE)
+#define	C_RATE    1000.00
+#define C_DT      0.001
 
 		switch (control_mode)
 		{
@@ -393,7 +386,7 @@ public:
 	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 	
 	// Generic Controller
-	void Controller(std::vector<float> &ang_vel, std::vector<float> &imus, std::condition_variable &cv, std::mutex &m);
+	void Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 
 	void accFeedforward();
 
@@ -578,6 +571,8 @@ private:
 	static float torque_error_last;
 	static float IntVelBIC;
 	static float IntTsea;
+
+	static float imu_rate;
 
 	//		STATE MEMORY VECTORS        //
 

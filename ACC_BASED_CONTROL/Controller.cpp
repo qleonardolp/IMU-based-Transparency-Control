@@ -496,7 +496,7 @@ void accBasedControl::SeaFeedbackControl(std::vector<float> &ang_vel, std::condi
 	}
 }
 
-void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float> &imus, std::condition_variable &cv, std::mutex &m)		// Generic Controller
+void accBasedControl::Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m)		// Generic Controller
 {
 	while (Run.load())
 	{
@@ -573,8 +573,8 @@ void accBasedControl::Controller(std::vector<float> &ang_vel, std::vector<float>
 			Run_Logger();
 			downsamplelog = 1;
 		}
-    // forcando a rodar @ 5kHz.. nao funcionou, largar de usar C_RATE/C_DT
-		std::this_thread::sleep_until(control_t_begin + microseconds(100));
+    	// forcando a rodar @ 1kHz..
+		std::this_thread::sleep_until(control_t_begin + microseconds(800));
 		auto control_t_end = system_clock::now();
 		control_t_Dt = (float)duration_cast<microseconds>(control_t_end - control_t_begin).count();
 		control_t_Dt = 1e-6*control_t_Dt;

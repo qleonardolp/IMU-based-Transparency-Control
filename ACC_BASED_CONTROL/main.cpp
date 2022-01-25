@@ -75,8 +75,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <chrono>
 #include <Eigen/Core>
 
-#define XSENS_RATE 120          // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
-#define XSENS_FC 60             // IMU cutoff frequency
+#define XSENS_RATE 100          // Using 100 Hz update rate for MTw, 150 Hz usually crashes!
+#define XSENS_FC 40             // IMU cutoff frequency
 #define XSENS_CH 25             // Use radio channel 25 for wireless master.
 #define CALIBRATION_PERIOD 3.0f // Gyroscope Bias integration period
 
@@ -576,8 +576,8 @@ int main(int argc, char **argv)
     epos.sync();
     eixo_out.ReadPDO01();
     eixo_in.ReadPDO01();
-    accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, log_time);
-    qASGDKF ahrs(log_time);
+    accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, log_time, XSENS_RATE);
+    qASGDKF ahrs(log_time, XSENS_RATE);
 
     std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
 

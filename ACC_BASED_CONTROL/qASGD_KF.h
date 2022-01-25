@@ -54,8 +54,6 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #define		RADS2RPM	(30/MY_PI)		// rad/s to rpm 
 #define		RPM2RADS	(MY_PI/30)		// rpm to rad/s
 
-#define		IMU_RATE	130.0f		// [Hz]	IMUs update rate
-#define		DELTA_T		(1/IMU_RATE) 	// [s]
 #define		FIXED_DT	0
 #define		MI0			0.10000f
 #define		BETA		1.14000f
@@ -68,8 +66,11 @@ class qASGDKF
 {
 public:
 	// Class Constructor
-	qASGDKF(int seconds) : log_seconds(seconds)
+	qASGDKF(int seconds, float xsens_rate) : log_seconds(seconds)
 	{
+#define		IMU_RATE	(xsens_rate)	// [Hz]	IMUs update rate
+#define		DELTA_T		(1/IMU_RATE) 	// [s]
+
 		logging = false;
 		//Criar arguivo de log com cabecalho:
 		if (log_seconds > 0)
