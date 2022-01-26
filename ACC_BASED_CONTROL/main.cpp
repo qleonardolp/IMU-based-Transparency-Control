@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ///////////////////////////////////////////////////////////////////////////
 // Adapted by Leonardo Felipe L. S. dos Santos, 2019-2023 (@qleonardolp) //
 ///////////////////////////////////////////////////////////////////////////
-#pragma optimize( "2", on )
+#pragma optimize( "d", on )
 
 #undef UNICODE
 
@@ -352,7 +352,7 @@ int main(int argc, char **argv)
       throw std::runtime_error(error.str());
     }
 
-    std::cout << "XsDevice instance created @ " << *wirelessMasterDevice << std::endl;
+    //std::cout << "XsDevice instance created @ " << *wirelessMasterDevice << std::endl;
 
     //std::cout << "Setting config mode..." << std::endl;
     if (!wirelessMasterDevice->gotoConfig())
@@ -361,20 +361,10 @@ int main(int argc, char **argv)
       error << "Failed to goto config mode: " << *wirelessMasterDevice;
       throw std::runtime_error(error.str());
     }
-
     //std::cout << "Attaching callback handler..." << std::endl;
     wirelessMasterDevice->addCallbackHandler(&wirelessMasterCallback);
-
-    std::cout << "Getting the list of the supported update rates..." << std::endl;
+    //std::cout << "Getting the list of the supported update rates..." << std::endl;
     const XsIntArray supportedUpdateRates = wirelessMasterDevice->supportedUpdateRates();
-
-    std::cout << "Supported update rates: ";
-    for (XsIntArray::const_iterator itUpRate = supportedUpdateRates.begin(); itUpRate != supportedUpdateRates.end(); ++itUpRate)
-    {
-      std::cout << *itUpRate << " ";
-    }
-    std::cout << std::endl;
-
     const int newUpdateRate = findClosestUpdateRate(supportedUpdateRates, desiredUpdateRate);
 
     std::cout << "Setting update rate to " << newUpdateRate << " Hz..." << std::endl;
@@ -385,7 +375,7 @@ int main(int argc, char **argv)
       throw std::runtime_error(error.str());
     }
 
-    std::cout << "Disabling radio channel if previously enabled..." << std::endl;
+   //std::cout << "Disabling radio channel if previously enabled..." << std::endl;
     if (wirelessMasterDevice->isRadioEnabled())
     {
       if (!wirelessMasterDevice->disableRadio())
@@ -687,7 +677,7 @@ int main(int argc, char **argv)
         freq = (float)CLOCKS_PER_SEC / loop_duration;
       }
 
-      if (scan_file == (int)RATE * 6) // every 6s reads the gains_values.txt
+      if (scan_file == (int)XSENS_RATE * 6) // every 6s reads the gains_values.txt
       {
         xsens2Eposcan.GainScan();
         ahrs.GainScan();
@@ -699,7 +689,7 @@ int main(int argc, char **argv)
       iSendResult = send(ClientSocket, tcp_msg, strlen(tcp_msg), 0);
 #endif
 
-      if (printer == (int)RATE / 4) // printing the status @ 4Hz
+      if (printer == (int)XSENS_RATE / 4) // printing the status @ 4Hz
       {
         system("cls");
         xsens2Eposcan.UpdateControlStatus();

@@ -148,7 +148,7 @@ public:
 		pos0_in = m_eixo_in->PDOgetActualPosition();
 
 		imu_rate = xsens_rate;
-#define RATE	  imu_rate	// [Hz]	IMUs update rate
+#define RATE	  imu_rate	// [Hz]	IMUs update rate (NAO USAR MAIS DEFINE ASSIM...VALE PARA TODO O CODIGO E NAO SO NESSA CLASSE)
 #define DELTA_T   (1/RATE)
 #define	C_RATE    1000.00
 #define C_DT      0.001
