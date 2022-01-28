@@ -1,14 +1,13 @@
 ﻿/*
-Programa para controle do exo
-v1 creada por Juan Carlos Perez Ibarra
-25/Oct/2020
+Controle do Exo Tau do Laboratório de Reabilitação Robótica da EESC-USP (2012 - 2022)
+Criador por Juan Carlos Perez Ibarra (25/Oct/2020)
+Contribuições: Maurício Félix Escalante, Jose Yecid, Wiliam Santos, Jonatan C. Jaimes, Leonardo Felipe dos Santos, Ícaro Ostan...
 */
 
 #define ITK_NOEXCEPT noexcept
 
 #ifdef _WIN32
 #include <WinSock2.h>
-//#include <conio.h>
 #endif
 
 #define verbose_m 0
@@ -97,12 +96,11 @@ void leitura_esp32(int T_esp);
 
 int salva_dataloggers(double (*datalog_ard)[n_datalogs_ard], size_t rows);
 
+float accBasedControl();
 
 
 int main()
 {
-
-
     //INICIALIZACAO DE TELA
     print_cabecalho("");
 
@@ -1066,18 +1064,13 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
     loop_timers timer_exo(SAMPLE_TIME_EXO);
 
 
-
     try
     {
-        // LOOP EXO
         do
         {
+            // LOOP EXO
             // Calcula o tempo de execucao do loop
             timer_exo.start_timer();
-
-            // std::ostringstream error;
-            // error << "Este es un error ficticio de prueba";
-            // throw std::runtime_error(error.str());
 
             // -------------------------------- //
             // AQUI O CODIGO DO LOOP
@@ -1096,18 +1089,6 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
 
             eixo_out.ReadPDO01();
             theta_l = ((-eixo_out.PDOgetActualPosition() - ZERO_01) * 2 * pi) / encoder_out;
-
-            //eixo_out.ReadPDO02();
-            //omega_l = -eixo_out.PDOgetActualVelocity();
-
-            /*
-            omega_l = (theta_l - theta_l_ant) / Ts;
-            omega_lf = -c2 * omega_lfant - c3 * omega_lfant2 + d1 * omega_l + d2 * omega_lant + d3 * omega_lant2;
-
-            eixo_in.ReadPDO02();
-            analog1 = eixo_in.PDOgetAnalogValue_01();
-            analog2 = eixo_in.PDOgetAnalogValue_02(); // mV
-            */
 
             controle_final = 0;
 
