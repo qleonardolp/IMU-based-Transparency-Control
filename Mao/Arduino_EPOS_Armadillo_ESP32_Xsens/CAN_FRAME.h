@@ -9,6 +9,7 @@
  * 
  * Created on 26 de Janeiro de 2012, 10:19
  */
+//OK
 
 #ifndef CAN_FRAME_H
 #define	CAN_FRAME_H

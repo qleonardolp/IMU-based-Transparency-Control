@@ -12,6 +12,7 @@
 * Adapted by Leonardo Felipe L. S. dos Santos, 2019
 *
 */
+//OK
 
 #ifndef CAN_FRAME_H
 #define	CAN_FRAME_H
