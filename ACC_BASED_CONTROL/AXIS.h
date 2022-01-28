@@ -15,6 +15,7 @@
 #include <string>
 #include <time.h>
 
+// OK
 #define HOMMING_MODE			0x06
 #define PROFILE_VELOCITY_MODE	0x03
 #define PROFILE_POSITION_MODE	0x01
