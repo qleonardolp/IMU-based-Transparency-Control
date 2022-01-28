@@ -167,13 +167,6 @@ public:
 			break;
 		}
 
-		for (size_t i = 0; i < SGVECT_SIZE; ++i)
-		{
-			velhumVec[i] = 0.000f; velexoVec[i] = 0.000f;
-			theta_l_vec[i] = 0.000f; theta_c_vec[i] = 0.000f;
-			torqueSeaVec[i] = 0.000f; torqueAccVec[i] = 0.000f;
-		}
-
 		if (seconds > 0)
 		{
 			timestamp_begin = std::chrono::system_clock::now();
@@ -372,18 +365,6 @@ public:
 
 	// Kalman Log
 	void kalmanLogger();
-
-	// Controlling tau_m using the Human acceleration feedforward
-	void accBasedController(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
-
-	// Collocated Admittance Controller using q' and tau_e, according to A. Calanca, R. Muradore and P. Fiorini
-	void CAdmittanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
-
-	// Basic Impedance Control
-	void ImpedanceControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
-
-	// SEA Feedback Control
-	void SeaFeedbackControl(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
 	
 	// Generic Controller
 	void Controller(std::vector<float> &ang_vel, std::condition_variable &cv, std::mutex &m);
@@ -407,15 +388,6 @@ public:
 
 	// 'Control Word' to show info at the console screen
 	std::string ctrl_word;
-
-	// Update and pass TCP message reference
-	char* TCPMessage(); 
-
-	// TCP message char vector
-	char tcp_message[100];
-
-	// Savitsky-Golay Smoothing and First Derivative based on the last 11 points
-	void SavitskyGolay(float window[], float newest_value, float* first_derivative);
 
 	// Stop the control_t thread loop, allowing .join at the main
 	void StopCtrlThread(){ Run = false; }
@@ -573,15 +545,6 @@ private:
 	static float IntTsea;
 
 	static float imu_rate;
-
-	//		STATE MEMORY VECTORS        //
-
-	float velhumVec[SGVECT_SIZE];		// [rad/s]
-	float velexoVec[SGVECT_SIZE];		// [rad/s]
-	float torqueSeaVec[SGVECT_SIZE];	// [N.m]
-	float torqueAccVec[SGVECT_SIZE];	// [N.m]
-	float theta_l_vec[SGVECT_SIZE];		// [rad]
-	float theta_c_vec[SGVECT_SIZE];		// [rad]
 
 	//		Kalman Filter: human-based model designed with Felix M. Escalante //
 
