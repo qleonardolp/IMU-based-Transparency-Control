@@ -21,16 +21,13 @@
     <ClCompile Include="declarations_xsens.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="myxda.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="console.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SerialPort.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="declarations_emgs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="qASGD_KF.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -59,16 +56,13 @@
     <ClInclude Include="nixnet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="myxda.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="console.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SerialPort.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="declarations_emgs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="qASGD_KF.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

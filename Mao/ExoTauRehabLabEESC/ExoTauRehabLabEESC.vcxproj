@@ -73,25 +73,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="console.cpp" />
     <ClCompile Include="declarations_emgs.cpp" />
     <ClCompile Include="declarations_xsens.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="myxda.cpp" />
+    <ClCompile Include="qASGD_KF.cpp" />
     <ClCompile Include="SerialPort.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AXIS.h" />
     <ClInclude Include="CAN_FRAME.h" />
-    <ClInclude Include="console.h" />
     <ClInclude Include="declarations.h" />
     <ClInclude Include="declarations_emgs.h" />
     <ClInclude Include="declarations_epos.h" />
     <ClInclude Include="declarations_xsens.h" />
     <ClInclude Include="EPOS_NETWORK.h" />
     <ClInclude Include="FORCE_SENSOR.h" />
-    <ClInclude Include="myxda.h" />
     <ClInclude Include="nixnet.h" />
+    <ClInclude Include="qASGD_KF.h" />
     <ClInclude Include="SerialPort.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
