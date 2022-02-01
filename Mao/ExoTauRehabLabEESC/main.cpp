@@ -1249,6 +1249,7 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
 
             if (com_controller == 4 && NumberOfImus != 3)
             {
+              controle_final = 0;
               throw std::runtime_error("Conecte 3 IMUs!");
             }
 

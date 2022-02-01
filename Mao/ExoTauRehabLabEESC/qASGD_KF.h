@@ -97,11 +97,11 @@ public:
 	void updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt);
 
 	// Update method for joint relative angle and velocity:
-	void updateJointStates(std::condition_variable &cv, std::mutex &mtx);
+	void updateJointStates(std::condition_variable &cv, std::mutex &mtx){};
 
 	// Methods to acquire the IMUs data:
-	void fetchIMUUpperLeg(Vector3f gyro, Vector3f acc);
-	void fetchIMULowerLeg(Vector3f gyro, Vector3f acc);
+	void fetchIMUUpperLeg(Vector3f gyro, Vector3f acc){};
+	void fetchIMULowerLeg(Vector3f gyro, Vector3f acc){};
 
 	// Convert Quaternion in Euler Angles (rad)
 	Vector3f quat2euler(Vector4f* quat);
