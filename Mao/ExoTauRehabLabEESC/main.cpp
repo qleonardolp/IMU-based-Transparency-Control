@@ -71,11 +71,19 @@ Contribuições: Maurício Félix Escalante, Jose Yecid, Wiliam Santos, Jonatan 
 #include "declarations_xsens.h"
 #include "declarations_emgs.h"
 
-using namespace std;
+//---------------------------------------//
+// Headers for IMU-based angle estimation (qASGD)
+//---------------------------------------//
+#include "qASGD_KF.h"
 
-vector<float> imus_data(12);
+using namespace std;
+using namespace Eigen;
+
+vector<float> imus_data(18);
 condition_variable imus_condvar;
 mutex imu_mtx;
+int NumberOfImus;
+qASGDKF estimador_angulo(samples_per_second_imu);
 
 
 void print_cabecalho(char *titulo);
@@ -290,14 +298,7 @@ int main()
                         std::cin>>OPC_K;
 
                  }
-                
-                /*
-                enum{
-                    REQUIRED
-                    ENABLE
-                    DISABLE};
-                
-                */
+
                 flag_arduino_multi_ard = false;
                 flag_arduino_multi_esp = true;
                 flag_arduino_multi_exo = false;
@@ -307,9 +308,6 @@ int main()
                 printf("\nflag_arduino_multi_esp : %d",flag_arduino_multi_esp );
                 printf("\nflag_arduino_multi_exo : %d",flag_arduino_multi_exo );
                 printf("\nflag_arduino_multi_imu : %d",flag_arduino_multi_imu );
-                
-
-            
             }
 
         
@@ -343,13 +341,17 @@ int main()
         std::thread thr_esp32;
         std::thread thr_control;
         std::thread thr_imuxsens;
+        std::thread thr_qasgd;
 
         aborting_ard = false;
         aborting_esp = false;
 
          // Funcion de leitura das XSens
         if (!flag_arduino_multi_imu)
+        {
             thr_imuxsens  = std::thread(leitura_xsens, exec_time * samples_per_second_imu);
+            thr_qasgd     = std::thread(&qASGDKF::updateJointStates, &estimador_angulo, std::ref(imus_condvar), std::ref(imu_mtx));
+        }
 
         // Funcion de leitura do arduino
         if (!flag_arduino_multi_ard)
@@ -388,12 +390,17 @@ int main()
             thr_emgdelsys.join();
 
         if (thr_imuxsens.joinable())
+        {
             thr_imuxsens.join();
+            thr_qasgd.join();
+        }
 
     } while (COMMAND_KEY != 0);
 
     //FINALIZA A COMUNICA��O COM AS EPOS
     epos.StopPDOS(1);
+
+    estimador_angulo.~qASGDKF();
 
     esperar_n_seg(1);
     cout << "FIM DE PROGRAMA" << endl;
@@ -1214,21 +1221,35 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
                 controle_final = controle;
             }
 
-            if (com_controller == 4)
+            if (com_controller == 4 && NumberOfImus == 3)
             {
 
-		          // imus_condvar.notify_one();
               
+              /// fprintf para teste..
+              FILE* test_file;
+              test_file = fopen("controle4_test.txt","w");
+              if (test_file != NULL){
+                fclose(test_file); 
+              }
+
               print_counter_4++;
               if (!(print_counter_4 % 200)){
                 unique_lock<mutex> Lk(imu_mtx); // esta dentro de um {}, OK
                 imus_condvar.notify_one();
-                std::cout << "AccZ IMU1: " << imus_data[2] << " m/s2" << std::endl;
-                // std::cout << "AccZ IMU1: " << 10.00 << " m/s2" << std::endl;
+                test_file = fopen("controle4_test.txt", "a");
+                if (test_file != NULL){
+                  fprintf(test_file, "GyroZ IMU1: %.4f \n", imus_data[2]);
+                  fclose(test_file);
+                }
                 print_counter_4 = 0;
               }
               
               controle_final = 0;
+            }
+
+            if (com_controller == 4 && NumberOfImus != 3)
+            {
+              throw std::runtime_error("Conecte 3 IMUs!");
             }
 
 		        //--------------------------------------------------------//
@@ -1537,6 +1558,23 @@ void leitura_xsens(int T_imu)
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
         }
 
+        NumberOfImus = (int)mtwDevices.size();
+
+        for (int i = 0; i < (int)mtwDevices.size(); ++i)
+        {
+          if (i == 0){
+            std::cout << "IMU na coxa da pessoa: " << mtwDevices[i]->deviceId().toString().toStdString() << "\n";
+          }
+          if (i == 1){
+            std::cout << "IMU na canela da pessoa: "<< mtwDevices[i]->deviceId().toString().toStdString() << "\n";
+          }
+          if (i == 2){
+            std::cout << "IMU na canela do exoesqueleto: "<< mtwDevices[i]->deviceId().toString().toStdString() << "\n";
+          }
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(5)); // talvez nao seja necessario
+
         flag_arduino_multi_imu = true;
         std::cout << " XSens ready " << endl;
 
@@ -1640,13 +1678,24 @@ void leitura_xsens(int T_imu)
                         #endif
 
                         unique_lock<mutex> Lck(imu_mtx); // dentro do {}, OK
-                        imus_data[0] = accData[0].value(0);
-                        imus_data[1] = accData[0].value(1);
-                        imus_data[2] = accData[0].value(2);
-                        imus_data[3] = gyroData[0].value(0);
-                        imus_data[4] = gyroData[0].value(1);
-                        imus_data[5] = gyroData[0].value(2);
-                        imus_condvar.notify_one();
+                        imus_data[6*i+0] = gyroData[i].value(0);
+                        imus_data[6*i+1] = gyroData[i].value(1);
+                        imus_data[6*i+2] = gyroData[i].value(2);
+                        imus_data[6*i+3] = accData[i].value(0);
+                        imus_data[6*i+4] = accData[i].value(1);
+                        imus_data[6*i+5] = accData[i].value(2);
+
+                        if (i == 0){
+                          Vector3f gyro( gyroData[i].toVector() ); 
+                          Vector3f acc( accData[i].toVector() );
+                          estimador_angulo.fetchIMUUpperLeg(gyro, acc);
+                        }
+                        if (i == 1){
+                          Vector3f gyro( gyroData[i].toVector() ); 
+                          Vector3f acc( accData[i].toVector() );
+                          estimador_angulo.fetchIMULowerLeg(gyro, acc);
+                        }
+                        imus_condvar.notify_all();
                         imus_condvar.wait(Lck);
 
                     }

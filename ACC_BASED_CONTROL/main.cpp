@@ -523,7 +523,7 @@ int main(int argc, char **argv)
         }
       }
 
-      if (newDataAvailable)
+      if (newDataAvailable) // TODO: melhorar isso, pois aqui nao esta checando por IMU...
       {
         std::unique_lock<std::mutex> Lck(Mtx);
         mtw_hum_raw = -(float)(gyroData[0].value(2) - imus_ybias[0]);
