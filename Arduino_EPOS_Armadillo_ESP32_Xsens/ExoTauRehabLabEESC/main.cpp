@@ -1,14 +1,7 @@
-﻿/*
-Programa para controle do exo
-v1 creada por Juan Carlos Perez Ibarra
-25/Oct/2020
-*/
-
-#define ITK_NOEXCEPT noexcept
+﻿#define ITK_NOEXCEPT noexcept
 
 #ifdef _WIN32
 #include <WinSock2.h>
-//#include <conio.h>
 #endif
 
 #define verbose_m 0
@@ -43,9 +36,9 @@ v1 creada por Juan Carlos Perez Ibarra
 //---------------------------------------//
 // Headers for XSens
 //---------------------------------------//
-#include "xsens/xsmutex.h"
-#include "include/xsensdeviceapi.h" // The Xsens device API header
-#include "conio.h"                  // For non ANSI _kbhit() and _getch()
+#include <xsensdeviceapi.h> // The Xsens device API header(sempre a primeira a ser incluida das Xsens!)
+#include <xsens\xsmutex.h>
+#include "conio.h"          // For non ANSI _kbhit() and _getch()
 #include "qASGD.h"
 
 //---------------------------------------//
@@ -1231,6 +1224,7 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
               {
                 unique_lock<mutex> lk(imu_mtx);
                 fprintf(testFile, "gyro1x: %.4f, gyro1y: %.4f, gyro1z: %.4f\n", imu_data[0], imu_data[1], imu_data[2]);
+                fclose(testFile);
               }
               controle_final = 0;
             }

@@ -33,6 +33,9 @@
     <ClCompile Include="declarations_emgs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="qASGD.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AXIS.h">
@@ -69,6 +72,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="declarations_emgs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="qASGD.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

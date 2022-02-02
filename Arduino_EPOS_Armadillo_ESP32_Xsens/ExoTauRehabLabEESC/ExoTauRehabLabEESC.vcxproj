@@ -46,12 +46,12 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\guilherme\Desktop\new_program_exo_juan\new_program_exo_juan\new_program_exo_juan\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\eigen3;C:\Program Files\Xsens\MT Software Suite 4.6\MT SDK\Win32\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;nixnet.lib;xsensdeviceapi32.lib;xstypes32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(NIEXTCCOMPILERSUPP)\lib32\msvc;C:\Users\guilherme\Desktop\new_program_exo_juan\new_program_exo_juan\new_program_exo_juan\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(NIEXTCCOMPILERSUPP)\lib32\msvc;C:\Program Files\Xsens\MT Software Suite 4.6\MT SDK\Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -78,6 +78,7 @@
     <ClCompile Include="declarations_xsens.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="myxda.cpp" />
+    <ClCompile Include="qASGD.cpp" />
     <ClCompile Include="SerialPort.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -92,6 +93,7 @@
     <ClInclude Include="FORCE_SENSOR.h" />
     <ClInclude Include="myxda.h" />
     <ClInclude Include="nixnet.h" />
+    <ClInclude Include="qASGD.h" />
     <ClInclude Include="SerialPort.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

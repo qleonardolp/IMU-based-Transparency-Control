@@ -3,9 +3,9 @@
 
 //---------------------------------------//
 // Headers for XSens
-#include "include/xsensdeviceapi.h" // The Xsens device API header
-#include "conio.h"                  // For non ANSI _kbhit() and _getch()
-
+#include <xsensdeviceapi.h> // The Xsens device API header(sempre a primeira a ser incluida das Xsens!)
+#include <xsens\xsmutex.h>
+#include "conio.h"
 #include <string>
 #include <stdexcept>
 #include <iostream>
@@ -14,8 +14,6 @@
 #include <set>
 #include <list>
 #include <utility>
-
-#include "xsens/xsmutex.h"
 //---------------------------------------//
 
 /*! \brief Stream insertion operator overload for XsPortInfo */
