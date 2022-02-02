@@ -71,6 +71,7 @@ using namespace std;
 // Variaveis Globais para comunicacao entre as threads
 condition_variable imu_cv;
 vector<float> imu_data(18);
+vector<float> imu_states(4);
 mutex imu_mtx;
 
 
@@ -287,13 +288,6 @@ int main()
 
                  }
                 
-                /*
-                enum{
-                    REQUIRED
-                    ENABLE
-                    DISABLE};
-                
-                */
                 flag_arduino_multi_ard = false;
                 flag_arduino_multi_esp = true;
                 flag_arduino_multi_exo = false;
@@ -303,9 +297,6 @@ int main()
                 printf("\nflag_arduino_multi_esp : %d",flag_arduino_multi_esp );
                 printf("\nflag_arduino_multi_exo : %d",flag_arduino_multi_exo );
                 printf("\nflag_arduino_multi_imu : %d",flag_arduino_multi_imu );
-                
-
-            
             }
 
         
@@ -317,12 +308,6 @@ int main()
                 flag_arduino_multi_esp = false;
                 flag_arduino_multi_exo = false;
                 flag_arduino_multi_imu = true;
-
-                // cout << "Corregir que pasa cuando no se inicializa el otro sensor..." << endl;
-
-                //esperar_n_seg(5);
-
-                //continue;
             }
 
             cout << endl;
@@ -1092,18 +1077,6 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
             eixo_out.ReadPDO01();
             theta_l = ((-eixo_out.PDOgetActualPosition() - ZERO_01) * 2 * pi) / encoder_out;
 
-            //eixo_out.ReadPDO02();
-            //omega_l = -eixo_out.PDOgetActualVelocity();
-
-            /*
-            omega_l = (theta_l - theta_l_ant) / Ts;
-            omega_lf = -c2 * omega_lfant - c3 * omega_lfant2 + d1 * omega_l + d2 * omega_lant + d3 * omega_lant2;
-
-            eixo_in.ReadPDO02();
-            analog1 = eixo_in.PDOgetAnalogValue_01();
-            analog2 = eixo_in.PDOgetAnalogValue_02(); // mV
-            */
-
             controle_final = 0;
 
             if (com_controller == 1 || com_controller == 3)
@@ -1230,6 +1203,29 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
 
             if (com_controller == 4)
             {
+              const float inertia_exo = 0.8768;
+              const float MgL = 20.08967;
+              const float Kp = 11.56;
+              const float Kd = 0.8;
+              float grav_comp = -MgL*cos(theta_l);
+              torque_l = ks * (theta_c - theta_l);
+
+              float acc_hum = 0;
+              float acc_exo = 0;
+              float vel_hum = 0;
+              float vel_exo = 0;
+              
+              // lei de controle:
+              {
+                unique_lock<mutex> lk(imu_mtx);
+                vel_hum = imu_states[0];
+                vel_exo = imu_states[1];
+                acc_hum = imu_states[2];
+                acc_exo = imu_states[3];
+	              float torque_m = inertia_exo*acc_hum + Kd*(acc_hum - acc_exo) + Kp*(vel_hum - vel_exo) + abs(grav_comp);
+                controle_final = torque_m*0.5; // conversao de torque desejado em velocidade desejada
+              }
+
               testFile = fopen("mutextest.txt","a");
               if (testFile != NULL)
               {
@@ -1245,22 +1241,10 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
             eixo_in.WritePDO02();
 
             // atualizar registros (ej. erro_ant = erro)
-            // {...}
             erro_2 = erro_1;
             erro_1 = erro_0;
 
             controle_ant = controle;
-
-
-            // Mostrar na tela dados
-            // {...}
-            /*
-            std::cout << "Data exo: "
-                      << " | Wm: " << controle
-                      << " | Tl: " << torque_l
-                      << " | Ol: " << theta_l
-                      << std::endl;
-                      */
 
             // Salvar dados em dataloggers
             datalog_exo[total_time_exo][0] = timer_exo.tempo2;
@@ -1588,7 +1572,9 @@ void leitura_xsens(int T_imu)
           imu_headers.push_back(mtwCallbacks[i]->device().deviceId().toInt());
         }
 
-        qASGDKF ahrs(-1, samples_per_second_imu);
+        qASGD ahrs(-1, samples_per_second_imu);
+        float vel_hum_last = 0;
+        float vel_exo_last = 0;
 
         // LOOP IMU
         do
@@ -1637,12 +1623,12 @@ void leitura_xsens(int T_imu)
                     #endif
                         
                     unique_lock<mutex> lk(imu_mtx);
-                    imu_data[6*i+0] = gyroData[i].value(0);
-                    imu_data[6*i+1] = gyroData[i].value(1);
-                    imu_data[6*i+2] = gyroData[i].value(2);
-                    imu_data[6*i+3] = accData[i].value(0);
-                    imu_data[6*i+4] = accData[i].value(1);
-                    imu_data[6*i+5] = accData[i].value(2);
+                    imu_data[6*i+0] =  gyroData[i].value(2);
+                    imu_data[6*i+1] = -gyroData[i].value(1);
+                    imu_data[6*i+2] =  gyroData[i].value(0);
+                    imu_data[6*i+3] =  accData[i].value(2);
+                    imu_data[6*i+4] = -accData[i].value(1);
+                    imu_data[6*i+5] =  accData[i].value(0);
 
                     Vector3f acc;
                     Vector3f gyro;
@@ -1660,9 +1646,17 @@ void leitura_xsens(int T_imu)
                 }
             }
 
-            
-
-            
+            Vector3f knee_angle = ahrs.quatDelta2euler();
+            Vector3f knee_speed = ahrs.RelOmegaNED();
+            {
+              unique_lock<mutex> _(imu_mtx);
+              imu_states[0] = knee_speed(0);
+              imu_states[2] = (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU;
+              vel_hum_last = knee_speed(0);
+              imu_states[1] = -imu_data[12];
+              imu_states[3] = (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU;
+              vel_exo_last = imu_states[1];
+            }
             // Salvar dados em dataloggers
             datalog_imu[total_time_imu][0] = timer_imu.tempo2;
             datalog_imu[total_time_imu][1] = total_time_imu;

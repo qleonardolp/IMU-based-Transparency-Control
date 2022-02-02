@@ -49,24 +49,19 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <unsupported/Eigen/MatrixFunctions>
 
 // CONSTANTS
-
 #define		MY_PI		3.141592653f	// Pi value
 #define		RADS2RPM	(30/MY_PI)		// rad/s to rpm 
 #define		RPM2RADS	(MY_PI/30)		// rpm to rad/s
-
 #define		FIXED_DT	1
-#define		MI0			0.10000f
-#define		BETA		1.14000f
-#define		RHO			0.00017f
 
 using namespace Eigen;
 using namespace std::chrono;
 
-class qASGDKF
+class qASGD
 {
 public:
 	// Class Constructor
-	qASGDKF(int seconds, float xsens_rate) : log_seconds(seconds)
+	qASGD(int seconds, float xsens_rate) : log_seconds(seconds)
 	{
 		imu_rate = xsens_rate;		// [Hz]	IMUs update rate
 		delta_t  = 1/xsens_rate;	// [s]
@@ -107,9 +102,9 @@ public:
 		Q1 = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 		Q2 = Q1;
 
-		mi0 = MI0;
-		Beta = BETA;
-		Rho = RHO;
+		mi0 = 0.100;
+		Beta = 1.1400;
+		Rho = 0.00017;
 	}
 
 	// Update method for qASGD AHRS Kalman Filer
@@ -136,7 +131,7 @@ public:
 	void GainScan();
 
 	// Class Destructor
-	~qASGDKF(){	}
+	~qASGD(){	}
 
 private:
 	int log_seconds;

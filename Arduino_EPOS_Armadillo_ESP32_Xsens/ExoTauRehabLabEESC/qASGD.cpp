@@ -25,7 +25,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 
 #include "qASGD.h"
 
-void qASGDKF::Recorder()
+void qASGD::Recorder()
 {
 	if(logging.load()){
 		logger = fopen(getLogfilename(), "a");
@@ -44,7 +44,7 @@ void qASGDKF::Recorder()
 	}
 }
 
-float qASGDKF::constrain_float(float val, float min, float max)
+float qASGD::constrain_float(float val, float min, float max)
 {
 	if (_isnan(val)) return (min + max)/2;
 
@@ -55,7 +55,7 @@ float qASGDKF::constrain_float(float val, float min, float max)
 	return val;
 }
 
-void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
+void qASGD::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
 	/*
 	-- Quaternion-based Attitude estimation using ASGD algorithm:
@@ -162,7 +162,7 @@ void qASGDKF::updateqASGD1Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	qASGD1_qk.normalize();
 }
 
-void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
+void qASGD::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 {
 	float q0 = qASGD2_qk(0);
 	float q1 = qASGD2_qk(1);
@@ -248,7 +248,7 @@ void qASGDKF::updateqASGD2Kalman(Vector3f gyro, Vector3f acc, float Dt)
 	qASGD2_qk.normalize();
 }
 
-Vector3f qASGDKF::quat2euler(Vector4f* quat)
+Vector3f qASGD::quat2euler(Vector4f* quat)
 {
 	float q0 = (*quat)(0);
 	float q1 = (*quat)(1);
@@ -264,7 +264,7 @@ Vector3f qASGDKF::quat2euler(Vector4f* quat)
 	return euler;
 }
 
-Vector3f qASGDKF::quat2euler(int id)
+Vector3f qASGD::quat2euler(int id)
 {
 	float q0, q1, q2, q3;
 
@@ -300,7 +300,7 @@ Vector3f qASGDKF::quat2euler(int id)
 }
 
 
-Vector3f qASGDKF::quatDelta2euler()
+Vector3f qASGD::quatDelta2euler()
 {
 	float qr0 = qASGD2_qk[0];
 	float qr1 = qASGD2_qk[1];
@@ -328,7 +328,7 @@ Vector3f qASGDKF::quatDelta2euler()
 	return euler;
 }
 
-Vector3f qASGDKF::RelOmegaNED()
+Vector3f qASGD::RelOmegaNED()
 {
 	float q0 = qASGD1_qk(0);
 	float q1 = qASGD1_qk(1);
@@ -371,7 +371,7 @@ Vector3f qASGDKF::RelOmegaNED()
 }
 
 
-void qASGDKF::GainScan()
+void qASGD::GainScan()
 {
 	FILE* pFile = fopen("ASGDparam.txt", "rt");
 
