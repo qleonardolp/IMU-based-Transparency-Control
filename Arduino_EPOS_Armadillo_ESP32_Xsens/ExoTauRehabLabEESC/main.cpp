@@ -46,6 +46,7 @@ v1 creada por Juan Carlos Perez Ibarra
 #include "xsens/xsmutex.h"
 #include "include/xsensdeviceapi.h" // The Xsens device API header
 #include "conio.h"                  // For non ANSI _kbhit() and _getch()
+#include "qASGD.h"
 
 //---------------------------------------//
 // Headers for CAN/EPOS
@@ -1587,13 +1588,7 @@ void leitura_xsens(int T_imu)
           imu_headers.push_back(mtwCallbacks[i]->device().deviceId().toInt());
         }
 
-        /*
-        IDs IMUs:
-        1: 11801311
-        2: 11800786
-        3: 11801156
-        4: 11800716
-        */
+        qASGDKF ahrs(-1, samples_per_second_imu);
 
         // LOOP IMU
         do
@@ -1649,6 +1644,19 @@ void leitura_xsens(int T_imu)
                     imu_data[6*i+4] = accData[i].value(1);
                     imu_data[6*i+5] = accData[i].value(2);
 
+                    Vector3f acc;
+                    Vector3f gyro;
+                    if (i == 0){
+                      acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                      gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                      ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                    }
+                    if (i == 1){
+                      acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                      gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                      ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                    }
+                    // variables with Knee states...
                 }
             }
 
