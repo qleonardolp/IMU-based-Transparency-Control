@@ -13,15 +13,26 @@ v1 creada por Juan Carlos Perez Ibarra
 
 #define verbose_m 0
 
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <atomic>
 #include <stdio.h>
-#include <time.h>
-
 #include <stdlib.h>
 #include <stdint.h>
+#include <iostream>
+#include <sstream>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <set>
+#include <time.h>
+#include <iomanip>
+#include <stdexcept>
+#include <utility>
+#include <string>
+#include <vector>
+#include <array>
+#include <list>
+#include <math.h>
+#include <algorithm>
+#include <condition_variable>
 
 //---------------------------------------//
 // Headers for EMGs Delsys
@@ -32,25 +43,9 @@ v1 creada por Juan Carlos Perez Ibarra
 //---------------------------------------//
 // Headers for XSens
 //---------------------------------------//
+#include "xsens/xsmutex.h"
 #include "include/xsensdeviceapi.h" // The Xsens device API header
 #include "conio.h"                  // For non ANSI _kbhit() and _getch()
-
-#include <string>
-#include <stdexcept>
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <set>
-#include <list>
-#include <utility>
-
-#include "xsens/xsmutex.h"
-//---------------------------------------//
-
-#include <vector>
-#include <algorithm>
-#include <array>
-#include <math.h>
 
 //---------------------------------------//
 // Headers for CAN/EPOS
@@ -72,6 +67,12 @@ v1 creada por Juan Carlos Perez Ibarra
 
 using namespace std;
 
+// Variaveis Globais para comunicacao entre as threads
+condition_variable imu_cv;
+vector<float> imu_data(18);
+mutex imu_mtx;
+
+
 void print_cabecalho(char *titulo);
 void esperar_n_seg(int sec);
 void start_transmissao_rede_epos();
@@ -89,7 +90,6 @@ void leitura_emg(int T_emg);
 void leitura_esp32(int T_esp);
 
 int salva_dataloggers(double (*datalog_ard)[n_datalogs_ard], size_t rows);
-
 
 
 int main()
@@ -253,6 +253,7 @@ int main()
                 cout << "[1] - IMPEDANCIA" << endl;
                 cout << "[2] - TORQUE" << endl;
                 cout << "[3] - IMP. ZERO + RUIDO" << endl;
+                cout << "[4] - ACC TRANSPARENCY" << endl;
                 cout << endl;
                 cout << "OPCAO: ";
 
@@ -981,6 +982,9 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
 
     cout << "Inicializando controle ..." << endl;
 
+    FILE *testFile = fopen("mutextest.txt","w");
+    if (testFile != NULL) fclose(testFile);
+
     try
     {
 
@@ -1223,6 +1227,16 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
                 controle_final = controle;
             }
 
+            if (com_controller == 4)
+            {
+              testFile = fopen("mutextest.txt","a");
+              if (testFile != NULL)
+              {
+                unique_lock<mutex> lk(imu_mtx);
+                fprintf(testFile, "gyro1x: %.4f, gyro1y: %.4f, gyro1z: %.4f\n", imu_data[0], imu_data[1], imu_data[2]);
+              }
+              controle_final = 0;
+            }
 		        //--------------------------------------------------------//
 
             // enviar o valor de controle ao motor
@@ -1606,33 +1620,35 @@ void leitura_xsens(int T_imu)
                     magData[i]   = packet->calibratedMagneticField();
                     
                     mtwCallbacks[i]->deleteOldestPacket();
-
-                    // mostrar datos en pantalla si necesario
-                    if (newDataAvailable)
-                    {
                         
-                        datalog_imu[total_time_imu][2+0+0*3+i*12] = gyroData[i].value(0); // Wix
-                        datalog_imu[total_time_imu][2+1+0*3+i*12] = gyroData[i].value(1); // Wiy
-                        datalog_imu[total_time_imu][2+2+0*3+i*12] = gyroData[i].value(2); // Wiz
-                                                              
-                        datalog_imu[total_time_imu][2+0+1*3+i*12] = accData[i].value(0); // Aix
-                        datalog_imu[total_time_imu][2+1+1*3+i*12] = accData[i].value(1); // Aiy
-                        datalog_imu[total_time_imu][2+2+1*3+i*12] = accData[i].value(2); // Aiz
-                                                              
-                        datalog_imu[total_time_imu][2+0+2*3+i*12] = magData[i].value(0); // Mix
-                        datalog_imu[total_time_imu][2+1+2*3+i*12] = magData[i].value(1); // Miy
-                        datalog_imu[total_time_imu][2+2+2*3+i*12] = magData[i].value(2); // Miz
-                                                              
-                        datalog_imu[total_time_imu][2+0+3*3+i*12] = eulerData[i].roll();  
-                        datalog_imu[total_time_imu][2+1+3*3+i*12] = eulerData[i].pitch(); 
-                        datalog_imu[total_time_imu][2+2+3*3+i*12] = eulerData[i].yaw();
+                    datalog_imu[total_time_imu][2+0+0*3+i*12] = gyroData[i].value(0); // Wix
+                    datalog_imu[total_time_imu][2+1+0*3+i*12] = gyroData[i].value(1); // Wiy
+                    datalog_imu[total_time_imu][2+2+0*3+i*12] = gyroData[i].value(2); // Wiz
+                                                          
+                    datalog_imu[total_time_imu][2+0+1*3+i*12] = accData[i].value(0); // Aix
+                    datalog_imu[total_time_imu][2+1+1*3+i*12] = accData[i].value(1); // Aiy
+                    datalog_imu[total_time_imu][2+2+1*3+i*12] = accData[i].value(2); // Aiz
+                                                          
+                    datalog_imu[total_time_imu][2+0+2*3+i*12] = magData[i].value(0); // Mix
+                    datalog_imu[total_time_imu][2+1+2*3+i*12] = magData[i].value(1); // Miy
+                    datalog_imu[total_time_imu][2+2+2*3+i*12] = magData[i].value(2); // Miz
+                                                          
+                    datalog_imu[total_time_imu][2+0+3*3+i*12] = eulerData[i].roll();  
+                    datalog_imu[total_time_imu][2+1+3*3+i*12] = eulerData[i].pitch(); 
+                    datalog_imu[total_time_imu][2+2+3*3+i*12] = eulerData[i].yaw();
 
-                        #if verbose_m == 1
-                          cout << "XSens " << i << " OK" << endl;
-                        #endif
+                    #if verbose_m == 1
+                      cout << "XSens " << i << " OK" << endl;
+                    #endif
                         
+                    unique_lock<mutex> lk(imu_mtx);
+                    imu_data[6*i+0] = gyroData[i].value(0);
+                    imu_data[6*i+1] = gyroData[i].value(1);
+                    imu_data[6*i+2] = gyroData[i].value(2);
+                    imu_data[6*i+3] = accData[i].value(0);
+                    imu_data[6*i+4] = accData[i].value(1);
+                    imu_data[6*i+5] = accData[i].value(2);
 
-                    }
                 }
             }
 
