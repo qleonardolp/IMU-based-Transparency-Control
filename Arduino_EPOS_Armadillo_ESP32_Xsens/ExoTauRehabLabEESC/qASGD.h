@@ -49,9 +49,11 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #include <unsupported/Eigen/MatrixFunctions>
 
 // CONSTANTS
-#define		MY_PI		3.141592653f	// Pi value
-#define		RADS2RPM	(30/MY_PI)		// rad/s to rpm 
-#define		RPM2RADS	(MY_PI/30)		// rpm to rad/s
+#ifndef M_PI
+  #define M_PI 3.141592653f
+#endif
+#define		RADS2RPM	(30/M_PI)		// rad/s to rpm 
+#define		RPM2RADS	(M_PI/30)		// rpm to rad/s
 #define		FIXED_DT	1
 
 using namespace Eigen;

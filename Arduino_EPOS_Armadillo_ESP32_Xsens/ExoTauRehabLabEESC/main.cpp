@@ -58,6 +58,7 @@
 #include "declarations_epos.h"
 #include "declarations_xsens.h"
 #include "declarations_emgs.h"
+#include "LowPassFilter2p.h"
 
 using namespace std;
 
@@ -1566,6 +1567,14 @@ void leitura_xsens(int T_imu)
           imu_headers.push_back(mtwCallbacks[i]->device().deviceId().toInt());
         }
 
+        // Filtros Passa Baixa para os dados das IMUs
+        LowPassFilter2pFloat imu_filters[18];
+        for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
+        {
+          imu_filters[i].set_cutoff_frequency(samples_per_second_imu, 16);
+          imu_filters[i].reset();
+        }
+
         qASGD ahrs(-1, samples_per_second_imu);
         float vel_hum_last = 0;
         float vel_exo_last = 0;
@@ -1617,12 +1626,12 @@ void leitura_xsens(int T_imu)
                     #endif
                         
                     unique_lock<mutex> lk(imu_mtx);
-                    imu_data[6*i+0] =  gyroData[i].value(2);
-                    imu_data[6*i+1] = -gyroData[i].value(1);
-                    imu_data[6*i+2] =  gyroData[i].value(0);
-                    imu_data[6*i+3] =  accData[i].value(2);
-                    imu_data[6*i+4] = -accData[i].value(1);
-                    imu_data[6*i+5] =  accData[i].value(0);
+                    imu_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                    imu_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                    imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                    imu_data[6*i+3] = imu_filters[6*i+3].apply( accData[i].value(2) );
+                    imu_data[6*i+4] = imu_filters[6*i+4].apply(-accData[i].value(1) );
+                    imu_data[6*i+5] = imu_filters[6*i+5].apply( accData[i].value(0) );
 
                     Vector3f acc;
                     Vector3f gyro;

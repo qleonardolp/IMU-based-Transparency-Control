@@ -33,10 +33,10 @@ void qASGD::Recorder()
 		{
 		timestamp = (float)1e-6*duration_cast<microseconds>(system_clock::now() - timestamp_begin).count();
 
-		Vector3f euler1 = quat2euler(1)*(180 / MY_PI);
-		Vector3f euler2 = quat2euler(2)*(180 / MY_PI);
-    	Vector3f DelAng = quatDelta2euler()*(180 / MY_PI);
-    	Vector3f RelVelocity = RelOmegaNED()*(180 / MY_PI);
+		Vector3f euler1 = quat2euler(1)*(180 / M_PI);
+		Vector3f euler2 = quat2euler(2)*(180 / M_PI);
+    	Vector3f DelAng = quatDelta2euler()*(180 / M_PI);
+    	Vector3f RelVelocity = RelOmegaNED()*(180 / M_PI);
 		fprintf(logger, "%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f,%5.3f\n", \
 				timestamp, euler1(0), euler1(1), euler2(0), euler2(1), DelAng(0), RelVelocity(0));
 			fclose(logger);
