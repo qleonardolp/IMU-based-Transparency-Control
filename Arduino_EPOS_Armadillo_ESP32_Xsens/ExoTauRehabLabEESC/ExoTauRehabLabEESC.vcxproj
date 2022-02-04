@@ -76,6 +76,7 @@
     <ClCompile Include="console.cpp" />
     <ClCompile Include="declarations_emgs.cpp" />
     <ClCompile Include="declarations_xsens.cpp" />
+    <ClCompile Include="LowPassFilter2p.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="myxda.cpp" />
     <ClCompile Include="qASGD.cpp" />
@@ -91,6 +92,7 @@
     <ClInclude Include="declarations_xsens.h" />
     <ClInclude Include="EPOS_NETWORK.h" />
     <ClInclude Include="FORCE_SENSOR.h" />
+    <ClInclude Include="LowPassFilter2p.h" />
     <ClInclude Include="myxda.h" />
     <ClInclude Include="nixnet.h" />
     <ClInclude Include="qASGD.h" />

@@ -65,7 +65,7 @@ using namespace std;
 // Variaveis Globais para comunicacao entre as threads
 condition_variable imu_cv;
 vector<float> imu_data(18);
-vector<float> imu_states(4);
+vector<float> imu_states(5);
 mutex imu_mtx;
 
 
@@ -1224,7 +1224,7 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
                 testFile = fopen("mutextest.txt","a");
                 if (testFile != NULL){
                   fprintf(testFile, "vel_hum: %.4f, vel_exo: %.4f, acc_hum: %.4f, acc_exo: %.4f, tht_c: %.4f, tht_l: %.4f\n", \
-                          vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l);
+                          vel_hum, vel_exo, acc_hum, acc_exo, theta_c, imu_states[4]);
                   fclose(testFile);
                 }
               }
@@ -1553,9 +1553,9 @@ void leitura_xsens(int T_imu)
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
             std::string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
             if (i == 0)
-              std::cout << "IMU Usuário Coxa: " << imu_id;
+              std::cout << "IMU Usuário Coxa: " << imu_id << std::endl;
             if (i == 1)
-              std::cout << "IMU Usuário Canela: " << imu_id;
+              std::cout << "IMU Usuário Canela: " << imu_id << std::endl;
             if (i == 2)
               std::cout << "IMU Exo: " << imu_id << std::endl;
         }
@@ -1604,7 +1604,7 @@ void leitura_xsens(int T_imu)
 
         // Filtros Passa Baixa para os dados das IMUs
         LowPassFilter2pFloat imu_filters[18];
-        for (int i = 0; i < sizeof(Filt)/sizeof(LowPassFilter2pFloat); i++)
+        for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
           imu_filters[i].set_cutoff_frequency(samples_per_second_imu, 16);
           imu_filters[i].reset();
@@ -1698,6 +1698,7 @@ void leitura_xsens(int T_imu)
               imu_states[1] = -imu_data[12];
               imu_states[3] = (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU;
               vel_exo_last = imu_states[1];
+              imu_states[4] = knee_angle(0);
             }
             else
             {

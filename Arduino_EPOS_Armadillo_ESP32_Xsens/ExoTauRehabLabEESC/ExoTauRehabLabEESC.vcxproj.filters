@@ -36,6 +36,9 @@
     <ClCompile Include="qASGD.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LowPassFilter2p.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AXIS.h">
@@ -75,6 +78,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="qASGD.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LowPassFilter2p.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
