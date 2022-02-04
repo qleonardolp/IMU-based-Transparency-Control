@@ -1603,6 +1603,8 @@ void leitura_xsens(int T_imu)
         }
 
         // Filtros Passa Baixa para os dados das IMUs
+        LowPassFilter2pFloat humAccFilt(samples_per_second_imu, 10);
+        LowPassFilter2pFloat exoAccFilt(samples_per_second_imu, 10);
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
@@ -1690,15 +1692,14 @@ void leitura_xsens(int T_imu)
             Vector3f knee_speed = ahrs.RelOmegaNED();
             // variables with Knee states:
             // Orientação das IMUs user esta boa, girar IMU do Exo
-            // TODO: filtrar mais as accs!
             if (mtwCallbacks.size() >= 3)
             {
               unique_lock<mutex> _(imu_mtx);
               imu_states[0] = knee_speed(0);
-              imu_states[2] = (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU;
+              imu_states[2] = humAccFilt.apply( (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU );
               vel_hum_last = knee_speed(0);
               imu_states[1] = -imu_data[12]; // girar IMU do Exo
-              imu_states[3] = (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU;
+              imu_states[3] = exoAccFilt.apply( (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU );
               vel_exo_last = imu_states[1];
               imu_states[4] = knee_angle(0);
             }
