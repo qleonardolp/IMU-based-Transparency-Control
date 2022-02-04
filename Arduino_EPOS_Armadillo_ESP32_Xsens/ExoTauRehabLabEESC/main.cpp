@@ -249,7 +249,8 @@ int main()
                 cout << "[1] - IMPEDANCIA" << endl;
                 cout << "[2] - TORQUE" << endl;
                 cout << "[3] - IMP. ZERO + RUIDO" << endl;
-                cout << "[4] - ACC TRANSPARENCY" << endl;
+                cout << "[4] - ACC - TRANSPARENCY" << endl;
+                cout << "[5] - ADM - TRANSPARENCY" << endl;
                 cout << endl;
                 cout << "OPCAO: ";
 
@@ -310,8 +311,13 @@ int main()
             cout << endl;
         }
 
+        for (int i = 0; i < imu_states.size(); i++){
+          imu_states[i] = 0;
+        }
+        for (int i = 0; i < imu_data.size(); i++){
+          imu_data[i] = 0;
+        }
 
-        
 
         std::thread thr_emgdelsys;
         std::thread thr_arduino;
@@ -1208,25 +1214,52 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
               float acc_exo = 0;
               float vel_hum = 0;
               float vel_exo = 0;
-              
-              // lei de controle:
               {
-                unique_lock<mutex> lk(imu_mtx);
+                unique_lock<mutex> _(imu_mtx);
                 vel_hum = imu_states[0];
                 vel_exo = imu_states[1];
                 acc_hum = imu_states[2];
                 acc_exo = imu_states[3];
-	              float torque_m = inertia_exo*acc_hum + Kd*(acc_hum - acc_exo) + Kp*(vel_hum - vel_exo) + abs(grav_comp);
-                controle_final = torque_m*0.5; // conversao de torque desejado em velocidade desejada
-              }
 
-              testFile = fopen("mutextest.txt","a");
-              if (testFile != NULL)
-              {
-                unique_lock<mutex> lk(imu_mtx);
-                fprintf(testFile, "gyro1x: %.4f, gyro1y: %.4f, gyro1z: %.4f\n", imu_data[0], imu_data[1], imu_data[2]);
-                fclose(testFile);
+                testFile = fopen("mutextest.txt","a");
+                if (testFile != NULL){
+                  fprintf(testFile, "vel_hum: %.4f, vel_exo: %.4f, acc_hum: %.4f, acc_exo: %.4f, tht_c: %.4f, tht_l: %.4f\n", \
+                          vel_hum, vel_exo, acc_hum, acc_exo, theta_c, theta_l);
+                  fclose(testFile);
+                }
               }
+              // lei de controle:
+	            float torque_m = inertia_exo*acc_hum + Kd*(acc_hum - acc_exo) + Kp*(vel_hum - vel_exo) + abs(grav_comp);
+              controle_final = torque_m*0.1; // conversao de torque desejado em velocidade desejada
+
+              controle_final = 0;
+            }
+            
+            if (com_controller == 5)
+            {
+              const float inertia_exo = 0.8768;
+              const float MgL = 20.08967;
+              const float Kp = 11.56;
+              const float Kd = 0.8;
+              const float Kadm = ks/20;
+              float grav_comp = -MgL*cos(theta_l);
+              torque_l = ks * (theta_c - theta_l);
+
+              float acc_hum = 0;
+              float acc_exo = 0;
+              float vel_hum = 0;
+              float vel_exo = 0;
+              {
+                unique_lock<mutex> _(imu_mtx);
+                vel_hum = imu_states[0];
+                vel_exo = imu_states[1];
+                acc_hum = imu_states[2];
+                acc_exo = imu_states[3];
+              }
+              // lei de controle:
+	            float des_torque_l = inertia_exo*acc_hum + Kd*(acc_hum - acc_exo) + Kp*(vel_hum - vel_exo) + abs(grav_comp);
+              controle_final = Kadm*(des_torque_l - torque_l);
+
               controle_final = 0;
             }
 		        //--------------------------------------------------------//

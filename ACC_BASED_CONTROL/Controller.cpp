@@ -275,6 +275,9 @@ void accBasedControl::Admittance()
 	// into the old C2 = (1 - stiffness_d / STIFFNESS) / (stiffness_d + damping_d / C_DT)
 	float C1 = damping_d / (damping_d + stiffness_d*C_DT);
 	float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d + damping_d);
+	// Se damping = 0:
+	float C1 = 0;
+	float C2 = (1 - stiffness_d / STIFFNESS) / (C_DT*stiffness_d);
 	
 	accbased_comp =  Kff_acc*INERTIA_EXO*acc_hum + Kp_acc*(acc_hum - acc_exo) + Ki_acc*(vel_hum - vel_exo);
 	float des_tsea = accbased_comp + abs(grav_comp);
