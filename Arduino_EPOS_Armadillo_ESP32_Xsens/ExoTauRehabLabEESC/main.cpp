@@ -1223,7 +1223,7 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
 
                 testFile = fopen("mutextest.txt","a");
                 if (testFile != NULL){
-                  fprintf(testFile, "vel_hum: %.4f, vel_exo: %.4f, acc_hum: %.4f, acc_exo: %.4f, tht_c: %.4f, tht_l: %.4f\n", \
+                  fprintf(testFile, "vel_hum, %.4f, vel_exo, %.4f, acc_hum, %.4f, acc_exo, %.4f, tht_c, %.4f, tht_l, %.4f\n", \
                           vel_hum, vel_exo, acc_hum, acc_exo, theta_c, imu_states[4]);
                   fclose(testFile);
                 }
@@ -1689,13 +1689,15 @@ void leitura_xsens(int T_imu)
             Vector3f knee_angle = ahrs.quatDelta2euler();
             Vector3f knee_speed = ahrs.RelOmegaNED();
             // variables with Knee states:
+            // Orientação das IMUs user esta boa, girar IMU do Exo
+            // TODO: filtrar mais as accs!
             if (mtwCallbacks.size() >= 3)
             {
               unique_lock<mutex> _(imu_mtx);
               imu_states[0] = knee_speed(0);
               imu_states[2] = (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU;
               vel_hum_last = knee_speed(0);
-              imu_states[1] = -imu_data[12];
+              imu_states[1] = -imu_data[12]; // girar IMU do Exo
               imu_states[3] = (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU;
               vel_exo_last = imu_states[1];
               imu_states[4] = knee_angle(0);
