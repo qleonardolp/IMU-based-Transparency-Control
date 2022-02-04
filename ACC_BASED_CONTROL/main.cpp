@@ -384,24 +384,19 @@ int main(int argc, char **argv)
       }
     }
 
-    //std::cout << "Attaching callback handlers to MTWs..." << std::endl;
+    std::cout << "Attaching callback handlers to MTWs..." << std::endl;
     mtwCallbacks.resize(mtwDevices.size());
     for (int i = 0; i < (int)mtwDevices.size(); ++i)
     {
-      mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
-      mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
-    }
-
-    for (int i = 0; i < (int)mtwDevices.size(); ++i)
-    {
-      if (i == 0)
-      {
-        std::cout << "MTw Hum: " << mtwDevices[i]->deviceId().toString().toStdString();
-      }
-      if (i == 1)
-      {
-        std::cout << " MTw Exo: " << mtwDevices[i]->deviceId().toString().toStdString() << std::endl;
-      }
+        mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
+        mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
+        std::string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
+        if (i == 0)
+          std::cout << "IMU Usuário Coxa: " << imu_id;
+        if (i == 1)
+          std::cout << "IMU Usuário Canela: " << imu_id;
+        if (i == 2)
+          std::cout << "IMU Exo: " << imu_id << std::endl;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(5));

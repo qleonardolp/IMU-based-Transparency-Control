@@ -1338,9 +1338,6 @@ void leitura_xsens(int T_imu)
     }
     i_dt_imu = 0;
 
-    // --------- //
-
-    int nm = 0;
     vector<int> imu_headers(4);
 
     // --------- //
@@ -1521,6 +1518,13 @@ void leitura_xsens(int T_imu)
         {
             mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
+            std::string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
+            if (i == 0)
+              std::cout << "IMU Usuário Coxa: " << imu_id;
+            if (i == 1)
+              std::cout << "IMU Usuário Canela: " << imu_id;
+            if (i == 2)
+              std::cout << "IMU Exo: " << imu_id << std::endl;
         }
 
         flag_arduino_multi_imu = true;
@@ -1551,8 +1555,6 @@ void leitura_xsens(int T_imu)
         std::cout << "\nMain loop. Press any key to quit\n"
                   << std::endl;
         std::cout << "Waiting for data available..." << std::endl;
-
-        nm = mtwCallbacks.size();
 
         // --------- //        
         std::vector<XsEuler> eulerData(mtwCallbacks.size()); // Vector to store euler data for each mtw
@@ -1591,7 +1593,7 @@ void leitura_xsens(int T_imu)
             // Leitura IMU
             bool newDataAvailable = false;
             
-            for (size_t i = 0; i < nm; ++i)
+            for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
                 if (mtwCallbacks[i]->dataAvailable())
                 {
@@ -1624,33 +1626,37 @@ void leitura_xsens(int T_imu)
                     #if verbose_m == 1
                       cout << "XSens " << i << " OK" << endl;
                     #endif
-                        
-                    unique_lock<mutex> lk(imu_mtx);
-                    imu_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                    imu_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                    imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                    imu_data[6*i+3] = imu_filters[6*i+3].apply( accData[i].value(2) );
-                    imu_data[6*i+4] = imu_filters[6*i+4].apply(-accData[i].value(1) );
-                    imu_data[6*i+5] = imu_filters[6*i+5].apply( accData[i].value(0) );
 
-                    Vector3f acc;
-                    Vector3f gyro;
-                    if (i == 0){
-                      acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                      gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                      ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                    if (mtwCallbacks.size() >= 3)
+                    {
+                      unique_lock<mutex> _(imu_mtx);
+                      imu_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                      imu_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                      imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                      imu_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                      imu_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                      imu_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+
+                      Vector3f acc;
+                      Vector3f gyro;
+                      if (i == 0){
+                        acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                        gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                        ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                      }
+                      if (i == 1){
+                        acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                        gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                        ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                      }
                     }
-                    if (i == 1){
-                      acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                      gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                      ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
-                    }
-                    // variables with Knee states...
                 }
             }
 
             Vector3f knee_angle = ahrs.quatDelta2euler();
             Vector3f knee_speed = ahrs.RelOmegaNED();
+            // variables with Knee states:
+            if (mtwCallbacks.size() >= 3)
             {
               unique_lock<mutex> _(imu_mtx);
               imu_states[0] = knee_speed(0);
@@ -1659,6 +1665,13 @@ void leitura_xsens(int T_imu)
               imu_states[1] = -imu_data[12];
               imu_states[3] = (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU;
               vel_exo_last = imu_states[1];
+            }
+            else
+            {
+              unique_lock<mutex> _(imu_mtx);
+              for (int i = 0; i < imu_states.size(); i++){
+                imu_states[i] = 0;
+              }
             }
             // Salvar dados em dataloggers
             datalog_imu[total_time_imu][0] = timer_imu.tempo2;
@@ -1677,8 +1690,6 @@ void leitura_xsens(int T_imu)
 
 
         } while (total_time_imu < T_imu);
-        //} while ((total_time_imu < T) && (!_kbhit()));
-        //(void)_getch();
 
         // --------- //
 
@@ -1699,8 +1710,6 @@ void leitura_xsens(int T_imu)
         }
 
         // --------- //
-
-
     }
     catch (std::exception const &ex)
     {
@@ -1729,15 +1738,7 @@ void leitura_xsens(int T_imu)
     {
         delete (*i);
     }
-
-        
     std::cout << "Successful exit." << std::endl;
-    //std::cout << "Press [ENTER] to continue." << std::endl;
-    //std::cin.get();
-
-    // --------- //
-    
-    /// INCLUIR FUNCION PARA SALVAR DATALOGGERS
   
     time_t ttt;
     time(&ttt);
@@ -1748,14 +1749,14 @@ void leitura_xsens(int T_imu)
     FILE *pFile_imu = fopen(fecha, "w");
     FILE *pFile_ld_imu = fopen("datos/last_data_xsens.dat", "w");
     
-    for (size_t i = 0; i < nm; ++i)
+    for (size_t i = 0; i < mtwCallbacks.size(); ++i)
     {
         int temp = imu_headers.at(i);
         fprintf(pFile_imu, "%d \t", temp);
         fprintf(pFile_ld_imu, "%d \t", temp);
     }
 
-    for (i_datalogs_imu = nm; i_datalogs_imu < n_datalogs_imu; i_datalogs_imu++)
+    for (i_datalogs_imu = mtwCallbacks.size(); i_datalogs_imu < n_datalogs_imu; i_datalogs_imu++)
     {
       fprintf(pFile_imu, "%d \t", 0);
       fprintf(pFile_ld_imu, "%d \t", 0);
@@ -1786,18 +1787,12 @@ void leitura_xsens(int T_imu)
      }catch(...){
        printf("\n\n\nHubo un error\n\n\n");
     }
-    
 }
 
 void leitura_emg(int T_emg)
 {
-
   // { crear una struct para datos EMG nueva }
   // structEMG_vars* EMG_vars;
-
-
-   
-
 }
 
 void leitura_esp32(int T_esp)

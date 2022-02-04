@@ -104,6 +104,9 @@ public:
 		Q1 = Matrix4f::Identity()*5.476e-6;	// Usar Eq. 19...
 		Q2 = Q1;
 
+		gyro1.setZero();
+		gyro2.setZero();
+
 		mi0 = 0.100;
 		Beta = 1.1400;
 		Rho = 0.00017;
