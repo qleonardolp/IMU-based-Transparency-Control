@@ -1603,8 +1603,8 @@ void leitura_xsens(int T_imu)
         }
 
         // Filtros Passa Baixa para os dados das IMUs
-        LowPassFilter2pFloat humAccFilt(samples_per_second_imu, 10);
-        LowPassFilter2pFloat exoAccFilt(samples_per_second_imu, 10);
+        LowPassFilter2pFloat humAccFilt(samples_per_second_imu, 8);
+        LowPassFilter2pFloat exoAccFilt(samples_per_second_imu, 8);
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
@@ -1664,25 +1664,37 @@ void leitura_xsens(int T_imu)
 
                     if (mtwCallbacks.size() >= 3)
                     {
-                      unique_lock<mutex> _(imu_mtx);
-                      imu_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                      imu_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                      imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                      imu_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                      imu_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                      imu_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                      //unique_lock<mutex> _(imu_mtx);
+                      // Orientacao Exo: [3 -2 1]
+                      // Orientacao Pessoa: [-3 2 1]
 
-                      Vector3f acc;
-                      Vector3f gyro;
-                      if (i == 0){
-                        acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                        gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                        ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                      if (i == 0 || i == 1){
+                        imu_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                        imu_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                        imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imu_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                        imu_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                        imu_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                        Vector3f acc;
+                        Vector3f gyro;
+                        if (i == 0){
+                          acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                          gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                          ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                        }
+                        if (i == 1){
+                          acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
+                          gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
+                          ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                        }
                       }
-                      if (i == 1){
-                        acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                        gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                        ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
+                      if (i == 2){
+                        imu_data[6*i+0] = imu_filters[6*i+0].apply(-gyroData[i].value(2) );
+                        imu_data[6*i+1] = imu_filters[6*i+1].apply( gyroData[i].value(1) );
+                        imu_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imu_data[6*i+3] = imu_filters[6*i+3].apply( -accData[i].value(2) );
+                        imu_data[6*i+4] = imu_filters[6*i+4].apply(  accData[i].value(1) );
+                        imu_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                     }
                 }
@@ -1698,7 +1710,7 @@ void leitura_xsens(int T_imu)
               imu_states[0] = knee_speed(0);
               imu_states[2] = humAccFilt.apply( (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU );
               vel_hum_last = knee_speed(0);
-              imu_states[1] = -imu_data[12]; // girar IMU do Exo
+              imu_states[1] = imu_data[12];
               imu_states[3] = exoAccFilt.apply( (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU );
               vel_exo_last = imu_states[1];
               imu_states[4] = knee_angle(0);
