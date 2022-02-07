@@ -70,6 +70,7 @@ std::atomic<bool> flag_arduino_multi_ard(true);
 std::atomic<bool> flag_arduino_multi_esp(true);
 std::atomic<bool> flag_arduino_multi_exo(true);
 std::atomic<bool> flag_arduino_multi_imu(true);
+std::atomic<bool> flag_kalman_filter(true);
 std::atomic<bool> aborting_emg(false);
 std::atomic<bool> aborting_ard(false);
 std::atomic<bool> aborting_esp(false);

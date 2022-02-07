@@ -60,6 +60,8 @@
 #include "declarations_emgs.h"
 #include "LowPassFilter2p.h"
 
+#include "KalmanFilter.h"
+
 using namespace std;
 
 // Variaveis Globais para comunicacao entre as threads
@@ -287,11 +289,13 @@ int main()
                 flag_arduino_multi_esp = true;
                 flag_arduino_multi_exo = false;
                 flag_arduino_multi_imu = false;
+                flag_kalman_filter = false;
 
                 printf("\nflag_arduino_multi_ard : %d",flag_arduino_multi_ard );
                 printf("\nflag_arduino_multi_esp : %d",flag_arduino_multi_esp );
                 printf("\nflag_arduino_multi_exo : %d",flag_arduino_multi_exo );
                 printf("\nflag_arduino_multi_imu : %d",flag_arduino_multi_imu );
+                printf("\nflag_kalman_filter : %d", flag_kalman_filter );
             }
 
         
@@ -971,6 +975,12 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
     FILE *testFile = fopen("mutextest.txt","w");
     if (testFile != NULL) fclose(testFile);
 
+    LowPassFilter2pFloat humAccFilt(samples_per_second_imu, 8);
+    LowPassFilter2pFloat exoAccFilt(samples_per_second_imu, 8);
+    qASGD ahrs(-1, samples_per_second_exo);
+    float vel_hum_last = 0;
+    float vel_exo_last = 0;
+
     try
     {
 
@@ -1210,21 +1220,48 @@ void controle_exo(int T_exo, int com_setpoint, int com_controller)
               float grav_comp = -MgL*cos(theta_l);
               torque_l = ks * (theta_c - theta_l);
 
+              float torque_int = 0;
+
               float acc_hum = 0;
               float acc_exo = 0;
               float vel_hum = 0;
               float vel_exo = 0;
+              float pos_hum = 0;
+              float pos_exo = theta_l;
               {
                 unique_lock<mutex> _(imu_mtx);
-                vel_hum = imu_states[0];
-                vel_exo = imu_states[1];
-                acc_hum = imu_states[2];
-                acc_exo = imu_states[3];
+                Vector3f acc;
+                Vector3f gyro;
+
+                acc << imu_data[3], imu_data[4], imu_data[5];
+                gyro << imu_data[0], imu_data[1], imu_data[2];
+                ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_EXO);
+
+                acc << imu_data[9], imu_data[10], imu_data[11];
+                gyro << imu_data[6], imu_data[7], imu_data[8];
+                ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_EXO);
+
+                Vector3f knee_angle = ahrs.quatDelta2euler();
+                Vector3f knee_speed = ahrs.RelOmegaNED();
+
+                pos_hum = knee_angle(0);
+
+                vel_hum = knee_speed(0);
+                acc_hum = humAccFilt.apply( (vel_hum - vel_hum_last)/SAMPLE_TIME_EXO );
+                vel_hum_last = vel_hum;
+
+                vel_exo = imu_data[12];
+                acc_exo = exoAccFilt.apply( (vel_exo - vel_exo_last)/SAMPLE_TIME_EXO );
+                vel_exo_last = vel_exo;
+
+                zk << torque_l, torque_int, pos_exo, vel_hum, pos_hum;
+                uk << RPM2RADS*omega_m;
+                updateKalmanFilter();
 
                 testFile = fopen("mutextest.txt","a");
                 if (testFile != NULL){
-                  fprintf(testFile, "vel_hum, %.4f, vel_exo, %.4f, acc_hum, %.4f, acc_exo, %.4f, tht_c, %.4f, tht_l, %.4f\n", \
-                          vel_hum, vel_exo, acc_hum, acc_exo, theta_c, imu_states[4]);
+                  fprintf(testFile, "pos_hum, %.4f, pos_exo, %.4f, vel_hum, %.4f, vel_exo, %.4f, acc_hum, %.4f, acc_exo, %.4f\n", \
+                          pos_hum, pos_exo, vel_hum, vel_exo, acc_hum, acc_exo);
                   fclose(testFile);
                 }
               }
@@ -1603,18 +1640,12 @@ void leitura_xsens(int T_imu)
         }
 
         // Filtros Passa Baixa para os dados das IMUs
-        LowPassFilter2pFloat humAccFilt(samples_per_second_imu, 8);
-        LowPassFilter2pFloat exoAccFilt(samples_per_second_imu, 8);
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
           imu_filters[i].set_cutoff_frequency(samples_per_second_imu, 16);
           imu_filters[i].reset();
         }
-
-        qASGD ahrs(-1, samples_per_second_imu);
-        float vel_hum_last = 0;
-        float vel_exo_last = 0;
 
         // LOOP IMU
         do
@@ -1664,7 +1695,7 @@ void leitura_xsens(int T_imu)
 
                     if (mtwCallbacks.size() >= 3)
                     {
-                      //unique_lock<mutex> _(imu_mtx);
+                      unique_lock<mutex> _(imu_mtx);
                       // Orientacao Exo: [3 -2 1]
                       // Orientacao Pessoa: [-3 2 1]
 
@@ -1675,18 +1706,6 @@ void leitura_xsens(int T_imu)
                         imu_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
                         imu_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
                         imu_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
-                        Vector3f acc;
-                        Vector3f gyro;
-                        if (i == 0){
-                          acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                          gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                          ahrs.updateqASGD1Kalman(gyro, acc, SAMPLE_TIME_IMU);
-                        }
-                        if (i == 1){
-                          acc << imu_data[6*i+3], imu_data[6*i+4], imu_data[6*i+5];
-                          gyro << imu_data[6*i+0], imu_data[6*i+1], imu_data[6*i+2];
-                          ahrs.updateqASGD2Kalman(gyro, acc, SAMPLE_TIME_IMU);
-                        }
                       }
                       if (i == 2){
                         imu_data[6*i+0] = imu_filters[6*i+0].apply(-gyroData[i].value(2) );
@@ -1700,28 +1719,6 @@ void leitura_xsens(int T_imu)
                 }
             }
 
-            Vector3f knee_angle = ahrs.quatDelta2euler();
-            Vector3f knee_speed = ahrs.RelOmegaNED();
-            // variables with Knee states:
-            // Orientação das IMUs user esta boa, girar IMU do Exo
-            if (mtwCallbacks.size() >= 3)
-            {
-              unique_lock<mutex> _(imu_mtx);
-              imu_states[0] = knee_speed(0);
-              imu_states[2] = humAccFilt.apply( (knee_speed(0) - vel_hum_last)/SAMPLE_TIME_IMU );
-              vel_hum_last = knee_speed(0);
-              imu_states[1] = imu_data[12];
-              imu_states[3] = exoAccFilt.apply( (imu_states[1] - vel_exo_last)/SAMPLE_TIME_IMU );
-              vel_exo_last = imu_states[1];
-              imu_states[4] = knee_angle(0);
-            }
-            else
-            {
-              unique_lock<mutex> _(imu_mtx);
-              for (int i = 0; i < imu_states.size(); i++){
-                imu_states[i] = 0;
-              }
-            }
             // Salvar dados em dataloggers
             datalog_imu[total_time_imu][0] = timer_imu.tempo2;
             datalog_imu[total_time_imu][1] = total_time_imu;
