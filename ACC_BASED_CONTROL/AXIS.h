@@ -1,21 +1,13 @@
 /* 
 * File:   AXIS.h
 * Author: GUILHERME FERNANDES
-*
-* ESTA FUNÇÃO REALIZA O CONTROLE DE UM EIXO DA EPOS
-* 
 * Created on 26 de Janeiro de 2012, 19:34
 */
-
-
 #include "CAN_FRAME.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <sstream>
-#include <string>
+// #include <stdlib.h>
+// #include <sstream>
 #include <time.h>
 
-// OK
 #define HOMMING_MODE			0x06
 #define PROFILE_VELOCITY_MODE	0x03
 #define PROFILE_POSITION_MODE	0x01
@@ -24,7 +16,6 @@
 #define CURRENT_MODE			0xFD
 #define MASTER_ENCODER_MODE		0xFB
 #define STEP_MODE				0xFA
-
 
 #ifndef AXIS_H
 #define	AXIS_H

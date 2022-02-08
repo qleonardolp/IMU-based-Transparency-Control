@@ -4,19 +4,16 @@
 *
 * Created on 26 de Janeiro de 2012, 10:26
 *
-* Adapted by Leonardo Felipe L. S. dos Santos, 2019
+* Adapted by Leonardo Felipe L. S. dos Santos, 2022
 *
 */
-//OK
 
 #ifndef EPOS_NETWORK_H
 #define	EPOS_NETWORK_H
 
 #include "CAN_FRAME.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <sstream>
-#include <string>
+// #include <stdlib.h>
+// #include <sstream>
 
 class EPOS_NETWORK
 {
