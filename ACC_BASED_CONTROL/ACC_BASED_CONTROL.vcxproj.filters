@@ -39,32 +39,23 @@
     <ClInclude Include="AXIS.h">
       <Filter>Header Files\epos_canopen</Filter>
     </ClInclude>
-    <ClInclude Include="findClosestUpdateRate.h">
-      <Filter>Header Files\xsens_awinda</Filter>
-    </ClInclude>
     <ClInclude Include="mastercallback.h">
       <Filter>Header Files\xsens_awinda</Filter>
     </ClInclude>
     <ClInclude Include="mtwcallback.h">
       <Filter>Header Files\xsens_awinda</Filter>
     </ClInclude>
-    <ClInclude Include="generalheader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Controller.h">
-      <Filter>Header Files\epos_canopen</Filter>
-    </ClInclude>
     <ClInclude Include="LowPassFilter2p.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="qASGD_KF.h">
+    <ClInclude Include="QpcLoopTimer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SharedStructs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="findClosestUpdateRate.cpp">
-      <Filter>Source Files\xsawinda</Filter>
-    </ClCompile>
     <ClCompile Include="mastercallback.cpp">
       <Filter>Source Files\xsawinda</Filter>
     </ClCompile>
@@ -74,13 +65,19 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Controller.cpp">
-      <Filter>Source Files\eposcan</Filter>
-    </ClCompile>
     <ClCompile Include="LowPassFilter2p.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="qASGD_KF.cpp">
+    <ClCompile Include="Controle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Logging.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="qASGD.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="readIMUs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

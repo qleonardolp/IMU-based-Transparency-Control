@@ -13,24 +13,23 @@
   <ItemGroup>
     <ClInclude Include="AXIS.h" />
     <ClInclude Include="CAN_FRAME.h" />
-    <ClInclude Include="Controller.h" />
     <ClInclude Include="EPOS_NETWORK.h" />
-    <ClInclude Include="findClosestUpdateRate.h" />
-    <ClInclude Include="generalheader.h" />
     <ClInclude Include="LowPassFilter2p.h" />
     <ClInclude Include="mtwcallback.h" />
     <ClInclude Include="mastercallback.h" />
     <ClInclude Include="nixnet.h" />
-    <ClInclude Include="qASGD_KF.h" />
+    <ClInclude Include="QpcLoopTimer.h" />
+    <ClInclude Include="SharedStructs.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Controller.cpp" />
-    <ClCompile Include="findClosestUpdateRate.cpp" />
+    <ClCompile Include="Controle.cpp" />
+    <ClCompile Include="Logging.cpp" />
     <ClCompile Include="LowPassFilter2p.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mastercallback.cpp" />
     <ClCompile Include="mtwcallback.cpp" />
-    <ClCompile Include="qASGD_KF.cpp" />
+    <ClCompile Include="qASGD.cpp" />
+    <ClCompile Include="readIMUs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -74,25 +73,26 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <WarningLevel>Level1</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>C:\Program Files\MATLAB\R2017b\extern\include;C:\eigen3;$(SolutionDir)\Win32\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\eigen3;C:\Program Files\Xsens\MT Software Suite 4.6\MT SDK\Win32\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ShowIncludes>true</ShowIncludes>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2017b\extern\lib\win64\microsoft;$(NIEXTCCOMPILERSUPP)\lib32\msvc;$(SolutionDir)\Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>odbc32.lib;odbccp32.lib;nixnet.lib;xsensdeviceapi32.lib;xstypes32.lib;libmx.lib;libmat.lib;libeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(NIEXTCCOMPILERSUPP)\lib32\msvc;C:\Program Files\Xsens\MT Software Suite 4.6\MT SDK\Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>odbc32.lib;odbccp32.lib;nixnet.lib;xsensdeviceapi32.lib;xstypes32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level1</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>

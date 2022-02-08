@@ -99,13 +99,13 @@ int main()
   eixo_out.WritePDO01();
   cout << "..";
 
-  auto endwait = clock() + 2 * CLOCKS_PER_SEC;
+  endwait = clock() + 2 * CLOCKS_PER_SEC;
   while (clock() < endwait){  }
 
   // EPOS 02
   eixo_in.PDOsetControlWord_FaultReset(true);
   eixo_in.WritePDO01();
-  auto endwait = clock() + 2 * CLOCKS_PER_SEC;
+  endwait = clock() + 2 * CLOCKS_PER_SEC;
   while (clock() < endwait){  }
   eixo_in.PDOsetControlWord_FaultReset(false);
   eixo_in.WritePDO01();
@@ -132,7 +132,7 @@ int main()
   thr_imus.join();
 
   epos.StopPDOS(1);
-  auto endwait = clock() + 2 * CLOCKS_PER_SEC;
+  endwait = clock() + 2 * CLOCKS_PER_SEC;
   while (clock() < endwait){  }
 
   cout << "Successful exit." << endl;
