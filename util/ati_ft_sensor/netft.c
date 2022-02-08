@@ -1,9 +1,10 @@
 /* Simple demo showing how to communicate with Net F/T using C language. */
 
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+// #include <arpa/inet.h>  // for Linux
+#include <winsock2.h>
+// #include <sys/types.h>  // for Linux
+// #include <sys/socket.h> // for Linux
+// #include <netdb.h> // for ??? Guess what
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
