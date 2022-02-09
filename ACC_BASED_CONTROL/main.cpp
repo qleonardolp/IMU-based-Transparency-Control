@@ -37,15 +37,15 @@ void Logging(ThrdStruct &data_struct);
 #define CTRL_SMPLTM 0.0002 // @5 kHz
 #define LOG_SMPLTM  0.0040 // @250 Hz 
 // Threads Priority:
-#define IMU_PRIORITY  -1 //
-#define ASGD_PRIORITY -1 //
-#define CTRL_PRIORITY -2 //
+#define IMU_PRIORITY   0 // -1
+#define ASGD_PRIORITY  0 // -1
+#define CTRL_PRIORITY  0 // -2
 #define LOG_PRIORITY   0 // 
 
 int main()
 {
   using namespace std;
-  
+#if PRIORITY
   DWORD dwPriority, dwError;
   if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)){
       dwError = GetLastError();
@@ -54,6 +54,7 @@ int main()
       dwPriority = GetPriorityClass( GetCurrentProcess() );
       printf("Process priority class: %lu \n", dwPriority);
   }
+#endif
   // START DA REDE CAN
   epos.StartPDOS(1);
   epos.StartPDOS(2);
@@ -105,8 +106,12 @@ int main()
 
   mutex imu_mtx;
   float shared_data[18];
+  //inicializa shared_data:
+  for (int i = 0; i < sizeof(shared_data)/sizeof(float); i++){
+    shared_data[i] = i*i;
+  }
   ThrdStruct imu_struct, asgd_struct, control_struct, logging_struct;
-  int execution_time = 30; // just for test
+  int execution_time = 5; // just for test
 
   imu_struct.sampletime_ = IMU_SMPLTM;
   imu_struct.param00_  = IMU_PRIORITY;
@@ -131,6 +136,24 @@ int main()
   logging_struct.exectime_ = execution_time;
   *(logging_struct.datavec_) = shared_data;
   logging_struct.mtx_ = &imu_mtx;
+
+  // using struct params as readiness flags:
+  imu_struct.param0A_ = asgd_struct.param0A_ = &imu_isready;
+  imu_struct.param0B_ = &asgd_isready;
+  imu_struct.param0C_ = &control_isready;
+  imu_struct.param0D_ = &logging_isready;
+  //asgd_struct.param0A_ = &imu_isready;
+  asgd_struct.param0B_ = &asgd_isready;
+  asgd_struct.param0C_ = &control_isready;
+  asgd_struct.param0D_ = &logging_isready;
+  control_struct.param0A_ = &imu_isready;
+  control_struct.param0B_ = &asgd_isready;
+  control_struct.param0C_ = &control_isready;
+  control_struct.param0D_ = &logging_isready;
+  logging_struct.param0A_ = &imu_isready;
+  logging_struct.param0B_ = &asgd_isready;
+  logging_struct.param0C_ = &control_isready;
+  logging_struct.param0D_ = &logging_isready;
   
   thread thr_imus;
   thread thr_qasgd;

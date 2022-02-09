@@ -19,7 +19,7 @@
 
 #include "nixnet.h"
 #include <stdio.h>
-// #include <string>
+#include <string>
 
 
 class CANFrame

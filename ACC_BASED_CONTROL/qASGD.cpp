@@ -34,7 +34,9 @@ void qASGD(ThrdStruct &data_struct)
     using namespace std;
     using namespace Eigen;
 
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     // Declarations
     float q0 = 0;
@@ -72,17 +74,18 @@ void qASGD(ThrdStruct &data_struct)
     float omg_norm = gyro1.norm();
     float mi(0);
 
+    //do {    } while (!imu_isready);
     asgd_isready = true;
+
     looptimer Timer(data_struct.sampletime_);
-    auto exec_time_micros = data_struct.exectime_ * MILLION;
-    auto t_begin = Timer.micro_now();
+    llint exec_time_micros = data_struct.exectime_ * MILLION;
+    llint t_begin = Timer.micro_now();
     do
     {
         Timer.tik();
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            for (size_t i = 0; i < 17; i++)
-                imus_data[i] = *data_struct.datavec_[i];
+            memcpy(imus_data, *data_struct.datavec_, 18*sizeof(float));
         } // fim da sessao critica
 
         gyro1 << imus_data[0], imus_data[1], imus_data[2];

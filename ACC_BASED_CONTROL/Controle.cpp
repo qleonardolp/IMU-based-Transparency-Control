@@ -20,28 +20,30 @@
 
 void Controle(ThrdStruct &data_struct){
     using namespace std;
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     // Sincroniza as epos
-    epos.sync();
+    //epos.sync();
 
     // Habilita o controle de velocidade
-    eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
+    //eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
     // eixo_out.ReadPDO01();
     // eixo_in.ReadPDO01();
     
     // setup stuff...
-
+    /*
+    do{
+      unique_lock<mutex> _(*data_struct.mtx_);
+    } while (!*data_struct.param0A_ || !*data_struct.param0B_);
+    */
     control_isready = true;
-    do
-    {
-        // wait!
-    } while (!imu_isready || !asgd_isready || !logging_isready);
     
 
     looptimer Timer(data_struct.sampletime_);
-    auto exec_time_micros = data_struct.exectime_*MILLION;
-    auto t_begin = Timer.micro_now();
+    llint exec_time_micros = data_struct.exectime_*MILLION;
+    llint t_begin = Timer.micro_now();
     do
     {
         Timer.tik();

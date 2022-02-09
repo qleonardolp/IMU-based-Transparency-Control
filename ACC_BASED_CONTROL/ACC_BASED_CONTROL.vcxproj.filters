@@ -22,9 +22,6 @@
     <Filter Include="Source Files\xsawinda">
       <UniqueIdentifier>{1749baa2-be57-447a-8b3e-c3ea61d33f0d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\eposcan">
-      <UniqueIdentifier>{b0459278-3fcf-4e1f-adce-f25a556670fb}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="nixnet.h">
@@ -52,6 +49,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SharedStructs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XsensEpos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

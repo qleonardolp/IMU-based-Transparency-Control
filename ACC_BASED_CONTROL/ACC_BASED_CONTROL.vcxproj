@@ -20,6 +20,7 @@
     <ClInclude Include="nixnet.h" />
     <ClInclude Include="QpcLoopTimer.h" />
     <ClInclude Include="SharedStructs.h" />
+    <ClInclude Include="XsensEpos.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Controle.cpp" />

@@ -18,7 +18,9 @@
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
+#include <stdexcept>
 #include <iostream>
+#include <chrono>
 #include <conio.h>
 #include <iomanip>
 
@@ -44,7 +46,9 @@ int findClosestUpdateRate(const XsIntArray &supportedUpdateRates, const int desi
 void readIMUs(ThrdStruct &data_struct)
 {
     using namespace std;
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     /* Xsens Awinda Station management
     __________________________________
@@ -60,9 +64,6 @@ void readIMUs(ThrdStruct &data_struct)
 
     const int desiredUpdateRate = 100; // data_struct.sampletime_;
     const int desiredRadioChannel = 25;
-    // looptimer xsensTimer(data_struct.sampletime_);
-    looptimer xsensTimer(desiredUpdateRate);
-    auto exec_time_micros = data_struct.exectime_*MILLION;
 
     WirelessMasterCallback wirelessMasterCallback; // Callback for wireless master
     vector<MtwCallback *> mtwCallbacks;            // Callbacks for mtw devices
@@ -216,19 +217,21 @@ void readIMUs(ThrdStruct &data_struct)
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
             string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
             if (i == 0)
-                cout << "IMU Usuário Coxa: " << imu_id << "\n";
+                cout << "IMU Usuario Coxa: " << imu_id << "\n";
             if (i == 1)
-                cout << "IMU Usuário Canela: " << imu_id << "\n";
+                cout << "IMU Usuario Canela: " << imu_id << "\n";
             if (i == 2)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
+        //this_thread::sleep_for(chrono::seconds(3));
         imu_isready = true;
 
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
 
-        wirelessMasterCallback.mtw_event.clear();
+        //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...
 
+        float imus_data[18]; 
         // Filtros Passa Baixa para os dados das IMUs
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
@@ -237,19 +240,18 @@ void readIMUs(ThrdStruct &data_struct)
           imu_filters[i].reset();
         }
 
-        auto t_begin = xsensTimer.micro_now();
+        llint exec_time_micros = (data_struct.exectime_)*MILLION;
+        // looptimer xsensTimer(data_struct.sampletime_);
+        looptimer xsensTimer(desiredUpdateRate);
+        llint t_begin = xsensTimer.micro_now();
         do
         {
             xsensTimer.tik();
-            bool newDataAvailable = false;
-
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
                 if (mtwCallbacks[i]->dataAvailable())
                 {
-                    newDataAvailable = true;
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-
                     accData[i] = packet->calibratedAcceleration();
                     gyroData[i] = packet->calibratedGyroscopeData();
 
@@ -257,26 +259,28 @@ void readIMUs(ThrdStruct &data_struct)
 
                     if (mtwCallbacks.size() >= 3)
                     {
-                      unique_lock<mutex> _(*data_struct.mtx_);
                       // Orientacao Exo: [3 -2 1]
                       // Orientacao Pessoa: [-3 2 1]
 
                       if (i == 0 || i == 1){
-                        *data_struct.datavec_[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        *data_struct.datavec_[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        *data_struct.datavec_[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        *data_struct.datavec_[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        *data_struct.datavec_[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        *data_struct.datavec_[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                       if (i == 2){
-                        *data_struct.datavec_[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        *data_struct.datavec_[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        *data_struct.datavec_[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        *data_struct.datavec_[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        *data_struct.datavec_[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        *data_struct.datavec_[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
+                      unique_lock<mutex> _(*data_struct.mtx_);
+                      memcpy(*data_struct.datavec_, imus_data, 18*sizeof(float));
+                      //*data_struct.datavec_ = imus_data;
                     }
                 }
             }
