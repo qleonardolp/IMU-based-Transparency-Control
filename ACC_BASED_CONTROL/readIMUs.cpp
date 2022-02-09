@@ -19,6 +19,7 @@
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
+#include <chrono>
 #include <conio.h>
 #include <iomanip>
 
@@ -44,7 +45,9 @@ int findClosestUpdateRate(const XsIntArray &supportedUpdateRates, const int desi
 void readIMUs(ThrdStruct &data_struct)
 {
     using namespace std;
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     /* Xsens Awinda Station management
     __________________________________
@@ -216,12 +219,13 @@ void readIMUs(ThrdStruct &data_struct)
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
             string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
             if (i == 0)
-                cout << "IMU Usuário Coxa: " << imu_id << "\n";
+                cout << "IMU Usuario Coxa: " << imu_id << "\n";
             if (i == 1)
-                cout << "IMU Usuário Canela: " << imu_id << "\n";
+                cout << "IMU Usuario Canela: " << imu_id << "\n";
             if (i == 2)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
+        this_thread::sleep_for(chrono::seconds(3));
         imu_isready = true;
 
         vector<XsVector> accData(mtwCallbacks.size());
@@ -229,6 +233,7 @@ void readIMUs(ThrdStruct &data_struct)
 
         wirelessMasterCallback.mtw_event.clear();
 
+        float imus_data[18]; 
         // Filtros Passa Baixa para os dados das IMUs
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
@@ -257,26 +262,27 @@ void readIMUs(ThrdStruct &data_struct)
 
                     if (mtwCallbacks.size() >= 3)
                     {
-                      unique_lock<mutex> _(*data_struct.mtx_);
                       // Orientacao Exo: [3 -2 1]
                       // Orientacao Pessoa: [-3 2 1]
 
                       if (i == 0 || i == 1){
-                        *data_struct.datavec_[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        *data_struct.datavec_[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        *data_struct.datavec_[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        *data_struct.datavec_[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        *data_struct.datavec_[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        *data_struct.datavec_[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                       if (i == 2){
-                        *data_struct.datavec_[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        *data_struct.datavec_[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        *data_struct.datavec_[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        *data_struct.datavec_[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        *data_struct.datavec_[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        *data_struct.datavec_[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
+                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
+                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
+                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
+                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
+                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
+                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
+                      unique_lock<mutex> _(*data_struct.mtx_);
+                      *data_struct.datavec_ = imus_data;
                     }
                 }
             }

@@ -19,7 +19,9 @@
 
 void Logging(ThrdStruct &data_struct){
     using namespace std;
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     // setup stuff...
     char filename[] = "./data/log_thread.txt";
@@ -27,8 +29,8 @@ void Logging(ThrdStruct &data_struct){
     if (logFileHandle != NULL) fclose(logFileHandle);
 
     float log_data[18];
+    do {    } while (!imu_isready || !asgd_isready || !control_isready);
     logging_isready = true;
-    do {    } while (!imu_isready || !asgd_isready);
 
     looptimer Timer(data_struct.sampletime_);
     auto exec_time_micros = data_struct.exectime_*MILLION;

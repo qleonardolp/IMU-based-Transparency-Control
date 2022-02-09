@@ -37,15 +37,15 @@ void Logging(ThrdStruct &data_struct);
 #define CTRL_SMPLTM 0.0002 // @5 kHz
 #define LOG_SMPLTM  0.0040 // @250 Hz 
 // Threads Priority:
-#define IMU_PRIORITY  -1 //
-#define ASGD_PRIORITY -1 //
-#define CTRL_PRIORITY -2 //
+#define IMU_PRIORITY   0 // -1
+#define ASGD_PRIORITY  0 // -1
+#define CTRL_PRIORITY  0 // -2
 #define LOG_PRIORITY   0 // 
 
 int main()
 {
   using namespace std;
-  
+#if PRIORITY
   DWORD dwPriority, dwError;
   if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)){
       dwError = GetLastError();
@@ -54,6 +54,7 @@ int main()
       dwPriority = GetPriorityClass( GetCurrentProcess() );
       printf("Process priority class: %lu \n", dwPriority);
   }
+#endif
   // START DA REDE CAN
   epos.StartPDOS(1);
   epos.StartPDOS(2);

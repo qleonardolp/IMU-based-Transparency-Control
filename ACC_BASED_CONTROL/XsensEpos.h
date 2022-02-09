@@ -1,32 +1,34 @@
 #ifndef XSENSEPOS_H
 #define XSENSEPOS_H
 
+#define PRIORITY  0
+
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
 #include <atomic>
 
 // ENDERECAMENTO DA BASE DE DADOS CAN
-char* CAN_INTERFACE = "CAN1";
-char* CAN_DATABASE  = "database";
-char* CAN_CLUSTER   = "NETCAN";
-char* NET_ID_SERVO_01 = "1";
-char* NET_ID_SERVO_02 = "2";
-char* NET_ID_SERVO_03 = "3";
-char* NET_ID_SERVO_04 = "4";
-char* NET_ID_SERVO_05 = "5";
-char* NET_ID_SERVO_06 = "6";
+static char* CAN_INTERFACE = "CAN1";
+static char* CAN_DATABASE  = "database";
+static char* CAN_CLUSTER   = "NETCAN";
+static char* NET_ID_SERVO_01 = "1";
+static char* NET_ID_SERVO_02 = "2";
+static char* NET_ID_SERVO_03 = "3";
+static char* NET_ID_SERVO_04 = "4";
+static char* NET_ID_SERVO_05 = "5";
+static char* NET_ID_SERVO_06 = "6";
 
 //DECLARACAO DA REDE CAN:
-EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
+static EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
 //DECLARACAO DAS EPOS:
-AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
-AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
+static AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
+static AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
 
 // Threads readiness flags: (globais)
-std::atomic<bool> imu_isready(false);
-std::atomic<bool> asgd_isready(false);
-std::atomic<bool> control_isready(false);
-std::atomic<bool> logging_isready(false);
+static std::atomic<bool> imu_isready(false);
+static std::atomic<bool> asgd_isready(false);
+static std::atomic<bool> control_isready(false);
+static std::atomic<bool> logging_isready(false);
 
 #endif // XSENSEPOS_H
 

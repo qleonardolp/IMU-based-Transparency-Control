@@ -20,7 +20,9 @@
 
 void Controle(ThrdStruct &data_struct){
     using namespace std;
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     // Sincroniza as epos
     epos.sync();
@@ -31,12 +33,11 @@ void Controle(ThrdStruct &data_struct){
     // eixo_in.ReadPDO01();
     
     // setup stuff...
-
-    control_isready = true;
     do
     {
         // wait!
-    } while (!imu_isready || !asgd_isready || !logging_isready);
+    } while (!imu_isready || !asgd_isready);
+    control_isready = true;
     
 
     looptimer Timer(data_struct.sampletime_);

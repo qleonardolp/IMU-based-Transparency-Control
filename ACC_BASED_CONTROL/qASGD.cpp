@@ -34,7 +34,9 @@ void qASGD(ThrdStruct &data_struct)
     using namespace std;
     using namespace Eigen;
 
+#if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+#endif
 
     // Declarations
     float q0 = 0;
@@ -72,7 +74,9 @@ void qASGD(ThrdStruct &data_struct)
     float omg_norm = gyro1.norm();
     float mi(0);
 
+    do {    } while (!imu_isready);
     asgd_isready = true;
+
     looptimer Timer(data_struct.sampletime_);
     auto exec_time_micros = data_struct.exectime_ * MILLION;
     auto t_begin = Timer.micro_now();
