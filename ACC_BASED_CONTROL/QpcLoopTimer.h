@@ -85,3 +85,11 @@ private:
 };
 
 #endif //QPCLOOPTIMER_H
+
+//////////////////////////////////////////\/////////\//
+// Leonardo Felipe Lima Santos dos Santos /\     ////\/
+// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
+//\///////////////////////\// ////	\_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\////\//

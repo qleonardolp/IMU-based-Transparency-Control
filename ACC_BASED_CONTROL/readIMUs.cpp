@@ -1,9 +1,17 @@
+//////////////////////////////////////////\/////////\//
+// Leonardo Felipe Lima Santos dos Santos /\     ////\/
+// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
+//\///////////////////////\// ////	\_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\////\//
+
 #ifdef _WIN32
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #else
 #include <windows.h>
 #endif
-
+// Copyright (c) 2003-2016 Xsens Technologies B.V. or subsidiaries worldwide. All rights reserved.
 #include "mastercallback.h" // Inclui Xsens device API header
 #include "mtwcallback.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>

@@ -1,3 +1,11 @@
+//////////////////////////////////////////\/////////\//
+// Leonardo Felipe Lima Santos dos Santos /\     ////\/
+// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
+//\///////////////////////\// ////	\_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\////\//
+
 #ifdef _WIN32
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #else
