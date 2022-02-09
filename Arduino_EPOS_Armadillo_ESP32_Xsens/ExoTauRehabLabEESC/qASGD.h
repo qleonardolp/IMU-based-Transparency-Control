@@ -52,8 +52,6 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 #ifndef M_PI
   #define M_PI 3.141592653f
 #endif
-#define		RADS2RPM	(30/M_PI)		// rad/s to rpm 
-#define		RPM2RADS	(M_PI/30)		// rpm to rad/s
 #define		FIXED_DT	1
 
 using namespace Eigen;
