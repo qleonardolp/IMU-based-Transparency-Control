@@ -12,36 +12,18 @@
 #else
 #include <windows.h>
 #endif
+#include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
-#include "AXIS.h"
-#include "EPOS_NETWORK.h"
 #include <processthreadsapi.h>
 #include <iostream>
 #include <stdexcept>
+#include <conio.h>
 // #include <sstream>
 // #include <utility>
 // #include <string>
 // #include <list>
 // #include <set>
-#include <conio.h>
 // #include <chrono>
-
-// ENDERECAMENTO DA BASE DE DADOS CAN
-char* CAN_INTERFACE = "CAN1";
-char* CAN_DATABASE  = "database";
-char* CAN_CLUSTER   = "NETCAN";
-char* NET_ID_SERVO_01 = "1";
-char* NET_ID_SERVO_02 = "2";
-char* NET_ID_SERVO_03 = "3";
-char* NET_ID_SERVO_04 = "4";
-char* NET_ID_SERVO_05 = "5";
-char* NET_ID_SERVO_06 = "6";
-
-//DECLARACAO DA REDE CAN:
-EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
-//DECLARACAO DAS EPOS:
-AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
-AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
 
 void HabilitaEixo(int ID);
 void DesabilitaEixo(int ID);
@@ -114,6 +96,8 @@ int main()
   mutex imu_mtx;
   float shared_data[18];
   ThrdStruct imu_struct, asgd_struct, control_struct, logging_struct;
+
+
   
   thread thr_imus;
   thread thr_qasgd;
@@ -122,8 +106,8 @@ int main()
 
   thr_imus     = thread(readIMUs, imu_struct);
   thr_qasgd    = thread(qASGD, asgd_struct);
-  thr_controle = thread(Controle, control_struct);
   thr_logging  = thread(Logging, logging_struct);
+  thr_controle = thread(Controle, control_struct);
 
 
   thr_controle.join();

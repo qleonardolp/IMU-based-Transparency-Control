@@ -1,3 +1,5 @@
+#ifndef SHAREDSTRUCT_H
+#define SHAREDSTRUCT_H
 // File for structs definitions:
 
 #include <stdio.h>
@@ -28,3 +30,5 @@ typedef struct shared_struct {
     short param0E_;
     short param0F_;
 } ThrdStruct;
+
+#endif // SHAREDSTRUCT_H
