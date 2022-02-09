@@ -11,6 +11,7 @@
 #else
 #include <windows.h>
 #endif
+#include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
@@ -29,5 +30,23 @@
 */
 
 void qASGD(ThrdStruct &data_struct){
-    //...
+    using namespace std;
+    SetThreadPriority(GetCurrentThread(), data_struct.param00_);
+
+
+    // setup stuff...
+
+    asgd_isready = true;
+    looptimer Timer(data_struct.sampletime_);
+    auto exec_time_micros = data_struct.exectime_*MILLION;
+    auto t_begin = Timer.micro_now();
+    do
+    {
+        Timer.tik();
+        /* code */
+
+        Timer.tak();
+    } while (Timer.micro_now() - t_begin <= exec_time_micros);
+
+    // ending stuff...
 }

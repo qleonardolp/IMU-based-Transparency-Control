@@ -3,6 +3,7 @@
 
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
+#include <atomic>
 
 // ENDERECAMENTO DA BASE DE DADOS CAN
 char* CAN_INTERFACE = "CAN1";
@@ -20,6 +21,12 @@ EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
 //DECLARACAO DAS EPOS:
 AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
 AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
+
+// Threads readiness flags: (globais)
+std::atomic<bool> imu_isready(false);
+std::atomic<bool> asgd_isready(false);
+std::atomic<bool> control_isready(false);
+std::atomic<bool> logging_isready(false);
 
 #endif // XSENSEPOS_H
 

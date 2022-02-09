@@ -14,6 +14,7 @@
 // Copyright (c) 2003-2016 Xsens Technologies B.V. or subsidiaries worldwide. All rights reserved.
 #include "mastercallback.h" // Inclui Xsens device API header
 #include "mtwcallback.h"
+#include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
@@ -221,6 +222,7 @@ void readIMUs(ThrdStruct &data_struct)
             if (i == 2)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
+        imu_isready = true;
 
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
@@ -296,15 +298,18 @@ void readIMUs(ThrdStruct &data_struct)
     }
     catch (exception const &ex)
     {
+        imu_isready = false;
         cout << ex.what() << endl;
         cout << "****ABORT****" << endl;
     }
     catch (...)
     {
+        imu_isready = false;
         cout << "An unknown fatal error has occured. Aborting." << endl;
         cout << "****ABORT****" << endl;
     }
 
+    imu_isready = false;
     cout << "Closing XsControl..." << endl;
     control->close();
 
