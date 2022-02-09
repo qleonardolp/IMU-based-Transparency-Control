@@ -16,6 +16,7 @@
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
+#include <chrono>
 
 void Logging(ThrdStruct &data_struct){
     using namespace std;
@@ -29,25 +30,25 @@ void Logging(ThrdStruct &data_struct){
     if (logFileHandle != NULL) fclose(logFileHandle);
 
     float log_data[18];
-    do {    } while (!imu_isready || !asgd_isready || !control_isready);
+    //do {    } while (!imu_isready || !asgd_isready);
+    //this_thread::sleep_for(chrono::seconds(4));
     logging_isready = true;
 
     looptimer Timer(data_struct.sampletime_);
-    auto exec_time_micros = data_struct.exectime_*MILLION;
-    auto t_begin = Timer.micro_now();
+    llint exec_time_micros = data_struct.exectime_*MILLION;
+    llint t_begin = Timer.micro_now();
     do
     {
         Timer.tik();
         {   // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            for (size_t i = 0; i < 17; i++)
-                log_data[i] = *data_struct.datavec_[i];
+            memcpy(log_data, *data_struct.datavec_, 18*sizeof(float));
         }   // fim da sessao critica
 
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
             fprintf(logFileHandle, "%lld", Timer.micro_now());
-            for (size_t i = 0; i < 17; i++)
+            for (size_t i = 0; i < 18; i++)
                 fprintf(logFileHandle, ", %.4f", log_data[i]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);

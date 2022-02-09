@@ -25,24 +25,25 @@ void Controle(ThrdStruct &data_struct){
 #endif
 
     // Sincroniza as epos
-    epos.sync();
+    //epos.sync();
 
     // Habilita o controle de velocidade
-    eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
+    //eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
     // eixo_out.ReadPDO01();
     // eixo_in.ReadPDO01();
     
     // setup stuff...
-    do
-    {
-        // wait!
-    } while (!imu_isready || !asgd_isready);
+    /*
+    do{
+      unique_lock<mutex> _(*data_struct.mtx_);
+    } while (!*data_struct.param0A_ || !*data_struct.param0B_);
+    */
     control_isready = true;
     
 
     looptimer Timer(data_struct.sampletime_);
-    auto exec_time_micros = data_struct.exectime_*MILLION;
-    auto t_begin = Timer.micro_now();
+    llint exec_time_micros = data_struct.exectime_*MILLION;
+    llint t_begin = Timer.micro_now();
     do
     {
         Timer.tik();

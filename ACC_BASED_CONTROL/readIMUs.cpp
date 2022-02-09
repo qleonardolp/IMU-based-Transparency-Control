@@ -18,6 +18,7 @@
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
+#include <stdexcept>
 #include <iostream>
 #include <chrono>
 #include <conio.h>
@@ -63,9 +64,6 @@ void readIMUs(ThrdStruct &data_struct)
 
     const int desiredUpdateRate = 100; // data_struct.sampletime_;
     const int desiredRadioChannel = 25;
-    // looptimer xsensTimer(data_struct.sampletime_);
-    looptimer xsensTimer(desiredUpdateRate);
-    auto exec_time_micros = data_struct.exectime_*MILLION;
 
     WirelessMasterCallback wirelessMasterCallback; // Callback for wireless master
     vector<MtwCallback *> mtwCallbacks;            // Callbacks for mtw devices
@@ -225,13 +223,13 @@ void readIMUs(ThrdStruct &data_struct)
             if (i == 2)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
-        this_thread::sleep_for(chrono::seconds(3));
+        //this_thread::sleep_for(chrono::seconds(3));
         imu_isready = true;
 
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
 
-        wirelessMasterCallback.mtw_event.clear();
+        //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...
 
         float imus_data[18]; 
         // Filtros Passa Baixa para os dados das IMUs
@@ -242,19 +240,18 @@ void readIMUs(ThrdStruct &data_struct)
           imu_filters[i].reset();
         }
 
-        auto t_begin = xsensTimer.micro_now();
+        llint exec_time_micros = (data_struct.exectime_)*MILLION;
+        // looptimer xsensTimer(data_struct.sampletime_);
+        looptimer xsensTimer(desiredUpdateRate);
+        llint t_begin = xsensTimer.micro_now();
         do
         {
             xsensTimer.tik();
-            bool newDataAvailable = false;
-
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
                 if (mtwCallbacks[i]->dataAvailable())
                 {
-                    newDataAvailable = true;
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-
                     accData[i] = packet->calibratedAcceleration();
                     gyroData[i] = packet->calibratedGyroscopeData();
 
@@ -282,7 +279,8 @@ void readIMUs(ThrdStruct &data_struct)
                         imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                       unique_lock<mutex> _(*data_struct.mtx_);
-                      *data_struct.datavec_ = imus_data;
+                      memcpy(*data_struct.datavec_, imus_data, 18*sizeof(float));
+                      //*data_struct.datavec_ = imus_data;
                     }
                 }
             }
