@@ -74,8 +74,18 @@ void qASGD(ThrdStruct &data_struct)
     float omg_norm = gyro1.norm();
     float mi(0);
 
-    //do {    } while (!imu_isready);
-    asgd_isready = true;
+    bool isready_imu(false);
+    do{ 
+        {   // qASGD confere IMU:
+            unique_lock<mutex> _(*data_struct.mtx_);
+            bool isready_imu = *data_struct.param0A_;
+        } 
+    } while (!isready_imu);
+
+    {   // qASGD avisa que esta pronto!
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0B_ = true;
+    }
 
     looptimer Timer(data_struct.sampletime_);
     llint exec_time_micros = data_struct.exectime_ * MILLION;

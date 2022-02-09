@@ -30,9 +30,22 @@ void Logging(ThrdStruct &data_struct){
     if (logFileHandle != NULL) fclose(logFileHandle);
 
     float log_data[18];
-    //do {    } while (!imu_isready || !asgd_isready);
-    //this_thread::sleep_for(chrono::seconds(4));
-    logging_isready = true;
+    bool isready_imu(false);
+    bool isready_asg(false);
+    bool isready_ctr(false);
+    do{ 
+        {   // Loggging confere IMU, ASGD e CONTROLE
+            unique_lock<mutex> _(*data_struct.mtx_);
+            bool isready_imu = *data_struct.param0A_;
+            bool isready_asg = *data_struct.param0B_;
+            bool isready_ctr = *data_struct.param0C_;
+        } 
+    } while (!isready_imu || !isready_asg || !isready_ctr);
+    
+    {   // Loggging avisa que esta pronto!
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0D_ = true;
+    }
 
     looptimer Timer(data_struct.sampletime_);
     llint exec_time_micros = data_struct.exectime_*MILLION;

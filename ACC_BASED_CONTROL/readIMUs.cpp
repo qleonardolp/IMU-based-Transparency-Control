@@ -14,15 +14,17 @@
 // Copyright (c) 2003-2016 Xsens Technologies B.V. or subsidiaries worldwide. All rights reserved.
 #include "mastercallback.h" // Inclui Xsens device API header
 #include "mtwcallback.h"
+#include <conio.h>
 #include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <stdexcept>
 #include <iostream>
-#include <chrono>
-#include <conio.h>
 #include <iomanip>
+#include <sstream>
+#include <utility>
+// #include <chrono>
 
 /*! \brief Stream insertion operator overload for XsPortInfo */
 std::ostream &operator<<(std::ostream &out, XsPortInfo const &p)
@@ -59,9 +61,8 @@ void readIMUs(ThrdStruct &data_struct)
     |  4   |           100 Hz        |
     |  6   |            75 Hz        |
     |  12  |            50 Hz        |
-    |  18  |            40 Hz        |
-    |______|_________________________|  */
-
+    |__18__|____________40 Hz________| */
+    try{
     const int desiredUpdateRate = 100; // data_struct.sampletime_;
     const int desiredRadioChannel = 25;
 
@@ -224,7 +225,10 @@ void readIMUs(ThrdStruct &data_struct)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
         //this_thread::sleep_for(chrono::seconds(3));
-        imu_isready = true;
+        {   // readIMUs nao espera as outras threads:
+            unique_lock<mutex> _(*data_struct.mtx_);
+            *data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
+        }
 
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
@@ -247,6 +251,7 @@ void readIMUs(ThrdStruct &data_struct)
         do
         {
             xsensTimer.tik();
+            ///*
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
                 if (mtwCallbacks[i]->dataAvailable())
@@ -284,6 +289,7 @@ void readIMUs(ThrdStruct &data_struct)
                     }
                 }
             }
+            //*/
             xsensTimer.tak();
         } while (xsensTimer.micro_now() - t_begin <= exec_time_micros);
 
@@ -317,32 +323,27 @@ void readIMUs(ThrdStruct &data_struct)
     cout << "Closing XsControl..." << endl;
     control->close();
 
-    for (vector<MtwCallback *>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i)
-    {
+    for (vector<MtwCallback *>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i){
         delete (*i);
     }
+
+    }catch(...){ cout << "Unknown Xsens Error" << endl; }
 }
 
 int findClosestUpdateRate(const XsIntArray& supportedUpdateRates, const int desiredUpdateRate)
 {
 	if (supportedUpdateRates.empty())
-	{
-		return 0;
-	}
+	    return 0;
 
 	if (supportedUpdateRates.size() == 1)
-	{
 		return supportedUpdateRates[0];
-	}
 
 	int uRateDist = -1;
 	int closestUpdateRate = -1;
 	for (XsIntArray::const_iterator itUpRate = supportedUpdateRates.begin(); itUpRate != supportedUpdateRates.end(); ++itUpRate)
 	{
 		const int currDist = std::abs(*itUpRate - desiredUpdateRate);
-
-		if ((uRateDist == -1) || (currDist < uRateDist))
-		{
+		if ((uRateDist == -1) || (currDist < uRateDist)){
 			uRateDist = currDist;
 			closestUpdateRate = *itUpRate;
 		}

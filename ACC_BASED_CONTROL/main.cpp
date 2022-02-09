@@ -17,12 +17,6 @@
 #include <stdexcept>
 #include <iostream>
 #include <conio.h>
-// #include <sstream>
-// #include <utility>
-// #include <string>
-// #include <list>
-// #include <set>
-// #include <chrono>
 
 void HabilitaEixo(int ID);
 void DesabilitaEixo(int ID);
@@ -37,10 +31,10 @@ void Logging(ThrdStruct &data_struct);
 #define CTRL_SMPLTM 0.0002 // @5 kHz
 #define LOG_SMPLTM  0.0040 // @250 Hz 
 // Threads Priority:
-#define IMU_PRIORITY   0 // -1
-#define ASGD_PRIORITY  0 // -1
-#define CTRL_PRIORITY  0 // -2
-#define LOG_PRIORITY   0 // 
+#define IMU_PRIORITY   -1 //
+#define ASGD_PRIORITY  -1 //
+#define CTRL_PRIORITY  -2 //
+#define LOG_PRIORITY    0 // 
 
 int main()
 {
@@ -115,46 +109,28 @@ int main()
 
   imu_struct.sampletime_ = IMU_SMPLTM;
   imu_struct.param00_  = IMU_PRIORITY;
-  imu_struct.exectime_ = execution_time;
   *(imu_struct.datavec_) = shared_data;
-  imu_struct.mtx_ = &imu_mtx;
 
   asgd_struct.sampletime_ = ASGD_SMPLTM;
   asgd_struct.param00_  = ASGD_PRIORITY;
-  asgd_struct.exectime_ = execution_time;
   *(asgd_struct.datavec_) = shared_data;
-  asgd_struct.mtx_ = &imu_mtx;
 
   control_struct.sampletime_ = CTRL_SMPLTM;
   control_struct.param00_  = CTRL_PRIORITY;
-  control_struct.exectime_ = execution_time;
   *(control_struct.datavec_) = shared_data;
-  control_struct.mtx_ = &imu_mtx;
 
   logging_struct.sampletime_ = LOG_SMPLTM;
   logging_struct.param00_  = LOG_PRIORITY;
-  logging_struct.exectime_ = execution_time;
   *(logging_struct.datavec_) = shared_data;
-  logging_struct.mtx_ = &imu_mtx;
 
+  imu_struct.mtx_ = asgd_struct.mtx_ = control_struct.mtx_ = logging_struct.mtx_ = &imu_mtx;
+  imu_struct.exectime_ = asgd_struct.exectime_ = control_struct.exectime_ = logging_struct.exectime_ = execution_time;
   // using struct params as readiness flags:
-  imu_struct.param0A_ = asgd_struct.param0A_ = &imu_isready;
-  imu_struct.param0B_ = &asgd_isready;
-  imu_struct.param0C_ = &control_isready;
-  imu_struct.param0D_ = &logging_isready;
-  //asgd_struct.param0A_ = &imu_isready;
-  asgd_struct.param0B_ = &asgd_isready;
-  asgd_struct.param0C_ = &control_isready;
-  asgd_struct.param0D_ = &logging_isready;
-  control_struct.param0A_ = &imu_isready;
-  control_struct.param0B_ = &asgd_isready;
-  control_struct.param0C_ = &control_isready;
-  control_struct.param0D_ = &logging_isready;
-  logging_struct.param0A_ = &imu_isready;
-  logging_struct.param0B_ = &asgd_isready;
-  logging_struct.param0C_ = &control_isready;
-  logging_struct.param0D_ = &logging_isready;
-  
+  imu_struct.param0A_ = asgd_struct.param0A_ = control_struct.param0A_ = logging_struct.param0A_ = &imu_isready;
+  imu_struct.param0B_ = asgd_struct.param0B_ = control_struct.param0B_ = logging_struct.param0B_ = &asgd_isready;
+  imu_struct.param0C_ = asgd_struct.param0C_ = control_struct.param0C_ = logging_struct.param0C_ = &control_isready;
+  imu_struct.param0D_ = asgd_struct.param0D_ = control_struct.param0D_ = logging_struct.param0D_ = &logging_isready;
+
   thread thr_imus;
   thread thr_qasgd;
   thread thr_controle;
@@ -164,8 +140,7 @@ int main()
   thr_qasgd    = thread(qASGD, asgd_struct);
   thr_logging  = thread(Logging, logging_struct);
   thr_controle = thread(Controle, control_struct);
-
-
+  // main waits while the threads execute thier tasks...
   thr_controle.join();
   thr_logging.join();
   thr_qasgd.join();

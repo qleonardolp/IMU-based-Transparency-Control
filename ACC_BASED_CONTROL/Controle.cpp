@@ -33,12 +33,21 @@ void Controle(ThrdStruct &data_struct){
     // eixo_in.ReadPDO01();
     
     // setup stuff...
-    /*
-    do{
-      unique_lock<mutex> _(*data_struct.mtx_);
-    } while (!*data_struct.param0A_ || !*data_struct.param0B_);
-    */
-    control_isready = true;
+    ///*
+    bool isready_imu(false);
+    bool isready_asg(false);
+    do{ 
+        {   // Controle confere se IMU e ASGD estao prontos:
+            unique_lock<mutex> _(*data_struct.mtx_);
+            bool isready_imu = *data_struct.param0A_;
+            bool isready_asg = *data_struct.param0B_;
+        } 
+    } while (!isready_imu || !isready_asg);
+
+    {   // Controle avisa que esta pronto!
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0C_ = true;
+    }
     
 
     looptimer Timer(data_struct.sampletime_);
