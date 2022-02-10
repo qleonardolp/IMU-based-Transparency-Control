@@ -6,7 +6,8 @@
 //\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
 ///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
 
-#include "XsensEpos.h"
+#include "AXIS.h"
+#include "EPOS_NETWORK.h"
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
@@ -20,13 +21,16 @@ void Controle(ThrdStruct &data_struct){
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
 
+    extern EPOS_NETWORK epos;
+    extern AXIS eixo_out;
+    extern AXIS eixo_in;
     // Sincroniza as epos
-    //epos.sync();
+    epos.sync();
 
     // Habilita o controle de velocidade
-    //eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
-    // eixo_out.ReadPDO01();
-    // eixo_in.ReadPDO01();
+    eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
+    eixo_out.ReadPDO01();
+    eixo_in.ReadPDO01();
     
     // setup stuff...
 

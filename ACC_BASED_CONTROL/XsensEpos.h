@@ -1,35 +1,133 @@
 #ifndef XSENSEPOS_H
 #define XSENSEPOS_H
 
-#define PRIORITY  0
-
+#include <iostream>
+#include <thread>
+#include <chrono>
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
-#include <atomic>
 
 // ENDERECAMENTO DA BASE DE DADOS CAN
-static char* CAN_INTERFACE = "CAN1";
-static char* CAN_DATABASE  = "database";
-static char* CAN_CLUSTER   = "NETCAN";
-static char* NET_ID_SERVO_01 = "1";
-static char* NET_ID_SERVO_02 = "2";
-static char* NET_ID_SERVO_03 = "3";
-static char* NET_ID_SERVO_04 = "4";
-static char* NET_ID_SERVO_05 = "5";
-static char* NET_ID_SERVO_06 = "6";
+char* CAN_INTERFACE = "CAN1";
+char* CAN_DATABASE  = "database";
+char* CAN_CLUSTER   = "NETCAN";
+// Right Knee
+char* NET_ID_SERVO_01  = "1";
+char* NET_ID_SENSOR_01 = "2";
+// Left Knee
+char* NET_ID_SERVO_02 = "3";
+// Right Hip 
+char* NET_ID_SERVO_03 = "4";
+// Left Hip
+char* NET_ID_SERVO_04 = "5";
+
+//EPOS USB
+//USB_Network * USB_1;
+//WORD _eposID = 6;
 
 //DECLARACAO DA REDE CAN:
-static EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
+EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
 //DECLARACAO DAS EPOS:
-static AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
-static AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
+AXIS eixo_out(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SENSOR_01);
+AXIS eixo_in(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
+
+/* "EPOS" FUNCTIONS */
+
+void IniciaRedeCan()
+{
+  epos.StartPDOS(1);
+  epos.StartPDOS(2);
+  epos.StartPDOS(3);
+  epos.StartPDOS(4);
+  epos.StartPDOS(5);
+
+  for (int i = 0; i < 10; i++)
+  {
+    // Aguarda tempo
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // Sincroniza as epos
+    epos.sync();
+    eixo_out.ReadPDO01();
+    eixo_in.ReadPDO01();
+    std::cout << ".";
+  }
+
+  // EPOS 01
+  eixo_out.PDOsetControlWord_FaultReset(true);
+  eixo_out.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  eixo_out.PDOsetControlWord_FaultReset(false);
+  eixo_out.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+  // EPOS 02
+  eixo_in.PDOsetControlWord_FaultReset(true);
+  eixo_in.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  eixo_in.PDOsetControlWord_FaultReset(false);
+  eixo_in.WritePDO01();
+
+  std::cout << " ok!" << std::endl;
+}
+
+void HabilitaEixo(int ID)
+{
+  if ((ID == 2) | (ID == 0)) {
+
+    eixo_in.PDOsetControlWord_SwitchOn(false);
+    eixo_in.PDOsetControlWord_EnableVoltage(true);
+    eixo_in.PDOsetControlWord_QuickStop(true);
+    eixo_in.PDOsetControlWord_EnableOperation(false);
+    eixo_in.WritePDO01();
+
+    std::cout << "Habilitando motor!" << std::endl;
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    eixo_in.PDOsetControlWord_SwitchOn(true);
+    eixo_in.PDOsetControlWord_EnableVoltage(true);
+    eixo_in.PDOsetControlWord_QuickStop(true);
+    eixo_in.PDOsetControlWord_EnableOperation(false);
+    eixo_in.WritePDO01();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    eixo_in.PDOsetControlWord_SwitchOn(true);
+    eixo_in.PDOsetControlWord_EnableVoltage(true);
+    eixo_in.PDOsetControlWord_QuickStop(true);
+    eixo_in.PDOsetControlWord_EnableOperation(true);
+    eixo_in.WritePDO01();
+  }
+}
+
+void DesabilitaEixo(int ID)
+{
+  if ((ID == 2) | (ID == 0)) {
+    std::cout << "Desabilitando motor!" << std::endl;
+
+    eixo_in.PDOsetControlWord_SwitchOn(true);
+    eixo_in.PDOsetControlWord_EnableVoltage(true);
+    eixo_in.PDOsetControlWord_QuickStop(true);
+    eixo_in.PDOsetControlWord_EnableOperation(false);
+    eixo_in.WritePDO01();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    eixo_in.PDOsetControlWord_SwitchOn(false);
+    eixo_in.PDOsetControlWord_EnableVoltage(true);
+    eixo_in.PDOsetControlWord_QuickStop(true);
+    eixo_in.PDOsetControlWord_EnableOperation(false);
+    eixo_in.WritePDO01();
+  }
+}
 
 #endif // XSENSEPOS_H
 
 //////////////////////////////////////////\/////////\//
 // Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// leonardo.felipe.santos@usp.br	  _____ ___  ___  //|
+// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
 // *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
 //\///////////////////////\// ////	\_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\/

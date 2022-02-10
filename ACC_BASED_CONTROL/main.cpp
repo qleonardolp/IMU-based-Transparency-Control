@@ -14,16 +14,16 @@
 #include <iostream>
 #include <conio.h>
 
-void HabilitaEixo(int ID);
-void DesabilitaEixo(int ID);
 void readIMUs(ThrdStruct &data_struct);
+void readFTSensor(ThrdStruct &data_struct);
 void qASGD(ThrdStruct &data_struct);
 void Controle(ThrdStruct &data_struct);
 void Logging(ThrdStruct &data_struct);
 
 // DEBUGGING DEFINES:
-#define EXEC_TIME   10
+#define PRIORITY     0
 #define ISREADY_WAIT 0
+#define EXEC_TIME   10
 
 // Threads Sample Time:
 #define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
@@ -49,54 +49,10 @@ int main()
       printf("Process priority class: %lu \n", dwPriority);
   }
 #endif
-  // START DA REDE CAN
-  epos.StartPDOS(1);
-  epos.StartPDOS(2);
-  epos.StartPDOS(3);
-  epos.StartPDOS(4);
-  epos.StartPDOS(5);
-  // epos.StartPDOS(1);
-  // epos.StartPDOS(2);
-  // epos.StartPDOS(3);
-  // epos.StartPDOS(4);
-  // epos.StartPDOS(5);
 
   cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << endl;
-
-  for (int i = 0; i < 10; i++)
-  {
-    // Aguarda tempo
-    auto endwait = clock() + 1 * CLOCKS_PER_SEC;
-    while (clock() < endwait){  }
-
-    // Sincroniza as epos
-    epos.sync();
-
-    eixo_out.ReadPDO01();
-    eixo_in.ReadPDO01();
-
-    printf(".");
-  }
-  // EPOS 01
-  eixo_out.PDOsetControlWord_FaultReset(true);
-  eixo_out.WritePDO01();
-  auto endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait){  }
-  eixo_out.PDOsetControlWord_FaultReset(false);
-  eixo_out.WritePDO01();
-  cout << "..";
-
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait){  }
-
-  // EPOS 02
-  eixo_in.PDOsetControlWord_FaultReset(true);
-  eixo_in.WritePDO01();
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait){  }
-  eixo_in.PDOsetControlWord_FaultReset(false);
-  eixo_in.WritePDO01();
-  cout << ".. OK!" << endl;
+  IniciaRedeCan();
+  HabilitaEixo(2);
 
   mutex imu_mtx;
   float shared_data[18];
@@ -161,71 +117,10 @@ int main()
   thr_qasgd.join();
   thr_imus.join();
 
+  DesabilitaEixo(0);
   epos.StopPDOS(1);
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait){  }
-
-  cout << "Successful exit. Press [ENTER] to quit.\n";
+  this_thread::sleep_for(chrono::milliseconds(1234));
+  cout << "Successful exit. Press [ENTER] to quit." << endl;
   cin.get();
   return 0;
-}
-
-/* EPOS FUNCTIONS */
-
-void HabilitaEixo(int ID)
-{
-
-  if ((ID == 2) | (ID == 0))
-  {
-
-    eixo_in.PDOsetControlWord_SwitchOn(false);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    printf("\nENERGIZANDO O MOTOR 2 E HABILITANDO O CONTROLE");
-
-    auto endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait){  }
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait){  }
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(true);
-    eixo_in.WritePDO01();
-  }
-}
-
-void DesabilitaEixo(int ID)
-{
-
-  if ((ID == 2) | (ID == 0))
-  {
-    printf("\nDESABILITANDO O MOTOR E CONTROLE\n\n");
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    auto endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait){  }
-
-    eixo_in.PDOsetControlWord_SwitchOn(false);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-  }
 }
