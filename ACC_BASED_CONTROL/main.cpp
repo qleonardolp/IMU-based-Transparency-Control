@@ -23,12 +23,12 @@ void Logging(ThrdStruct &data_struct);
 // DEBUGGING DEFINES:
 #define PRIORITY     0
 #define ISREADY_WAIT 0
-#define EXEC_TIME   10
+#define EXEC_TIME   50
 
 // Threads Sample Time:
 #define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
 #define ASGD_SMPLTM 0.0050 //  @200  Hz
-#define CTRL_SMPLTM 0.0005 //  @2000 Hz
+#define CTRL_SMPLTM 0.0002 //  @5000 Hz
 #define LOG_SMPLTM  0.0050 //  @200  Hz 
 // Threads Priority:
 #define IMU_PRIORITY   -1 //

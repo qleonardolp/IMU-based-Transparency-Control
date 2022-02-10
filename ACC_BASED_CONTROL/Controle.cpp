@@ -27,7 +27,8 @@ void Controle(ThrdStruct &data_struct){
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
     
-    // setup stuff...
+    float states_data[18];
+    for (int i = 0; i < 18; i++) states_data[i] = 0;
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -59,11 +60,23 @@ void Controle(ThrdStruct &data_struct){
     do
     {
         Timer.tik();
-        /* code */
+        epos.sync();
+
+        { // sessao critica: minimo codigo necessario para pegar datavec_
+            unique_lock<mutex> _(*data_struct.mtx_);
+            memcpy(states_data, *data_struct.datavec_, 18*sizeof(float));
+        } // fim da sessao critica
+
+        float vel_exo = states_data[12];
+        int desiredVelRPM = 4*(30/M_PI)*vel_exo; // 4 eh ganho de teste
+
+        eixo_in.PDOsetVelocitySetpoint(desiredVelRPM);
+        eixo_in.WritePDO02();
 
         Timer.tak();
     } while (Timer.micro_now() - t_begin <= exec_time_micros);
 
     // ending stuff...
+    epos.sync();
     DesabilitaEixo(0);
 }
