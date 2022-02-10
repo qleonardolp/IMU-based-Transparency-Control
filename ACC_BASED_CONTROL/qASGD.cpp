@@ -1,23 +1,19 @@
-//////////////////////////////////////////\/////////\//
-// Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	| |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\/
+/////////////////////////////\_____///\///\////\/\|//\
+// Leonardo Felipe Lima Santos dos Santos /\____//|\//\
+// leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
+// github/bitbucket qleonardolp / 	| |  | . \/   \  \/|
+// *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
+//\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
+///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
 
-#ifdef _WIN32
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#else
-#include <windows.h>
-#endif
-#include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <iostream>
+#include <string>
 
 /*  -- Obtain attitude quaternion:
     -- Quaternion-based Attitude estimation using ASGD algorithm
@@ -73,15 +69,15 @@ void qASGD(ThrdStruct &data_struct)
     Matrix<float, 4, 3> Xi;
     float omg_norm = gyro1.norm();
     float mi(0);
-
+    
     bool isready_imu(false);
     do{ 
         {   // qASGD confere IMU:
             unique_lock<mutex> _(*data_struct.mtx_);
-            bool isready_imu = *data_struct.param0A_;
+            isready_imu = *data_struct.param0A_;
         } 
     } while (!isready_imu);
-
+    
     {   // qASGD avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0B_ = true;

@@ -6,12 +6,8 @@
 //\///////////////////////\// ////	\_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\/
 
-#ifdef _WIN32
-#include "QpcLoopTimer.h" // ja inclui <windows.h>
-#else
-#include <windows.h>
-#endif
 #include "XsensEpos.h"
+#include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include <processthreadsapi.h>
 #include <stdexcept>
@@ -25,11 +21,15 @@ void qASGD(ThrdStruct &data_struct);
 void Controle(ThrdStruct &data_struct);
 void Logging(ThrdStruct &data_struct);
 
+// DEBUGGING DEFINES:
+#define EXEC_TIME   10
+#define ISREADY_WAIT 0
+
 // Threads Sample Time:
-#define IMU_SMPLTM  0.0100 // @100 Hz
-#define ASGD_SMPLTM 0.0050 // @200 Hz
-#define CTRL_SMPLTM 0.0002 // @5 kHz
-#define LOG_SMPLTM  0.0040 // @250 Hz 
+#define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
+#define ASGD_SMPLTM 0.0050 //  @200  Hz
+#define CTRL_SMPLTM 0.0005 //  @2000 Hz
+#define LOG_SMPLTM  0.0040 //  @250  Hz 
 // Threads Priority:
 #define IMU_PRIORITY   -1 //
 #define ASGD_PRIORITY  -1 //
@@ -100,12 +100,17 @@ int main()
 
   mutex imu_mtx;
   float shared_data[18];
-  //inicializa shared_data:
+  //initialize shared_data:
   for (int i = 0; i < sizeof(shared_data)/sizeof(float); i++){
     shared_data[i] = i*i;
   }
+
+  short imu_isready(false);
+  short asgd_isready(false);
+  short control_isready(false);
+  short logging_isready(false);
   ThrdStruct imu_struct, asgd_struct, control_struct, logging_struct;
-  int execution_time = 5; // just for test
+  int execution_time = EXEC_TIME; // just for test
 
   imu_struct.sampletime_ = IMU_SMPLTM;
   imu_struct.param00_  = IMU_PRIORITY;
@@ -125,7 +130,7 @@ int main()
 
   imu_struct.mtx_ = asgd_struct.mtx_ = control_struct.mtx_ = logging_struct.mtx_ = &imu_mtx;
   imu_struct.exectime_ = asgd_struct.exectime_ = control_struct.exectime_ = logging_struct.exectime_ = execution_time;
-  // using struct params as readiness flags:
+  // Readiness Flags:
   imu_struct.param0A_ = asgd_struct.param0A_ = control_struct.param0A_ = logging_struct.param0A_ = &imu_isready;
   imu_struct.param0B_ = asgd_struct.param0B_ = control_struct.param0B_ = logging_struct.param0B_ = &asgd_isready;
   imu_struct.param0C_ = asgd_struct.param0C_ = control_struct.param0C_ = logging_struct.param0C_ = &control_isready;
@@ -136,6 +141,16 @@ int main()
   thread thr_controle;
   thread thr_logging;
 
+  /*
+    - Programar "menu" com opcoes
+    Aqui vem um grande switch com opcoes def pelo usuario.
+    As threads serao disparadas de forma condicional.
+    Para simplificar, as threads que nao forem disparadas e que travam as outras
+    serao consideradas "isready = true"  dispensando a skip_flag. 
+    Programar tbm para voltar ao "menu principal" depois que acabar a execucao
+  */
+
+  // Threads fired:
   thr_imus     = thread(readIMUs, imu_struct);
   thr_qasgd    = thread(qASGD, asgd_struct);
   thr_logging  = thread(Logging, logging_struct);
@@ -150,10 +165,8 @@ int main()
   endwait = clock() + 2 * CLOCKS_PER_SEC;
   while (clock() < endwait){  }
 
-  cout << "Successful exit." << endl;
-  cout << "Press [ENTER] to continue." << endl;
+  cout << "Successful exit. Press [ENTER] to quit.\n";
   cin.get();
-
   return 0;
 }
 

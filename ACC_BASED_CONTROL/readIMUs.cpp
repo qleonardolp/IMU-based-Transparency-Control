@@ -1,30 +1,23 @@
 //////////////////////////////////////////\/////////\//
 // Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
 // *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
 //\///////////////////////\// ////	\_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\/
 
-#ifdef _WIN32
-#include "QpcLoopTimer.h" // ja inclui <windows.h>
-#else
-#include <windows.h>
-#endif
-// Copyright (c) 2003-2016 Xsens Technologies B.V. or subsidiaries worldwide. All rights reserved.
+// Copyright (c) 2003-2016 Xsens Technologies B.V.
+// or subsidiaries worldwide. All rights reserved.
 #include "mastercallback.h" // Inclui Xsens device API header
 #include "mtwcallback.h"
-#include <conio.h>
-#include "XsensEpos.h"
+#include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
-#include <stdexcept>
 #include <iostream>
 #include <iomanip>
-#include <sstream>
-#include <utility>
-// #include <chrono>
+#include <conio.h>
+#include <string>
 
 /*! \brief Stream insertion operator overload for XsPortInfo */
 std::ostream &operator<<(std::ostream &out, XsPortInfo const &p)
@@ -63,8 +56,9 @@ void readIMUs(ThrdStruct &data_struct)
     |  12  |            50 Hz        |
     |__18__|____________40 Hz________| */
     try{
-    const int desiredUpdateRate = 100; // data_struct.sampletime_;
+    const int desiredUpdateRate = 100; // (data_struct.sampletime_)^-1 !!!
     const int desiredRadioChannel = 25;
+    const float sampleTime = 1/float(desiredUpdateRate);
 
     WirelessMasterCallback wirelessMasterCallback; // Callback for wireless master
     vector<MtwCallback *> mtwCallbacks;            // Callbacks for mtw devices
@@ -224,11 +218,6 @@ void readIMUs(ThrdStruct &data_struct)
             if (i == 2)
                 cout << "IMU Exo: " << imu_id << "\n";
         }
-        //this_thread::sleep_for(chrono::seconds(3));
-        {   // readIMUs nao espera as outras threads:
-            unique_lock<mutex> _(*data_struct.mtx_);
-            *data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
-        }
 
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
@@ -244,9 +233,13 @@ void readIMUs(ThrdStruct &data_struct)
           imu_filters[i].reset();
         }
 
+        {   // readIMUs nao espera as outras threads:
+            unique_lock<mutex> _(*data_struct.mtx_);
+            *data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
+        }
+
+        looptimer xsensTimer(sampleTime);
         llint exec_time_micros = (data_struct.exectime_)*MILLION;
-        // looptimer xsensTimer(data_struct.sampletime_);
-        looptimer xsensTimer(desiredUpdateRate);
         llint t_begin = xsensTimer.micro_now();
         do
         {
@@ -285,7 +278,6 @@ void readIMUs(ThrdStruct &data_struct)
                       }
                       unique_lock<mutex> _(*data_struct.mtx_);
                       memcpy(*data_struct.datavec_, imus_data, 18*sizeof(float));
-                      //*data_struct.datavec_ = imus_data;
                     }
                 }
             }
@@ -308,18 +300,15 @@ void readIMUs(ThrdStruct &data_struct)
     }
     catch (exception const &ex)
     {
-        imu_isready = false;
         cout << ex.what() << endl;
         cout << "****ABORT****" << endl;
     }
     catch (...)
     {
-        imu_isready = false;
         cout << "An unknown fatal error has occured. Aborting." << endl;
         cout << "****ABORT****" << endl;
     }
 
-    imu_isready = false;
     cout << "Closing XsControl..." << endl;
     control->close();
 

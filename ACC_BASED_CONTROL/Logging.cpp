@@ -1,21 +1,17 @@
 //////////////////////////////////////////\/////////\//
 // Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
 // *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
 //\///////////////////////\// ////	\_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\/
 
-#ifdef _WIN32
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#else
-#include <windows.h>
-#endif
-#include "XsensEpos.h"
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
+#include <string>
 #include <chrono>
 
 void Logging(ThrdStruct &data_struct){
@@ -33,15 +29,16 @@ void Logging(ThrdStruct &data_struct){
     bool isready_imu(false);
     bool isready_asg(false);
     bool isready_ctr(false);
+
     do{ 
         {   // Loggging confere IMU, ASGD e CONTROLE
             unique_lock<mutex> _(*data_struct.mtx_);
-            bool isready_imu = *data_struct.param0A_;
-            bool isready_asg = *data_struct.param0B_;
-            bool isready_ctr = *data_struct.param0C_;
+            isready_imu = *data_struct.param0A_;
+            isready_asg = *data_struct.param0B_;
+            isready_ctr = *data_struct.param0C_;
         } 
     } while (!isready_imu || !isready_asg || !isready_ctr);
-    
+
     {   // Loggging avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0D_ = true;

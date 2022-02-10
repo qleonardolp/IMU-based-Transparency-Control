@@ -12,6 +12,8 @@
 // usado para manter precisao com long long int
 #define MILLION 1000000
 
+typedef long long int llint;
+
 class looptimer
 {
 public:

@@ -1,17 +1,13 @@
 /////////////////////////////\_____///\///\////\/\|//\
 // Leonardo Felipe Lima Santos dos Santos /\____//|\//\
 // leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
-// github/bitbucket qleonardolp /	| |  | . \/   \  \/|
+// github/bitbucket qleonardolp /	  | |  | . \/   \  \/|
 // *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
 //\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
 ///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
 
-#ifdef _WIN32
-#include "QpcLoopTimer.h" // ja inclui <windows.h>
-#else
-#include <windows.h>
-#endif
 #include "XsensEpos.h"
+#include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
@@ -33,17 +29,17 @@ void Controle(ThrdStruct &data_struct){
     // eixo_in.ReadPDO01();
     
     // setup stuff...
-    ///*
+
     bool isready_imu(false);
     bool isready_asg(false);
     do{ 
         {   // Controle confere se IMU e ASGD estao prontos:
             unique_lock<mutex> _(*data_struct.mtx_);
-            bool isready_imu = *data_struct.param0A_;
-            bool isready_asg = *data_struct.param0B_;
+            isready_imu = *data_struct.param0A_;
+            isready_asg = *data_struct.param0B_;
         } 
     } while (!isready_imu || !isready_asg);
-
+    
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = true;
