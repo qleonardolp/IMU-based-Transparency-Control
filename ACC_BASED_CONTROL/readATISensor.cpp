@@ -1,8 +1,8 @@
 
-#include "QpcLoopTimer.h" // ja inclui <windows.h>
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#include "Axia80M50.h"        // precisou vir primeiro para nao conflitar com <windows.h>
+#include "QpcLoopTimer.h"     // ja inclui <windows.h>
+#include "SharedStructs.h"    // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
-//#include <Axia80M50.h>
 #include <processthreadsapi.h>
 #include <iostream>
 #include <string>
