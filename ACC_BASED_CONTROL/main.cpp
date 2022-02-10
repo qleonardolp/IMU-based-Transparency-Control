@@ -29,7 +29,7 @@ void Logging(ThrdStruct &data_struct);
 #define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
 #define ASGD_SMPLTM 0.0050 //  @200  Hz
 #define CTRL_SMPLTM 0.0005 //  @2000 Hz
-#define LOG_SMPLTM  0.0040 //  @250  Hz 
+#define LOG_SMPLTM  0.0050 //  @200  Hz 
 // Threads Priority:
 #define IMU_PRIORITY   -1 //
 #define ASGD_PRIORITY  -1 //
@@ -52,7 +52,6 @@ int main()
 
   cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << endl;
   IniciaRedeCan();
-  HabilitaEixo(2);
 
   mutex imu_mtx;
   float shared_data[18];
@@ -117,7 +116,6 @@ int main()
   thr_qasgd.join();
   thr_imus.join();
 
-  DesabilitaEixo(0);
   epos.StopPDOS(1);
   this_thread::sleep_for(chrono::milliseconds(1234));
   cout << "Successful exit. Press [ENTER] to quit." << endl;

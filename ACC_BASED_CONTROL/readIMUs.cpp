@@ -55,7 +55,7 @@ void readIMUs(ThrdStruct &data_struct)
     |  6   |            75 Hz        |
     |  12  |            50 Hz        |
     |__18__|____________40 Hz________| */
-    try{
+
     const int desiredUpdateRate = 100; // (data_struct.sampletime_)^-1 !!!
     const int desiredRadioChannel = 25;
     const float sampleTime = 1/float(desiredUpdateRate);
@@ -244,7 +244,7 @@ void readIMUs(ThrdStruct &data_struct)
         do
         {
             xsensTimer.tik();
-            ///*
+
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
                 if (mtwCallbacks[i]->dataAvailable())
@@ -281,7 +281,7 @@ void readIMUs(ThrdStruct &data_struct)
                     }
                 }
             }
-            //*/
+
             xsensTimer.tak();
         } while (xsensTimer.micro_now() - t_begin <= exec_time_micros);
 
@@ -315,8 +315,6 @@ void readIMUs(ThrdStruct &data_struct)
     for (vector<MtwCallback *>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i){
         delete (*i);
     }
-
-    }catch(...){ cout << "Unknown Xsens Error" << endl; }
 }
 
 int findClosestUpdateRate(const XsIntArray& supportedUpdateRates, const int desiredUpdateRate)

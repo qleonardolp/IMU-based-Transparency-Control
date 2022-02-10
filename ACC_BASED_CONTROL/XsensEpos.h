@@ -81,8 +81,6 @@ void HabilitaEixo(int ID)
     eixo_in.PDOsetControlWord_EnableOperation(false);
     eixo_in.WritePDO01();
 
-    std::cout << "Habilitando motor!" << std::endl;
-
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     eixo_in.PDOsetControlWord_SwitchOn(true);
@@ -98,13 +96,14 @@ void HabilitaEixo(int ID)
     eixo_in.PDOsetControlWord_QuickStop(true);
     eixo_in.PDOsetControlWord_EnableOperation(true);
     eixo_in.WritePDO01();
+
+    std::cout << "Motor habilitado!" << std::endl;
   }
 }
 
 void DesabilitaEixo(int ID)
 {
   if ((ID == 2) | (ID == 0)) {
-    std::cout << "Desabilitando motor!" << std::endl;
 
     eixo_in.PDOsetControlWord_SwitchOn(true);
     eixo_in.PDOsetControlWord_EnableVoltage(true);
@@ -119,6 +118,8 @@ void DesabilitaEixo(int ID)
     eixo_in.PDOsetControlWord_QuickStop(true);
     eixo_in.PDOsetControlWord_EnableOperation(false);
     eixo_in.WritePDO01();
+
+    std::cout << "Motor desabilitado!" << std::endl;
   }
 }
 
