@@ -20,6 +20,8 @@
 
 #ifndef M_PI
   #define M_PI 3.141592653f
+  #define RADS2RPM (30/M_PI) // rad/s to rpm 
+  #define RPM2RADS (M_PI/30) // rpm to rad/s
 #endif
 
 

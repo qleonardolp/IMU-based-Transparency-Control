@@ -113,12 +113,7 @@ int main()
   thread thr_ftsensor;
 
   /*
-    - Programar "menu" com opcoes
-    Aqui vem um grande switch com opcoes def pelo usuario.
-    As threads serao disparadas de forma condicional.
-    Para simplificar, as threads que nao forem disparadas e que travam as outras
-    serao consideradas "isready = true"  dispensando a skip_flag. 
-    Programar tbm para voltar ao "menu principal" depois que acabar a execucao
+    - TODO: Programar thread com GainScan geral...
   */
 
   do
