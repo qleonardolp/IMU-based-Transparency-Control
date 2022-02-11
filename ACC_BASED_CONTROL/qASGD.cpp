@@ -45,6 +45,7 @@ void qASGD(ThrdStruct &data_struct)
     float q2 = 0;
     float q3 = 0;
     float imus_data[18];
+    float states_data[10];
     const float Ts = data_struct.sampletime_;
     const float mi0 = 0.100;
     const float Beta = 1.1400;
@@ -100,7 +101,8 @@ void qASGD(ThrdStruct &data_struct)
         Timer.tik();
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            memcpy(imus_data, *data_struct.datavec_, 18*sizeof(float));
+            //unique_lock<mutex> _(*data_struct.mtx01_);
+            memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
         } // fim da sessao critica
 
         gyro1 << imus_data[0], imus_data[1], imus_data[2];
@@ -210,10 +212,30 @@ void qASGD(ThrdStruct &data_struct)
         // Relative Omega between IMUs:
         Vector3f omega_ned = RelOmegaNED(&qASGD1_qk, &qASGD2_qk, &gyro1, &gyro2);
 
+        states_data[0] = euler_ned(0);
+        states_data[1] = euler_ned(1);
+        states_data[2] = euler_ned(2);
+        states_data[3] = omega_ned(0);
+        states_data[4] = omega_ned(1);
+        states_data[5] = omega_ned(2);
+        states_data[6] = imus_data[12];
+        states_data[7] = imus_data[13];
+        states_data[8] = imus_data[14];
+        states_data[9] = 23;
+
+        { // sessao critica
+            unique_lock<mutex> _(*data_struct.mtx_);
+            //unique_lock<mutex> _(*data_struct.mtx02_);
+            memcpy(*data_struct.datavecB_, states_data, sizeof(states_data));
+        } // fim da sessao critica
+
         Timer.tak();
     } while (Timer.micro_now() - t_begin <= exec_time_micros);
 
-    // ending stuff...
+    {   
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0B_ = false;
+    }
 }
 
 void removeYaw(Eigen::Vector4f* quat)

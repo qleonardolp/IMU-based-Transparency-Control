@@ -277,6 +277,7 @@ void readIMUs(ThrdStruct &data_struct)
                         imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                       unique_lock<mutex> _(*data_struct.mtx_);
+                      //unique_lock<mutex> _(*data_struct.mtx01_);
                       memcpy(*data_struct.datavec_, imus_data, 18*sizeof(float));
                     }
                 }
@@ -314,6 +315,11 @@ void readIMUs(ThrdStruct &data_struct)
 
     for (vector<MtwCallback *>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i){
         delete (*i);
+    }
+
+    {
+      unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param0A_ = false;
     }
 }
 

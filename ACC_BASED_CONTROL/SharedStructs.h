@@ -11,7 +11,12 @@ typedef struct shared_struct {
     int     exectime_;
     float      *data_;
     std::mutex  *mtx_;
+    std::mutex  *mtx01_;
+    std::mutex  *mtx02_;
+    std::mutex  *mtx03_;
     float *datavec_[18];
+    float *datavecA_[10];
+    float *datavecB_[10];
 
     // 64 parameters for data/options/flags exchange:
     // parameters, 1� block:

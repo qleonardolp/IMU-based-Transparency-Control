@@ -29,7 +29,7 @@ void Logging(ThrdStruct &data_struct);
 // Threads Sample Time:
 #define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
 #define ASGD_SMPLTM 0.0050 //  @200  Hz
-#define CTRL_SMPLTM 0.0002 //  @5000 Hz
+#define CTRL_SMPLTM 0.0010 //  @1000 Hz
 #define LOG_SMPLTM  0.0050 //  @200  Hz 
 #define FT_SMPLTM   0.0010 //  @1000 Hz, pode chegar a 7kHz ... 
 // Threads Priority:
@@ -68,43 +68,65 @@ int main()
   IniciaRedeCan();
 
   mutex imu_mtx;
-  mutex ati_mtx;
-  float shared_data[18];
+  mutex log_mtx;
+  mutex states_mtx;
+  mutex upgains_mtx; // bridge between updateGains and Control
+  mutex lggains_mtx; // bridge between updateGains and Logging
+  mutex comm_mtx;
+  float imu_data[18];
+  float logging_data[10];
+  float states_data[10];
   float ati_data[6];
-  //initialize shared_data:
-  for (int i = 0; i < sizeof(shared_data)/sizeof(float); i++){
-    shared_data[i] = i*i;
-    if (i < 6)
-      ati_data[i] = 0;
+  //initialize data vectors (safety):
+  for (int i = 0; i < sizeof(imu_data)/sizeof(float); i++){
+    imu_data[i] = i*i;
+    if (i < 10) {
+      logging_data[i] = 0;
+      states_data[i]  = 0;
+    }
+    if (i < 6) ati_data[i] = 0;
   }
-
+  // Function Structs definition:
   imu_struct.sampletime_ = IMU_SMPLTM;
   imu_struct.param00_  = IMU_PRIORITY;
-  *(imu_struct.datavec_) = shared_data;
+  *(imu_struct.datavec_) = imu_data;
+  imu_struct.mtx_ = &comm_mtx;
+  imu_struct.mtx01_ = &imu_mtx;
 
   asgd_struct.sampletime_ = ASGD_SMPLTM;
   asgd_struct.param00_  = ASGD_PRIORITY;
-  *(asgd_struct.datavec_) = shared_data;
+  *(asgd_struct.datavec_) = imu_data;
+  *(asgd_struct.datavecB_) = states_data;
+  asgd_struct.mtx_   = &comm_mtx;
+  asgd_struct.mtx01_ = &imu_mtx;
+  asgd_struct.mtx02_ = &states_mtx;
 
   control_struct.sampletime_ = CTRL_SMPLTM;
   control_struct.param00_  = CTRL_PRIORITY;
-  *(control_struct.datavec_) = shared_data;
+  //*(control_struct.datavec_) = gain_data;
+  *(control_struct.datavecA_) = logging_data;
+  *(control_struct.datavecB_) = states_data;
+  control_struct.mtx_   = &comm_mtx;
+  control_struct.mtx01_ = &log_mtx;
+  control_struct.mtx02_ = &states_mtx;
 
   logging_struct.sampletime_ = LOG_SMPLTM;
   logging_struct.param00_  = LOG_PRIORITY;
-  *(logging_struct.datavec_) = shared_data;
+  *(logging_struct.datavecA_) = logging_data;
+  logging_struct.mtx_ = &comm_mtx;
+  logging_struct.mtx01_ = &log_mtx;
 
   ati_struct.sampletime_ = FT_SMPLTM;
-  *ati_struct.datavec_ = ati_data;
-  ati_struct.mtx_ = &ati_mtx;
+  *(ati_struct.datavecB_) = states_data;
+  ati_struct.mtx_ = &comm_mtx;
+  ati_struct.mtx02_ = &states_mtx;
 
-  imu_struct.mtx_ = asgd_struct.mtx_ = control_struct.mtx_ = logging_struct.mtx_ = &imu_mtx;
-  // Readiness Flags:
+  // Readiness Flags: (deixar melhor explicado...)
   logging_struct.param0A_ = control_struct.param0A_ = asgd_struct.param0A_ = imu_struct.param0A_ = &imu_isready;
   logging_struct.param0B_ = control_struct.param0B_ = asgd_struct.param0B_ = &asgd_isready;
-  logging_struct.param0B_ = control_struct.param0B_ = &control_isready;
+  logging_struct.param0C_ = control_struct.param0C_ = &control_isready;
+  control_struct.param0D_ = logging_struct.param0D_ = &logging_isready;
   logging_struct.param0E_ = control_struct.param0E_ = &ftsensor_isready;
-  logging_struct.param0D_ = &logging_isready; // "apenas logging sabe que se aprontou..."
 
   thread thr_imus;
   thread thr_qasgd;
@@ -118,6 +140,7 @@ int main()
 
   do
   {
+    system("cls");
     Interface();
     // Fire Threads:
     if (!imu_isready)  thr_imus = thread(readIMUs, imu_struct);
@@ -133,13 +156,11 @@ int main()
     if (thr_qasgd.joinable()) thr_qasgd.join();
     if (thr_imus.joinable()) thr_imus.join();
 
-    system("cls");
   } while (!execution_end);
 
   epos.StopPDOS(1);
-  this_thread::sleep_for(chrono::milliseconds(1234));
-  cout << "Successful exit. Press [ENTER] to quit." << endl;
-  cin.get();
+  cout << "Successful exit." << endl;
+  this_thread::sleep_for(chrono::milliseconds(700));
   return 0;
 }
 
@@ -163,7 +184,7 @@ void Interface()
   cout << " [03]: Controle sem IMUs \n";
   cout << " [04]: Leitura IMUs \n";
   cout << " [05]: Leitura F/T  \n";
-  cout << " Ou zero (0) para finalizar. \n";
+  cout << " Ou zero (0) para finalizar. \n ";
   cin >> option;
 
   switch (option)
@@ -199,7 +220,7 @@ void Interface()
   }
 
   if (!execution_end) {
-    cout << "\n Defina o tempo de execucao em segundos: \n";
+    cout << "\n Defina o tempo de execucao em segundos: ";
     cin >> execution_time;
     imu_struct.exectime_  = execution_time;
     asgd_struct.exectime_ = execution_time;
@@ -213,11 +234,10 @@ void Interface()
       cout << " Escolha uma controlador: \n";
       cout << " [01]: Controle com IMUs + F/T \n";
       cout << " [02]: Controle com IMUs \n";
-      cout << " [03]: Controle sem IMUs \n";
-      cout << " [04]: Leitura IMUs \n";
-      cout << " [05]: Leitura F/T  \n";
+      cout << " [03]: Controle sem IMUs \n ";
       cin >> option;
       control_struct.param01_ = option;
+      logging_struct.param10_ = option; // to logging the control option
     }
     cout << " Iniciando Threads..." << endl;
   } 

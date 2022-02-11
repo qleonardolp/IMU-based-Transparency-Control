@@ -27,11 +27,17 @@ void Controle(ThrdStruct &data_struct){
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
     
-    float states_data[18];
-    for (int i = 0; i < 18; i++) states_data[i] = 0;
+    const size_t statesize = 10;
+    const size_t loggsize  = 10;
+    float states_data[statesize];
+    float logging_data[loggsize];
+
+    for (int i = 0; i < statesize; i++) states_data[i] = 0;
+    for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
 
     bool isready_imu(false);
     bool isready_asg(false);
+    bool isready_log(false);
     do{ 
         {   // Controle confere se IMU e ASGD estao prontos:
             unique_lock<mutex> _(*data_struct.mtx_);
@@ -64,19 +70,39 @@ void Controle(ThrdStruct &data_struct){
 
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            memcpy(states_data, *data_struct.datavec_, 18*sizeof(float));
+            //unique_lock<mutex> _(*data_struct.mtx02_);
+            memcpy(states_data, *data_struct.datavecB_, sizeof(states_data));
+            isready_log = *data_struct.param0D_;
         } // fim da sessao critica
 
-        float vel_exo = states_data[12];
-        int desiredVelRPM = 4*(30/M_PI)*vel_exo; // 4 eh ganho de teste
+        float vel_hum = states_data[3];
+        int desiredVelRPM = 4*(30/M_PI)*vel_hum; // 4 eh ganho de teste
 
         eixo_in.PDOsetVelocitySetpoint(desiredVelRPM);
         eixo_in.WritePDO02();
 
+        for (int i = 0; i < loggsize; i++){
+          logging_data[i] = states_data[i];
+        }
+
+        // Share states with Logging:
+        if(isready_log) 
+        {
+            // sessao critica
+            unique_lock<mutex> _(*data_struct.mtx_);
+            //unique_lock<mutex> _(*data_struct.mtx01_);
+            memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
+            // fim da sessao critica
+        }
+        
         Timer.tak();
     } while (Timer.micro_now() - t_begin <= exec_time_micros);
+    
+    {
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0C_ = false;
+    }
 
-    // ending stuff...
     epos.sync();
     DesabilitaEixo(0);
 }

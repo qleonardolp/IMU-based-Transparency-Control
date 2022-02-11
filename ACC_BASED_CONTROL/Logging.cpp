@@ -25,7 +25,11 @@ void Logging(ThrdStruct &data_struct){
     FILE* logFileHandle = fopen(filename,"w");
     if (logFileHandle != NULL) fclose(logFileHandle);
 
-    float log_data[18];
+    float rad2deg = 180/(M_PI);
+    const size_t vecsize = 10;
+    float log_data[vecsize];
+    for (int i = 0; i < vecsize; i++) log_data[i] = 0;
+
     bool isready_imu(false);
     bool isready_asg(false);
     bool isready_ctr(false);
@@ -50,21 +54,27 @@ void Logging(ThrdStruct &data_struct){
     do
     {
         Timer.tik();
+        
         {   // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            memcpy(log_data, *data_struct.datavec_, 18*sizeof(float));
+            //unique_lock<mutex> _(*data_struct.mtx01_);
+            memcpy(log_data, *data_struct.datavecA_, sizeof(log_data));
         }   // fim da sessao critica
+        
 
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
             fprintf(logFileHandle, "%lld", Timer.micro_now());
-            for (size_t i = 0; i < 18; i++)
-                fprintf(logFileHandle, ", %.4f", log_data[i]);
+            for (size_t i = 0; i < vecsize; i++)
+                fprintf(logFileHandle, ", %.4f", rad2deg*log_data[i]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);
         }
         Timer.tak();
     } while (Timer.micro_now() - t_begin <= exec_time_micros);
 
-    // ending stuff...
+    {   
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0D_ = false;
+    }
 }
