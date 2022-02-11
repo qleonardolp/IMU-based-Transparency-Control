@@ -221,7 +221,7 @@ void qASGD(ThrdStruct &data_struct)
         states_data[6] = imus_data[12];
         states_data[7] = imus_data[13];
         states_data[8] = imus_data[14];
-        states_data[9] = 23;
+        //states_data[9] = 23;
 
         { // sessao critica
             unique_lock<mutex> _(*data_struct.mtx_);

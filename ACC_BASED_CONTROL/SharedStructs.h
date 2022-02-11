@@ -17,6 +17,7 @@ typedef struct shared_struct {
     float *datavec_[18];
     float *datavecA_[10];
     float *datavecB_[10];
+    float *datavecF_[6];
 
     // 64 parameters for data/options/flags exchange:
     // parameters, 1� block:

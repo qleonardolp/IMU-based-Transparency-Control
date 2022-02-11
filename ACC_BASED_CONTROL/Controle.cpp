@@ -70,7 +70,6 @@ void Controle(ThrdStruct &data_struct){
 
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            //unique_lock<mutex> _(*data_struct.mtx02_);
             memcpy(states_data, *data_struct.datavecB_, sizeof(states_data));
             isready_log = *data_struct.param0D_;
         } // fim da sessao critica
@@ -90,7 +89,6 @@ void Controle(ThrdStruct &data_struct){
         {
             // sessao critica
             unique_lock<mutex> _(*data_struct.mtx_);
-            //unique_lock<mutex> _(*data_struct.mtx01_);
             memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
             // fim da sessao critica
         }

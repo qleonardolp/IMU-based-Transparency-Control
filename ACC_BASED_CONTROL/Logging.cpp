@@ -28,6 +28,7 @@ void Logging(ThrdStruct &data_struct){
     float rad2deg = 180/(M_PI);
     const size_t vecsize = 10;
     float log_data[vecsize];
+    float log_ftsensor[6];
     for (int i = 0; i < vecsize; i++) log_data[i] = 0;
 
     bool isready_imu(false);
@@ -57,16 +58,17 @@ void Logging(ThrdStruct &data_struct){
         
         {   // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            //unique_lock<mutex> _(*data_struct.mtx01_);
             memcpy(log_data, *data_struct.datavecA_, sizeof(log_data));
+            memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
         }   // fim da sessao critica
         
 
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
             fprintf(logFileHandle, "%lld", Timer.micro_now());
-            for (size_t i = 0; i < vecsize; i++)
+            for (size_t i = 0; i < (vecsize-1); i++)
                 fprintf(logFileHandle, ", %.4f", rad2deg*log_data[i]);
+            fprintf(logFileHandle, ", %f", log_ftsensor[1]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);
         }

@@ -113,20 +113,22 @@ int main()
   logging_struct.sampletime_ = LOG_SMPLTM;
   logging_struct.param00_  = LOG_PRIORITY;
   *(logging_struct.datavecA_) = logging_data;
+  *(logging_struct.datavecF_) = ati_data;
   logging_struct.mtx_ = &comm_mtx;
   logging_struct.mtx01_ = &log_mtx;
 
   ati_struct.sampletime_ = FT_SMPLTM;
   *(ati_struct.datavecB_) = states_data;
+  *(ati_struct.datavecF_) = ati_data;
   ati_struct.mtx_ = &comm_mtx;
-  ati_struct.mtx02_ = &states_mtx;
+  ati_struct.param0A_ = &imu_isready;
 
   // Readiness Flags: (deixar melhor explicado...)
   logging_struct.param0A_ = control_struct.param0A_ = asgd_struct.param0A_ = imu_struct.param0A_ = &imu_isready;
   logging_struct.param0B_ = control_struct.param0B_ = asgd_struct.param0B_ = &asgd_isready;
+  logging_struct.param0E_ = control_struct.param0E_ = ati_struct.param0E_ = &ftsensor_isready;
   logging_struct.param0C_ = control_struct.param0C_ = &control_isready;
   control_struct.param0D_ = logging_struct.param0D_ = &logging_isready;
-  logging_struct.param0E_ = control_struct.param0E_ = &ftsensor_isready;
 
   thread thr_imus;
   thread thr_qasgd;
