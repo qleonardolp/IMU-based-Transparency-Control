@@ -13,7 +13,8 @@ typedef struct shared_struct {
     std::mutex  *mtx_;
     float *datavec_[18];
 
-    // parameters, 1º block:
+    // 64 parameters for data/options/flags exchange:
+    // parameters, 1ï¿½ block:
     short  param00_; // thread priority
     short  param01_; //
     short  param02_;
@@ -28,10 +29,10 @@ typedef struct shared_struct {
     short *param0B_; // asgd_isready    (flag)
     short *param0C_; // control_isready (flag)
     short *param0D_; // logging_isready (flag)
-    short *param0E_; // abort_flag
+    short *param0E_; // ftsensor_isready (flag)
     short *param0F_; // ...
 
-    // parameters, 2º block:
+    // parameters, 2ï¿½ block:
     short  param10_;
     short  param11_;
     short  param12_;
@@ -49,7 +50,7 @@ typedef struct shared_struct {
     short *param1E_;
     short *param1F_; 
 
-    // parameters, 3º block:
+    // parameters, 3ï¿½ block:
     short  param20_;
     short  param21_;
     short  param22_;
@@ -67,7 +68,7 @@ typedef struct shared_struct {
     short *param2E_;
     short *param2F_; 
 
-    // parameters, 4º block:
+    // parameters, 4ï¿½ block:
     short  param30_;
     short  param31_;
     short  param32_;
@@ -89,10 +90,15 @@ typedef struct shared_struct {
 
 #endif // SHAREDSTRUCT_H
 
-//////////////////////////////////////////\/////////\//
-// Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\/
+/////////////////////////////\_____///\///\////\/\|//\
+// Leonardo Felipe Lima Santos dos Santos /\____//|\//\
+// leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
+// github/bitbucket qleonardolp /   | |  | . \/   \  \/|
+// *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
+//\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
+///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
+//"Because this is dedicated to the kids            /
+// Dedicated to wherever music lives               /
+// Dedicated to those tired of the same old same  /
+// And dedicated to the people advancin' the game"
+// _________________________'Dedicated' (1999)__/

@@ -1,7 +1,7 @@
 /////////////////////////////\_____///\///\////\/\|//\
 // Leonardo Felipe Lima Santos dos Santos /\____//|\//\
 // leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
-// github/bitbucket qleonardolp /	  | |  | . \/   \  \/|
+// github/bitbucket qleonardolp /   | |  | . \/   \  \/|
 // *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
 //\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
 ///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
