@@ -29,22 +29,27 @@ void Controle(ThrdStruct &data_struct){
     
     const size_t statesize = 10;
     const size_t loggsize  = 10;
+    const size_t gainsize  = 18;
     float states_data[statesize];
     float logging_data[loggsize];
-
+    float gains_data[gainsize];
+    // Inicialização por segurança:
     for (int i = 0; i < statesize; i++) states_data[i] = 0;
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
+    for (int i = 0; i < gainsize; i++)   gains_data[i] = 0;
 
     bool isready_imu(false);
     bool isready_asg(false);
+    bool isready_ati(false);
     bool isready_log(false);
     do{ 
-        {   // Controle confere se IMU e ASGD estao prontos:
+        {   // Espera IMU / ASGD / FT Sensor (ATI) estarem prontos:
             unique_lock<mutex> _(*data_struct.mtx_);
             isready_imu = *data_struct.param0A_;
             isready_asg = *data_struct.param0B_;
+            isready_ati = *data_struct.param0E_;
         } 
-    } while (!isready_imu || !isready_asg);
+    } while (!isready_imu || !isready_asg || !isready_ati);
 
     // Sincroniza as epos
     epos.sync();
@@ -71,6 +76,7 @@ void Controle(ThrdStruct &data_struct){
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(states_data, *data_struct.datavecB_, sizeof(states_data));
+            memcpy(gains_data, *data_struct.datavec_, sizeof(gains_data));
             isready_log = *data_struct.param0D_;
         } // fim da sessao critica
 
@@ -96,7 +102,7 @@ void Controle(ThrdStruct &data_struct){
         Timer.tak();
     } while (Timer.micro_now() - t_begin <= exec_time_micros);
     
-    {
+    {   // Fim da execução
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = false;
     }

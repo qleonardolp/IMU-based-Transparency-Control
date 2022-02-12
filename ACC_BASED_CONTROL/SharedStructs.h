@@ -11,9 +11,6 @@ typedef struct shared_struct {
     int     exectime_;
     float      *data_;
     std::mutex  *mtx_;
-    std::mutex  *mtx01_;
-    std::mutex  *mtx02_;
-    std::mutex  *mtx03_;
     float *datavec_[18];
     float *datavecA_[10];
     float *datavecB_[10];
@@ -31,12 +28,12 @@ typedef struct shared_struct {
     short  param07_;
     short  param08_;
     short  param09_;
-    short *param0A_; // imu_isready     (flag)
-    short *param0B_; // asgd_isready    (flag)
-    short *param0C_; // control_isready (flag)
-    short *param0D_; // logging_isready (flag)
+    short *param0A_; // imu_isready      (flag)
+    short *param0B_; // asgd_isready     (flag)
+    short *param0C_; // control_isready  (flag)
+    short *param0D_; // logging_isready  (flag)
     short *param0E_; // ftsensor_isready (flag)
-    short *param0F_; // ...
+    short *param0F_; // gscan_isready    (flag)
 
     // parameters, 2� block:
     short  param10_;

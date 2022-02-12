@@ -101,7 +101,6 @@ void qASGD(ThrdStruct &data_struct)
         Timer.tik();
         { // sessao critica: minimo codigo necessario para pegar datavec_
             unique_lock<mutex> _(*data_struct.mtx_);
-            //unique_lock<mutex> _(*data_struct.mtx01_);
             memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
         } // fim da sessao critica
 

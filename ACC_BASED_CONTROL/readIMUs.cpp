@@ -277,7 +277,6 @@ void readIMUs(ThrdStruct &data_struct)
                         imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
                       }
                       unique_lock<mutex> _(*data_struct.mtx_);
-                      //unique_lock<mutex> _(*data_struct.mtx01_);
                       memcpy(*data_struct.datavec_, imus_data, 18*sizeof(float));
                     }
                 }
