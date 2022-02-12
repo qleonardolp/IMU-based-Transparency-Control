@@ -256,8 +256,11 @@ void Interface()
       cout << " Escolha uma controlador: \n";
       cout << " [01]: Acc-based Transparency (PD) \n";
       cout << " [02]: Acc-based Transparency Z(0) \n";
-      cout << " [02]: Acc-based Transparency (LS) \n";
+      cout << " [03]: Acc-based Transparency (LS) \n";
       cout << " [04]: Int-based Transparency (F/T)\n ";
+      cout << " [05]: Markoviano Impedância \n";
+      cout << " [06]: Markoviano Torque \n";
+      cout << " [07]: Markoviano Z(0) + RUÍDO \n";
       cin >> option;
       control_struct.param01_ = option;
       logging_struct.param10_ = option; // to logging the control option

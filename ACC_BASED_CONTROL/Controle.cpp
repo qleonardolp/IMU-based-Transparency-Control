@@ -14,19 +14,28 @@
 #include <processthreadsapi.h>
 #include <Eigen/Core>
 #include <iostream>
+#include <chrono>
 
-extern AXIS eixo_out;
-extern AXIS eixo_in;
+extern AXIS kneeRightMotor;
+extern AXIS kneeRightEncoder;
+extern AXIS kneeLeftMotor;
+extern AXIS hipRightMotor;
+extern AXIS hipLeftMotor;
 extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
+
+float controle_junta(const float states[10]);
+float controle_acc(const float states[10]);
+float controle_sea(const float states[10]);
 
 void Controle(ThrdStruct &data_struct){
     using namespace std;
 #if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
-    
+    // pulando o 0 --\\/
+    enum  controller{ _, ABC, ZTC, LTC, ITC, MKZ, MKT, MK0R};
     const size_t statesize = 10;
     const size_t loggsize  = 10;
     const size_t gainsize  = 18;
@@ -37,6 +46,13 @@ void Controle(ThrdStruct &data_struct){
     for (int i = 0; i < statesize; i++) states_data[i] = 0;
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
     for (int i = 0; i < gainsize; i++)   gains_data[i] = 0;
+
+    float zero_kr = 0;      // kneeRightMotor zero
+    float zero_kl = 0;      // kneeLeftMotor  zero
+    float zero_hr = 0;      // hipRightMotor  zero
+    float zero_hl = 0;      // hipLeftMotor   zero
+    float zero_kr_enc = 0;  // kneeRightEncoder '0'
+    float zero_kl_enc = 0;  // kneeLeftEncoder  '0'
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -52,14 +68,41 @@ void Controle(ThrdStruct &data_struct){
     } while (!isready_imu || !isready_asg || !isready_ati);
 
     // Sincroniza as epos
+    {
     epos.sync();
-    HabilitaEixo(2);
+    this_thread::sleep_for(chrono::milliseconds(1000));
 
-    // Habilita o controle de velocidade
-    eixo_in.VCS_SetOperationMode(VELOCITY_MODE);
-    eixo_out.ReadPDO01();
-    eixo_in.ReadPDO01();
-    
+    kneeRightEncoder.ReadPDO01();
+    zero_kr_enc = kneeRightEncoder.PDOgetActualPosition();
+    kneeRightMotor.ReadPDO01();
+    zero_kr = kneeRightMotor.PDOgetActualPosition();
+    kneeLeftMotor.ReadPDO01();
+    zero_kl = kneeLeftMotor.PDOgetActualPosition();
+    hipRightMotor.ReadPDO01();
+    zero_hr = hipRightMotor.PDOgetActualPosition();
+    hipLeftMotor.ReadPDO01();
+    zero_hl = hipLeftMotor.PDOgetActualPosition();
+
+    // Definindo modo de operacao das EPOS:
+    if (data_struct.param01_ == LTC){
+        kneeRightMotor.VCS_SetOperationMode(CURRENT_MODE);
+    } else{
+        kneeRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    }
+    kneeLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    hipRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    hipLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+
+    kneeRightEncoder.ReadPDO01();
+    kneeRightMotor.ReadPDO01();
+    kneeLeftMotor.ReadPDO01();
+    hipRightMotor.ReadPDO01();
+    hipLeftMotor.ReadPDO01();
+
+    this_thread::sleep_for(chrono::milliseconds(2000));
+    HabilitaEixo(2);
+    }
+
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = true;
@@ -80,11 +123,32 @@ void Controle(ThrdStruct &data_struct){
             isready_log = *data_struct.param0D_;
         } // fim da sessao critica
 
+
+        switch (data_struct.param01_)
+        {
+        case ABC:
+            /* code */
+            break;
+        case ZTC:
+            /* code */
+            break;
+        case ITC:
+            /* code */
+            break;
+        case LTC:
+            /* code */
+            kneeRightMotor.PDOsetCurrentSetpoint(0);
+            kneeRightMotor.WritePDO01();
+            break;
+        default:
+            break;
+        }
+
         float vel_hum = states_data[3];
         int desiredVelRPM = 4*(30/M_PI)*vel_hum; // 4 eh ganho de teste
 
-        eixo_in.PDOsetVelocitySetpoint(desiredVelRPM);
-        eixo_in.WritePDO02();
+        kneeRightMotor.PDOsetVelocitySetpoint(desiredVelRPM);
+        kneeRightMotor.WritePDO02();
 
         for (int i = 0; i < loggsize; i++){
           logging_data[i] = states_data[i];
