@@ -1,3 +1,11 @@
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\
+
 
 #include "Axia80M50.h"        // Vem primeiro para nao conflitar com <windows.h>
 #include "QpcLoopTimer.h"     // ja inclui <windows.h>
@@ -7,6 +15,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+//#include <math.h>
 
 
 void readFTSensor(ThrdStruct &data_struct){
@@ -17,7 +26,8 @@ void readFTSensor(ThrdStruct &data_struct){
 
   // setup stuff...
   char* atiSensorIp = "192.168.1.1";
-  float sensor_data[6];
+  float sensor_data[6]; // Fx Fy Fz Tx Ty Tz
+  float aux_data[10];
 
   // inicializa sensor F/T:
   Axia80M50* sensorAxia = new Axia80M50(atiSensorIp);
@@ -39,15 +49,13 @@ void readFTSensor(ThrdStruct &data_struct){
   sensorAxia->bias();
   this_thread::sleep_for(chrono::milliseconds(500));
 
+  looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
   // inicializa looptimer
-  looptimer Timer(data_struct.sampletime_);
-  llint exec_time_micros = data_struct.exectime_*MILLION;
-  llint t_begin = Timer.micro_now();
+  Timer.start();
   do
   {
     Timer.tik();
     sensorAxia->peek();
-
     sensor_data[0] = sensorAxia->values.Fx;
     sensor_data[1] = sensorAxia->values.Fy;
     sensor_data[2] = sensorAxia->values.Fz;
@@ -57,12 +65,15 @@ void readFTSensor(ThrdStruct &data_struct){
 
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
-      //(*data_struct.datavecB_)[9] = sensor_data[1]; // nao funciona!!
-      memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data));
+      //(*data_struct.datavecB_)[9] = sensor_data[1]; // nao funciona, mas:
+      memcpy(aux_data, *data_struct.datavecB_, sizeof(aux_data));
+      aux_data[9] = sensor_data[1]; // só alteramos o último elemento
+      memcpy(*data_struct.datavecB_, aux_data, sizeof(aux_data));
+      memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
     }   // fim da sessao critica
 
     Timer.tak();
-  } while (Timer.micro_now() - t_begin <= exec_time_micros);
+  } while (!Timer.end());
 
   {   
     unique_lock<mutex> _(*data_struct.mtx_);

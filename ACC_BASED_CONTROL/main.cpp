@@ -1,10 +1,10 @@
-//////////////////////////////////////////\/////////\//
-// Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\/
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\
 
 #include "XsensEpos.h"
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
@@ -132,6 +132,7 @@ int main()
   logging_struct.param0B_  = &asgd_isready;
   logging_struct.param0C_  = &control_isready;
   logging_struct.param0E_  = &ftsensor_isready;
+  *(logging_struct.datavec_ ) = gains_data;
   *(logging_struct.datavecA_) = logging_data;
   *(logging_struct.datavecF_) = ati_data;
   logging_struct.mtx_ = &comm_mtx;
@@ -264,3 +265,12 @@ void Interface()
     cout << " Iniciando Threads..." << endl;
   } 
 }
+
+
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\

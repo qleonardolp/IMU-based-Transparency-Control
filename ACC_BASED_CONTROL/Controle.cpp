@@ -1,10 +1,10 @@
-/////////////////////////////\_____///\///\////\/\|//\
-// Leonardo Felipe Lima Santos dos Santos /\____//|\//\
-// leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
-// github/bitbucket qleonardolp /   | |  | . \/   \  \/|
-// *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
-//\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
-///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\
 
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
@@ -65,15 +65,15 @@ void Controle(ThrdStruct &data_struct){
         *data_struct.param0C_ = true;
     }
 
-    looptimer Timer(data_struct.sampletime_);
-    llint exec_time_micros = data_struct.exectime_*MILLION;
-    llint t_begin = Timer.micro_now();
+    looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    // inicializa looptimer
+    Timer.start();
     do
     {
         Timer.tik();
         epos.sync();
 
-        { // sessao critica: minimo codigo necessario para pegar datavec_
+        { // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(states_data, *data_struct.datavecB_, sizeof(states_data));
             memcpy(gains_data, *data_struct.datavec_, sizeof(gains_data));
@@ -100,7 +100,7 @@ void Controle(ThrdStruct &data_struct){
         }
         
         Timer.tak();
-    } while (Timer.micro_now() - t_begin <= exec_time_micros);
+    } while (!Timer.end());
     
     {   // Fim da execução
         unique_lock<mutex> _(*data_struct.mtx_);

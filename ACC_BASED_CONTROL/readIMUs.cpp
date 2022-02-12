@@ -1,10 +1,10 @@
-//////////////////////////////////////////\/////////\//
-// Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\/
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\
 
 // Copyright (c) 2003-2016 Xsens Technologies B.V.
 // or subsidiaries worldwide. All rights reserved.
@@ -238,9 +238,9 @@ void readIMUs(ThrdStruct &data_struct)
             *data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
         }
 
-        looptimer xsensTimer(sampleTime);
-        llint exec_time_micros = (data_struct.exectime_)*MILLION;
-        llint t_begin = xsensTimer.micro_now();
+        looptimer xsensTimer(sampleTime, data_struct.exectime_);
+        // inicializar looptimer:
+        xsensTimer.start();
         do
         {
             xsensTimer.tik();
@@ -283,7 +283,7 @@ void readIMUs(ThrdStruct &data_struct)
             }
 
             xsensTimer.tak();
-        } while (xsensTimer.micro_now() - t_begin <= exec_time_micros);
+        } while (!xsensTimer.end());
 
         if (!wirelessMasterDevice->gotoConfig())
         {

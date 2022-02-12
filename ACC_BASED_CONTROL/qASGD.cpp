@@ -1,10 +1,7 @@
-/////////////////////////////\_____///\///\////\/\|//\
-// Leonardo Felipe Lima Santos dos Santos /\____//|\//\
-// leonardo.felipe.santos@usp.br /	_____ ___  ___  \//|
-// github/bitbucket qleonardolp / 	| |  | . \/   \  \/|
-// *Copyright 2021-2026* \//// //\ 	| |   \ \   |_|   \|
-//\////////\/\/\/\/\/\/\//\// ////\	\_'_/\_`_/__|     /
-///\_]//////\/\/\/\/\/\////\_////\////|////////\//[__/
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
 
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
@@ -93,9 +90,9 @@ void qASGD(ThrdStruct &data_struct)
         *data_struct.param0B_ = true;
     }
 
-    looptimer Timer(data_struct.sampletime_);
-    llint exec_time_micros = data_struct.exectime_ * MILLION;
-    llint t_begin = Timer.micro_now();
+    looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    // inicializa looptimer
+    Timer.start();
     do
     {
         Timer.tik();
@@ -229,7 +226,7 @@ void qASGD(ThrdStruct &data_struct)
         } // fim da sessao critica
 
         Timer.tak();
-    } while (Timer.micro_now() - t_begin <= exec_time_micros);
+    } while (!Timer.end());
 
     {   
         unique_lock<mutex> _(*data_struct.mtx_);
@@ -322,3 +319,9 @@ Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f
 
 	return Omega2 - Omega1;
 }
+
+
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|

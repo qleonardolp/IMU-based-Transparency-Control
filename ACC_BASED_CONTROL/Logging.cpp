@@ -1,10 +1,10 @@
-//////////////////////////////////////////\/////////\//
-// Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br  	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\/
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\
 
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
@@ -26,10 +26,12 @@ void Logging(ThrdStruct &data_struct){
     if (logFileHandle != NULL) fclose(logFileHandle);
 
     float rad2deg = 180/(M_PI);
-    const size_t vecsize = 10;
-    float log_data[vecsize];
-    float log_ftsensor[6];
-    for (int i = 0; i < vecsize; i++) log_data[i] = 0;
+    const size_t ftsize   = 6;
+    const size_t vecsize  = 10;
+    const size_t gainsize = 18;
+    float log_states[vecsize];
+    float log_gains[gainsize];
+    float log_ftsensor[ftsize];
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -49,31 +51,33 @@ void Logging(ThrdStruct &data_struct){
         *data_struct.param0D_ = true;
     }
 
-    looptimer Timer(data_struct.sampletime_);
-    llint exec_time_micros = data_struct.exectime_*MILLION;
-    llint t_begin = Timer.micro_now();
+    looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    // inicializa looptimer
+    Timer.start();
     do
     {
         Timer.tik();
         
-        {   // sessao critica: minimo codigo necessario para pegar datavec_
+        {   // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
-            memcpy(log_data, *data_struct.datavecA_, sizeof(log_data));
+            memcpy(log_gains, *data_struct.datavec_, sizeof(log_gains));
+            memcpy(log_states, *data_struct.datavecA_, sizeof(log_states));
             memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
         }   // fim da sessao critica
-        
 
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
             fprintf(logFileHandle, "%lld", Timer.micro_now());
             for (size_t i = 0; i < (vecsize-1); i++)
-                fprintf(logFileHandle, ", %.4f", rad2deg*log_data[i]);
+                fprintf(logFileHandle, ", %.4f", rad2deg*log_states[i]);
             fprintf(logFileHandle, ", %f", log_ftsensor[1]);
+            fprintf(logFileHandle, ", %.3f", log_gains[0]);
+            fprintf(logFileHandle, ", %.3f", log_gains[1]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);
         }
         Timer.tak();
-    } while (Timer.micro_now() - t_begin <= exec_time_micros);
+    } while (!Timer.end());
 
     {   
         unique_lock<mutex> _(*data_struct.mtx_);

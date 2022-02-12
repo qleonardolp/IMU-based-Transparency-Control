@@ -1,3 +1,8 @@
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
+
 #ifndef QPCLOOPTIMER_H
 #define QPCLOOPTIMER_H
 
@@ -7,7 +12,7 @@
 #include <windows.h>
 #endif
 
-// conferir melhor implementacao para linux, clock() ficou com f/2... talvez usar std::chrono
+// implementacao para linux... talvez usar std::chrono
 
 // usado para manter precisao com long long int
 #define MILLION 1000000
@@ -18,7 +23,7 @@ class looptimer
 {
 public:
     // Class Constructor
-    looptimer(float sample_period) : lpInSeconds(sample_period){
+    looptimer(float sample_period, int duration) : lpInSeconds(sample_period), execDuration(duration){
 #ifdef _WIN32
         lpInMicroseconds = MILLION*lpInSeconds;
         QueryPerformanceFrequency(&qpcFrequency);
@@ -28,6 +33,16 @@ public:
 #ifdef linux
         loopPeriodMSinTicks = CLOCKS_PER_SEC*lpInSeconds;
 #endif
+    execDuration *= MILLION;
+    }
+    // Execution beginning timestamp
+    void start(){
+        execBegin = micro_now();
+    }
+
+    // Execution end check
+    bool end(){
+        return  (micro_now() - execBegin) > execDuration;
     }
 
     // Clock-based time (now) in microseconds
@@ -74,6 +89,8 @@ public:
 private:
     // lp = loop period
     float lpInSeconds;
+    int execDuration;
+    long long int execBegin;
     long long int lpInMicroseconds;
     long long int loopPeriodMSinTicks;
     long long int beginning_t;

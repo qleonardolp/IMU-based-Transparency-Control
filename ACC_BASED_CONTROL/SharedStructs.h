@@ -1,3 +1,8 @@
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
+
 #ifndef SHAREDSTRUCT_H
 #define SHAREDSTRUCT_H
 // File for structs definitions:

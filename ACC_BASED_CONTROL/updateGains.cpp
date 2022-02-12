@@ -1,3 +1,7 @@
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
 
 #include "QpcLoopTimer.h"     // ja inclui <windows.h>
 #include "SharedStructs.h"    // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
@@ -9,14 +13,15 @@
 float constrain_float(float val, float min, float max);
 
 void updateGains(ThrdStruct &data_struct){
+  looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
   using namespace std;
 #if PRIORITY
   SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
 
-  // setup stuff...
-  float gains[18];
   FILE* pFile;
+  float gains[18];
+  float rawgains[18];
   bool isready_ctr(false);
   bool isready_log(false);
   do{ 
@@ -33,9 +38,7 @@ void updateGains(ThrdStruct &data_struct){
   }
 
   // inicializa looptimer
-  looptimer Timer(data_struct.sampletime_);
-  llint exec_time_micros = data_struct.exectime_*MILLION;
-  llint t_begin = Timer.micro_now();
+  Timer.start();
   do
   {
     Timer.tik();
@@ -43,18 +46,22 @@ void updateGains(ThrdStruct &data_struct){
     // TODO: Leitura do arquivo com ganhos...
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL) {
-      //fscanf(pFile, "mi0 %f\nbeta %f\nrho %f\n", &mi0, &Beta, &Rho);
-      //fclose(pFile);
+      for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++)
+        fscanf(pFile, "%f\n", rawgains[i]);
+      fclose(pFile);
     }
 
-    // TODO: Saturação para limitar valores por segurança:
-
+    // Saturação para limitar valores (segurança):
+    for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++) {
+      gains[i] = constrain_float(rawgains[i], 0.0f, 1.0e4f);
+    }
+    
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       memcpy(*data_struct.datavec_, gains, sizeof(gains));
     }   // fim da sessao critica
     Timer.tak();
-  } while (Timer.micro_now() - t_begin <= exec_time_micros);
+  } while (!Timer.end());
 
   {   
     unique_lock<mutex> _(*data_struct.mtx_);
