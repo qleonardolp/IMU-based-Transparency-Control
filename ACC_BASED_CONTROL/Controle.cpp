@@ -47,12 +47,23 @@ void Controle(ThrdStruct &data_struct){
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
     for (int i = 0; i < gainsize; i++)   gains_data[i] = 0;
 
-    float zero_kr = 0;      // kneeRightMotor zero
-    float zero_kl = 0;      // kneeLeftMotor  zero
-    float zero_hr = 0;      // hipRightMotor  zero
-    float zero_hl = 0;      // hipLeftMotor   zero
-    float zero_kr_enc = 0;  // kneeRightEncoder '0'
-    float zero_kl_enc = 0;  // kneeLeftEncoder  '0'
+    // Variaveis (muuuitas):
+    float zero_kr(0);      // kneeRightMotor zero  (epos)
+    float zero_kl(0);      // kneeLeftMotor  zero  (epos)
+    float zero_hr(0);      // hipRightMotor  zero  (epos)
+    float zero_hl(0);      // hipLeftMotor   zero  (epos)
+    float zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
+    float zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
+    float ang_knee_x(0);   // states_data[0]
+    float ang_knee_y(0);   // states_data[1]
+    float ang_knee_z(0);   // states_data[2]
+    float omg_knee_x(0);   // states_data[3]
+    float omg_knee_y(0);   // states_data[4]
+    float omg_knee_z(0);   // states_data[5]
+    float gyro_exo_x(0);   // states_data[6]
+    float gyro_exo_y(0);   // states_data[7]
+    float gyro_exo_z(0);   // states_data[8]
+    float ftsensor_fx(0);   // states_data[9]
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -144,22 +155,20 @@ void Controle(ThrdStruct &data_struct){
             break;
         }
 
-        float vel_hum = states_data[3];
-        int desiredVelRPM = 4*(30/M_PI)*vel_hum; // 4 eh ganho de teste
+        omg_knee_x = states_data[3];
+        gyro_exo_x = states_data[6];
+        int desiredVelRPM = (30/M_PI)*gyro_exo_x; // 4 eh ganho de teste
 
         kneeRightMotor.PDOsetVelocitySetpoint(desiredVelRPM);
         kneeRightMotor.WritePDO02();
         kneeLeftMotor.PDOsetVelocitySetpoint(desiredVelRPM);
         kneeLeftMotor.WritePDO02();
 
-        for (int i = 0; i < loggsize; i++){
-          logging_data[i] = states_data[i];
-        }
-
         // Share states with Logging:
         if(isready_log) 
         {
-            // sessao critica
+            for (int i = 0; i < loggsize; i++) logging_data[i] = states_data[i];
+            // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
             // fim da sessao critica

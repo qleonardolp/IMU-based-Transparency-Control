@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "Build mingw32",
+			"command": "x86_64-w64-mingw32-g++",
+			"args": [
+				"-g",
+				"${file}",
+				"-o",
+				"${fileDirname}\\build\\${fileBasenameNoExtension}.exe",
+				"-L","${fileDirname}",
+				"-L","C:\\DEV2\\LIB\\EPOS\\Microsoft Visual C++\\Definition Files",
+				"-I","C:\\DEV2\\LIB\\EPOS\\Microsoft Visual C++\\Definition Files",
+				"-l","EposCmd64"
+			],
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build",
+			"detail": "compilador: C:\\TDM-GCC-64\\bin\\cpp.exe",
+			
+		}
+	]
+}

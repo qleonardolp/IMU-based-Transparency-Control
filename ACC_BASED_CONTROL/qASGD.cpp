@@ -208,15 +208,15 @@ void qASGD(ThrdStruct &data_struct)
         // Relative Omega between IMUs:
         Vector3f omega_ned = RelOmegaNED(&qASGD1_qk, &qASGD2_qk, &gyro1, &gyro2);
 
-        states_data[0] = euler_ned(0);
-        states_data[1] = euler_ned(1);
-        states_data[2] = euler_ned(2);
-        states_data[3] = omega_ned(0);
-        states_data[4] = omega_ned(1);
-        states_data[5] = omega_ned(2);
-        states_data[6] = imus_data[12];
-        states_data[7] = imus_data[13];
-        states_data[8] = imus_data[14];
+        states_data[0] = euler_ned(0);    // ang_knee_x
+        states_data[1] = euler_ned(1);    // ang_knee_y
+        states_data[2] = euler_ned(2);    // ang_knee_z
+        states_data[3] = omega_ned(0);    // omg_knee_x
+        states_data[4] = omega_ned(1);    // omg_knee_y
+        states_data[5] = omega_ned(2);    // omg_knee_z
+        states_data[6] = imus_data[12];   // gyro_exo_x
+        states_data[7] = imus_data[13];   // gyro_exo_y
+        states_data[8] = imus_data[14];   // gyro_exo_z
         //states_data[9] = 23;
 
         { // sessao critica
