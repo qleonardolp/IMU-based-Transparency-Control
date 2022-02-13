@@ -32,10 +32,10 @@ extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
 
-float controle_junta(const states input);  // generico
-float controle_acc(const states input, const float gains[18]);  // acc-based
-float controle_adm(const states input);    // admittance
-float controle_sea(const states input);    // SEA feedback
+float controle_junta(const states input, const float gains[18], float buffer[10]);  // generico
+float controle_acc(const states input, const float gains[18], float buffer[10]);  // acc-based
+float controle_adm(const states input, const float gains[18], float buffer[10]);    // admittance
+float controle_sea(const states input, const float gains[18], float buffer[10]);    // SEA feedback
 float controle_lpshap(const states input, const float gains[18], float buffer[10]); // loop-haping
 
 float constrain_float(float val, float min, float max);
@@ -46,7 +46,7 @@ void Controle(ThrdStruct &data_struct){
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
     // pulando o 0 --\\/
-    enum  controller{ _, ABC, ZTC, LTC, ITC, MKZ, MKT, MK0R};
+    enum  controller{ _, ABC, ZTC, LTC, ITC, MKZ, MKT, MK0R, SEA};
     //Rotor Inertia: 137 gcm^2 = 0.137 Kg(0.01m)^2 =  0.137e-4 Kgm^2
     const float motor_inertia = 0.137e-4;
     const int sea_kr_stiffness = 104; // [N.m/rad]
@@ -60,7 +60,14 @@ void Controle(ThrdStruct &data_struct){
     float logging_data[loggsize];
     float gains_data[gainsize];
     float lp_buffer[10];
-    for (size_t i = 0; i < 10; i++) lp_buffer[i] = 0;
+    float sea_bffr[10];
+    float acc_bffr[10];
+    for (size_t i = 0; i < 10; i++)
+    {
+        lp_buffer[i] = 0;
+        sea_bffr[i]  = 0;
+        acc_bffr[i]  = 0;
+    }
     // Inicialização por segurança:
     for (int i = 0; i < statesize; i++) states_data[i] = 0;
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
@@ -166,7 +173,7 @@ void Controle(ThrdStruct &data_struct){
         states_data[6] = sea_kr_stiffness*(mtr_pos - exo_pos);
 
         kneeRightMotor.ReadPDO02();
-        states_data[4] = sensor_filters[2].apply( (M_PI/30)*(kneeRightMotor.PDOgetActualVelocity()) );
+        states_data[4] = sensor_filters[2].apply( RPM2RADS*(kneeRightMotor.PDOgetActualVelocity()) );
         states_data[9] = states_data[4];
 
         kneeRightMotor.ReadPDO01();
@@ -178,13 +185,17 @@ void Controle(ThrdStruct &data_struct){
         switch (data_struct.param01_)
         {
         case ABC:
-            float setpoint = controle_acc(sendto_control, gains_data);
+            float setpoint = controle_acc(sendto_control, gains_data, acc_bffr);
             int setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
             break;
         case ZTC:
-            /* code */
+            float desiredVelRPM = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
+            int setpoint_rpm = constrain_float(desiredVelRPM, -7590, 7590); // No load speed
+            // simplesmente... esqueci a reducao do sistema!!!
+            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
+            kneeRightMotor.WritePDO02();
             break;
         case ITC:
             /* code */
@@ -195,15 +206,15 @@ void Controle(ThrdStruct &data_struct){
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
             break;
+        case SEA:
+            float setpoint = controle_sea(sendto_control, gains_data, sea_bffr);
+            int setpoint_rpm = constrain_float(RADS2RPM*sea_kr_ratio*setpoint, -7590, 7590);
+            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
+            kneeRightMotor.WritePDO02();
+            break;
         default:
             break;
         }
-
-        //int desiredVelRPM = 4*(30/M_PI)*sendto_control.hum_rgtknee_vel; // 4 eh "ganho"
-        //kneeRightMotor.PDOsetVelocitySetpoint(desiredVelRPM);
-        //kneeRightMotor.WritePDO02();
-        //kneeLeftMotor.PDOsetVelocitySetpoint(desiredVelRPM);
-        //kneeLeftMotor.WritePDO02();
 
         // Share states with Logging:
         if(isready_log) 
@@ -228,9 +239,9 @@ void Controle(ThrdStruct &data_struct){
 }
 
 // Controladores (em essência):
-float controle_junta(const states input) {return 0;} 
+float controle_junta(const states input, const float gains[18], float buffer[10]) {return 0;} 
 
-float controle_acc(const states input, const float gains[18])
+float controle_acc(const states input, const float gains[18], float buffer[10])
 {
     const float Jr = 0.885;
     float Kp = gains[0];
@@ -244,9 +255,9 @@ float controle_acc(const states input, const float gains[18])
     return actuation;
 } 
 
-float controle_adm(const states input) {return 0;} 
+float controle_adm(const states input, const float gains[18], float buffer[10]) {return 0;} 
 
-float controle_sea(const states input) {return 0;} 
+float controle_sea(const states input, const float gains[18], float buffer[10]) {return 0;} 
 
 float controle_lpshap(const states input, const float gains[18], float buffer[10])
 {
