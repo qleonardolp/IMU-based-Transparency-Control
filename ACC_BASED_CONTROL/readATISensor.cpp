@@ -56,7 +56,8 @@ void readFTSensor(ThrdStruct &data_struct){
   LowPassFilter2pFloat sensor_filters[6];
   for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
   {
-    sensor_filters[i].set_cutoff_frequency(data_struct.sampletime_, cutoff_freq);
+    float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
+    sensor_filters[i].set_cutoff_frequency(thread_frequency, cutoff_freq);
     sensor_filters[i].reset();
   }
 

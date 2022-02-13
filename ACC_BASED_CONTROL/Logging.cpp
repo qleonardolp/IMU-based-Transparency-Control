@@ -68,10 +68,10 @@ void Logging(ThrdStruct &data_struct){
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
             fprintf(logFileHandle, "%lld", Timer.micro_now());
-            for (size_t i = 0; i < (vecsize-1); i++)
-                fprintf(logFileHandle, ", %.4f", rad2deg*log_states[i]);
-            fprintf(logFileHandle, ", %f", log_ftsensor[1]);
-            fprintf(logFileHandle, ", %.3f", log_gains[0]);
+            for (size_t i = 0; i < (vecsize); i++)
+                fprintf(logFileHandle, ", %.4f", log_states[i]);
+            fprintf(logFileHandle, ", %f", -log_ftsensor[0]);
+            //fprintf(logFileHandle, ", %.3f", log_gains[0]);
             fprintf(logFileHandle, ", %.3f", log_gains[1]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);

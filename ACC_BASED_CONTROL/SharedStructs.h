@@ -177,7 +177,7 @@ typedef struct states{
         mtr_rgtknee_tau = vector[8];
         mtr_rgtknee_omg = vector[9];
     }
-};
+} States;
 
 #endif // SHAREDSTRUCT_H
 

@@ -59,6 +59,9 @@ void Controle(ThrdStruct &data_struct){
     float states_data[statesize];
     float logging_data[loggsize];
     float gains_data[gainsize];
+    float setpoint(0);
+    int   setpoint_rpm(0);
+    int   setpoint_mA(0);
     float lp_buffer[10];
     float sea_bffr[10];
     float acc_bffr[10];
@@ -73,14 +76,14 @@ void Controle(ThrdStruct &data_struct){
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
     for (int i = 0; i < gainsize; i++)   gains_data[i] = 0;
 
-    states sendto_control;
+    States sendto_control;
     // Zeros EPOS:
-    float zero_kr(0);      // kneeRightMotor zero  (epos)
-    float zero_kl(0);      // kneeLeftMotor  zero  (epos)
-    float zero_hr(0);      // hipRightMotor  zero  (epos)
-    float zero_hl(0);      // hipLeftMotor   zero  (epos)
-    float zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
-    float zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
+    int zero_kr(0);      // kneeRightMotor zero  (epos)
+    int zero_kl(0);      // kneeLeftMotor  zero  (epos)
+    int zero_hr(0);      // hipRightMotor  zero  (epos)
+    int zero_hl(0);      // hipLeftMotor   zero  (epos)
+    int zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
+    int zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -142,7 +145,8 @@ void Controle(ThrdStruct &data_struct){
     LowPassFilter2pFloat sensor_filters[4];
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
     {
-      sensor_filters[i].set_cutoff_frequency(data_struct.sampletime_, 16);
+      float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
+      sensor_filters[i].set_cutoff_frequency(thread_frequency, 16);
       sensor_filters[i].reset();
     }
 
@@ -162,9 +166,9 @@ void Controle(ThrdStruct &data_struct){
         } // fim da sessao critica
 
         kneeRightEncoder.ReadPDO01();
-        float exo_pos = 2*M_PI*(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc)/encoder_kr_steps;
+        float exo_pos = 2*M_PI*float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc)/encoder_kr_steps;
         kneeRightMotor.ReadPDO01();
-        float mtr_pos = 2*M_PI*( kneeRightMotor.PDOgetActualPosition() - zero_kr)/(motor_kr_steps*sea_kr_ratio);
+        float mtr_pos = 2*M_PI*float( kneeRightMotor.PDOgetActualPosition() - zero_kr)/(motor_kr_steps*sea_kr_ratio);
 
         exo_pos = sensor_filters[0].apply(exo_pos);
         mtr_pos = sensor_filters[1].apply(mtr_pos);
@@ -177,22 +181,22 @@ void Controle(ThrdStruct &data_struct){
         states_data[9] = states_data[4];
 
         kneeRightMotor.ReadPDO01();
-        // Torque Constant: 0.0603 N.m/A = 60.3 N.m/mA
-        states_data[8] = sensor_filters[3].apply( 60.30f*(kneeRightMotor.PDOgetActualCurrent()) ); // [mA]
+        // Torque Constant: 0.0603 N.m/A
+        states_data[8] = sensor_filters[3].apply( 0.0603f*float(kneeRightMotor.PDOgetActualCurrent())/1000 ); // [mA]
         states_data[5] = states_data[8]/motor_inertia;
 
         sendto_control.assign(states_data);
         switch (data_struct.param01_)
         {
         case ABC:
-            float setpoint = controle_acc(sendto_control, gains_data, acc_bffr);
-            int setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
+            setpoint = controle_acc(sendto_control, gains_data, acc_bffr);
+            setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
             break;
         case ZTC:
-            float desiredVelRPM = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
-            int setpoint_rpm = constrain_float(desiredVelRPM, -7590, 7590); // No load speed
+            setpoint = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
+            setpoint_rpm = constrain_float(setpoint, -7590, 7590); // No load speed
             // simplesmente... esqueci a reducao do sistema!!!
             kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
             kneeRightMotor.WritePDO02();
@@ -201,14 +205,14 @@ void Controle(ThrdStruct &data_struct){
             /* code */
             break;
         case LTC:
-            float setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer);
-            int setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
+            setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer);
+            setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
             break;
         case SEA:
-            float setpoint = controle_sea(sendto_control, gains_data, sea_bffr);
-            int setpoint_rpm = constrain_float(RADS2RPM*sea_kr_ratio*setpoint, -7590, 7590);
+            setpoint = controle_sea(sendto_control, gains_data, sea_bffr);
+            setpoint_rpm = constrain_float(RADS2RPM*sea_kr_ratio*setpoint, -7590, 7590);
             kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
             kneeRightMotor.WritePDO02();
             break;
@@ -220,6 +224,7 @@ void Controle(ThrdStruct &data_struct){
         if(isready_log) 
         {
             for (int i = 0; i < loggsize; i++) logging_data[i] = states_data[i];
+            logging_data[1] = sendto_control.hum_rgtknee_vel;
             // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));

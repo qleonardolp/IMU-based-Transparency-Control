@@ -229,7 +229,8 @@ void readIMUs(ThrdStruct &data_struct)
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
-          imu_filters[i].set_cutoff_frequency(desiredUpdateRate, 16);
+          float thread_frequency = desiredUpdateRate;
+          imu_filters[i].set_cutoff_frequency(thread_frequency, 16);
           imu_filters[i].reset();
         }
 

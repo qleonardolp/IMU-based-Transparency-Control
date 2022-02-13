@@ -179,7 +179,7 @@ int main()
   } while (!execution_end);
 
   epos.StopPDOS(1);
-  cout << "Successful exit." << endl;
+  cout << " Successful exit." << endl;
   this_thread::sleep_for(chrono::milliseconds(700));
   return 0;
 }
