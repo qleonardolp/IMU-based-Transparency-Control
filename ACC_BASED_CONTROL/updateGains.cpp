@@ -8,9 +8,8 @@
 #include <processthreadsapi.h>
 #include <iostream>
 #include <string>
-#include <math.h>
 
-float constrain_float(float val, float min, float max);
+extern float constrain_float(float val, float min, float max); // definida em Controle.cpp
 
 void updateGains(ThrdStruct &data_struct){
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -67,15 +66,4 @@ void updateGains(ThrdStruct &data_struct){
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0F_ = false;
   }
-}
-
-float constrain_float(float val, float min, float max)
-{
-	if (_isnan(val)) return (min + max)/2;
-
-	if (val < min) return min;
-
-	if(val > max) return max;
-	
-	return val;
 }

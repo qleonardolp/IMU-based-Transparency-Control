@@ -88,7 +88,7 @@ void readFTSensor(ThrdStruct &data_struct){
       unique_lock<mutex> _(*data_struct.mtx_);
       //(*data_struct.datavecB_)[9] = sensor_data[1]; // nao funciona, mas:
       memcpy(aux_data, *data_struct.datavecB_, sizeof(aux_data));
-      aux_data[9] = sensor_data[0]; // só alteramos o último elemento
+      aux_data[7] = -sensor_data[0]; // "inter_rgtshank  = vector[7];"
       memcpy(*data_struct.datavecB_, aux_data, sizeof(aux_data));
       memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
     }   // fim da sessao critica

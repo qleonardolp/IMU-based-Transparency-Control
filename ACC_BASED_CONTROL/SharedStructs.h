@@ -51,12 +51,12 @@ typedef struct shared_struct {
     short  param17_;
     short  param18_;
     short  param19_;
-    short *param1A_;
-    short *param1B_;
-    short *param1C_;
-    short *param1D_;
-    short *param1E_;
-    short *param1F_; 
+    short *param1A_; // imu_aborting      (flag)
+    short *param1B_; // asgd_aborting     (flag)
+    short *param1C_; // control_aborting  (flag)
+    short *param1D_; // logging_aborting  (flag)
+    short *param1E_; // ftsensor_aborting (flag)
+    short *param1F_; // gscan_aborting    (flag)
 
     // parameters, 3� block:
     short  param20_;
@@ -69,12 +69,12 @@ typedef struct shared_struct {
     short  param27_;
     short  param28_;
     short  param29_;
-    short *param2A_;
-    short *param2B_;
-    short *param2C_;
-    short *param2D_;
-    short *param2E_;
-    short *param2F_; 
+    short *param2A_; // imu_holding      (flag)
+    short *param2B_; // asgd_holding     (flag)
+    short *param2C_; // control_holding  (flag)
+    short *param2D_; // logging_holding  (flag)
+    short *param2E_; // ftsensor_holding (flag)
+    short *param2F_; // gscan_holding    (flag) 
 
     // parameters, 4� block:
     short  param30_;
@@ -95,6 +95,89 @@ typedef struct shared_struct {
     short *param3F_; 
 
 } ThrdStruct;
+
+typedef struct states{
+    // MUST be used in SI units!
+    // positions (rad)
+    float rbt_rgthip_pos;
+    float rbt_lfthip_pos;
+    float rbt_rgtknee_pos;
+    float rbt_lftknee_pos;
+    float rbt_rgtankle_pos;
+    float rbt_lftankle_pos;
+    float hum_rgthip_pos;
+    float hum_lfthip_pos;
+    float hum_rgtknee_pos;
+    float hum_lftknee_pos;
+    float hum_rgtankle_pos;
+    float hum_lftankle_pos;
+    // velocities (rad/s)
+    float rbt_rgthip_vel;
+    float rbt_lfthip_vel;
+    float rbt_rgtknee_vel;
+    float rbt_lftknee_vel;
+    float rbt_rgtankle_vel;
+    float rbt_lftankle_vel;
+    float hum_rgthip_vel;
+    float hum_lfthip_vel;
+    float hum_rgtknee_vel;
+    float hum_lftknee_vel;
+    float hum_rgtankle_vel;
+    float hum_lftankle_vel;
+    // accelerations (rad/ss)
+    float rbt_rgthip_acc;
+    float rbt_lfthip_acc;
+    float rbt_rgtknee_acc;
+    float rbt_lftknee_acc;
+    float rbt_rgtankle_acc;
+    float rbt_lftankle_acc;
+    float hum_rgthip_acc;
+    float hum_lfthip_acc;
+    float hum_rgtknee_acc;
+    float hum_lftknee_acc;
+    float hum_rgtankle_acc;
+    float hum_lftankle_acc;
+
+    // Forces/Torques (N.m) (SEA)
+    float sea_lftthigh;
+    float sea_rgtthigh;
+    float sea_lftshank;
+    float sea_rgtshank;
+    float sea_lftfoot;
+    float sea_rgtfoot;
+    float inter_lftthigh;
+    float inter_rgtthigh;
+    float inter_lftshank;
+    float inter_rgtshank;
+    float inter_lftfoot;
+    float inter_rgtfoot;
+
+    // Motor Torque (N.m)
+    float mtr_lfthip_tau;
+    float mtr_rgthip_tau;
+    float mtr_lftknee_tau;
+    float mtr_rgtknee_tau;
+    // Motor Speed (rad/s)
+    float mtr_lfthip_omg;
+    float mtr_rgthip_omg;
+    float mtr_lftknee_omg;
+    float mtr_rgtknee_omg;
+
+    // metodo de atribuicao:
+    void assign(const float vector[10]){
+        // por enquanto so para o joelho direito:
+        hum_rgtknee_pos = vector[0];
+        hum_rgtknee_vel = vector[1];
+        hum_rgtknee_acc = vector[2];
+        rbt_rgtknee_pos = vector[3];
+        rbt_rgtknee_vel = vector[4];
+        rbt_rgtknee_acc = vector[5];
+        sea_rgtshank    = vector[6];
+        inter_rgtshank  = vector[7];
+        mtr_rgtknee_tau = vector[8];
+        mtr_rgtknee_omg = vector[9];
+    }
+};
 
 #endif // SHAREDSTRUCT_H
 

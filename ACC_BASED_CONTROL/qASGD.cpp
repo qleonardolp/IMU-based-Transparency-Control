@@ -43,6 +43,8 @@ void qASGD(ThrdStruct &data_struct)
     float q3 = 0;
     float imus_data[18];
     float states_data[10];
+    float euler_k[3] = {0,0,0};
+    float omega_k[3] = {0,0,0};
     const float Ts = data_struct.sampletime_;
     const float mi0 = 0.100;
     const float Beta = 1.1400;
@@ -208,16 +210,34 @@ void qASGD(ThrdStruct &data_struct)
         // Relative Omega between IMUs:
         Vector3f omega_ned = RelOmegaNED(&qASGD1_qk, &qASGD2_qk, &gyro1, &gyro2);
 
-        states_data[0] = euler_ned(0);    // ang_knee_x
-        states_data[1] = euler_ned(1);    // ang_knee_y
-        states_data[2] = euler_ned(2);    // ang_knee_z
-        states_data[3] = omega_ned(0);    // omg_knee_x
-        states_data[4] = omega_ned(1);    // omg_knee_y
-        states_data[5] = omega_ned(2);    // omg_knee_z
-        states_data[6] = imus_data[12];   // gyro_exo_x
-        states_data[7] = imus_data[13];   // gyro_exo_y
-        states_data[8] = imus_data[14];   // gyro_exo_z
-        //states_data[9] = 23;
+        /*
+        // por enquanto so para o joelho direito:
+        hum_rgtknee_pos = vector[0]; v
+        hum_rgtknee_vel = vector[1]; v
+        hum_rgtknee_acc = vector[2]; v
+        rbt_rgtknee_pos = vector[3]; x
+        rbt_rgtknee_vel = vector[4]; x
+        rbt_rgtknee_acc = vector[5]; x
+        sea_rgtshank    = vector[6]; x
+        inter_rgtshank  = vector[7]; x
+        mtr_rgtknee_tau = vector[8]; x
+        mtr_rgtknee_omg = vector[9]; x
+        */
+
+        // Finite Difference Acc approximation:
+        euler_k[0] = euler_ned(0);
+        float acc_euler = (euler_k[0] - 2*euler_k[1] + euler_k[2])/(Ts*Ts);
+        euler_k[2] = euler_k[1]; 
+        euler_k[1] = euler_k[0];
+
+        omega_k[0] = omega_ned(0);
+        float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
+        omega_k[2] = omega_k[1]; 
+        omega_k[1] = omega_k[0]; 
+
+        states_data[0] = euler_ned(0);  // hum_rgtknee_pos
+        states_data[1] = omega_ned(0);  // hum_rgtknee_vel
+        states_data[2] = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
 
         { // sessao critica
             unique_lock<mutex> _(*data_struct.mtx_);

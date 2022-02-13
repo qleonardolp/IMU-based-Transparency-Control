@@ -267,7 +267,7 @@ void Interface()
       cin >> option;
       control_struct.param01_ = option;
       logging_struct.param10_ = option; // to logging the control option
-      ftsensor_struct.param01_ = false; // F/T filtering on/off
+      ftsensor_struct.param01_ = true; // F/T filtering on/off
     }
     cout << " Iniciando Threads..." << endl;
   } 
