@@ -225,10 +225,18 @@ void qASGD(ThrdStruct &data_struct)
         */
 
         // Finite Difference Acc approximation:
+        // testing imgui static usage:
+        static float last_angles[3] = {0,0,0};
+        last_angles[0] = euler_ned(0);
+        static float acc_euler = (last_angles[0] - 2*last_angles[1] + last_angles[2])/(Ts*Ts);
+        last_angles[2] = last_angles[1]; 
+        last_angles[1] = last_angles[0];
+        /*
         euler_k[0] = euler_ned(0);
         float acc_euler = (euler_k[0] - 2*euler_k[1] + euler_k[2])/(Ts*Ts);
         euler_k[2] = euler_k[1]; 
         euler_k[1] = euler_k[0];
+        */
 
         omega_k[0] = omega_ned(0);
         float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
@@ -237,7 +245,8 @@ void qASGD(ThrdStruct &data_struct)
 
         states_data[0] = euler_ned(0);  // hum_rgtknee_pos
         states_data[1] = omega_ned(0);  // hum_rgtknee_vel
-        states_data[2] = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        // states_data[2] = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        states_data[2] = (acc_euler); // hum_rgtknee_acc
 
         { // sessao critica
             unique_lock<mutex> _(*data_struct.mtx_);
