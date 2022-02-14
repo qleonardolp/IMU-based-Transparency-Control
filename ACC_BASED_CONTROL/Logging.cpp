@@ -71,7 +71,7 @@ void Logging(ThrdStruct &data_struct){
             for (size_t i = 0; i < (vecsize); i++)
                 fprintf(logFileHandle, ", %.4f", log_states[i]);
             fprintf(logFileHandle, ", %f", -log_ftsensor[0]);
-            //fprintf(logFileHandle, ", %.3f", log_gains[0]);
+            fprintf(logFileHandle, ", %.3f", log_gains[0]);
             fprintf(logFileHandle, ", %.3f", log_gains[13]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);

@@ -33,9 +33,9 @@ void updateGains(ThrdStruct &data_struct){
     fgets(checkSignature, 67, pFile);
     if (strcmp(paramSignature, checkSignature) == 0){
       file_isvalid = true;
-      cout << "Arquivo de Parametros valido!\n";
+      cout << " Arquivo de Parametros valido!\n";
     } else{
-      cout << "Arquivo de Parametros invalido!\n";
+      cout << " Arquivo de Parametros invalido!\n";
     }
     fclose(pFile);
   }
@@ -62,12 +62,13 @@ void updateGains(ThrdStruct &data_struct){
     // TODO: Leitura do arquivo com ganhos...
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL && file_isvalid) {
-      fscanf(pFile, "%s\n", checkSignature);
+      char header[67];
+      fscanf(pFile, "%67c", header); // empurrando o ponteiro de leitura para depois do cabecalho 'paramSignature'
       for (size_t i = 0; i < sizeof(rawgains)/sizeof(float); i++)
         fscanf(pFile, "%f\n", rawgains + i);
       // Scanning Transfer Function:
-      fscanf(pFile, "-> LS Transfer Funct <-\n[Or(den) >= Or(num)] (Matlab style):\nnum = [%f %f %f %f]\nden = [%f %f %f %f]\n",\
-        rawgains[10],rawgains[11],rawgains[12],rawgains[13],rawgains[14],rawgains[15],rawgains[16],rawgains[17]);
+      fscanf(pFile, "Transfer Funct Matlab\nnum [%f %f %f %f]\nden [%f %f %f %f]\n", \
+      rawgains+10, rawgains+11, rawgains+12, rawgains+13, rawgains+14, rawgains+15, rawgains+16, rawgains+17);
       fclose(pFile);
     }
 

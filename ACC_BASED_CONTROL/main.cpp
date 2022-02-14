@@ -204,31 +204,60 @@ void Interface()
   cout << " [03]: Controle sem IMUs \n";
   cout << " [04]: Leitura IMUs \n";
   cout << " [05]: Leitura F/T  \n";
+  cout << " [06]: Leitura Parametros  \n";
   cout << " Ou zero (0) para finalizar. \n ";
   cin >> option;
 
   switch (option)
   {  
   case 1:
-    // tudo roda!
+    // tudo roda:
+    asgd_isready = imu_isready = false;
+    gscan_isready = false;
+    logging_isready  = false;
+    control_isready  = false;
+    ftsensor_isready = false;
+    execution_end = false;
     break;
   case 2:
+    asgd_isready = imu_isready = false;
+    gscan_isready = false;
+    logging_isready  = false;
+    control_isready  = false;
     ftsensor_isready = true;
+    execution_end = false;
     break;
   case 3:
-    imu_isready = true;
-    asgd_isready = true;
+    asgd_isready = imu_isready = true;
+    gscan_isready = false;
+    logging_isready  = false;
+    control_isready  = false;
     ftsensor_isready = true;
+    execution_end = false;
     break;
   case 4:
+    asgd_isready = imu_isready = false;
+    gscan_isready = true;
+    logging_isready  = false;
     control_isready  = true;
     ftsensor_isready = true;
-    gscan_isready = true;
+    execution_end = false;
     break;
   case 5:
-    control_isready  = true;
+    asgd_isready = imu_isready = true;
     gscan_isready = true;
-    imu_isready = true;
+    logging_isready  = false;
+    control_isready  = true;
+    ftsensor_isready = false;
+    execution_end = false;
+    break;
+  case 6:
+    asgd_isready = imu_isready = true;
+    gscan_isready = false;
+    logging_isready  = false;
+    control_isready  = true;
+    ftsensor_isready = true;
+    execution_end = false;
     break;
   case 0:
   default:

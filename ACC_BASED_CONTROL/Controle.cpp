@@ -226,7 +226,7 @@ void Controle(ThrdStruct &data_struct){
         if(isready_log) 
         {
             for (int i = 0; i < loggsize; i++) logging_data[i] = states_data[i];
-            logging_data[1] = sendto_control.hum_rgtknee_vel;
+            logging_data[8] = 0.0603f*setpoint; // check LS output
             // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
@@ -268,8 +268,6 @@ float controle_sea(const states input, const float gains[18], float buffer[10]) 
 
 float controle_lpshap(const states input, const float gains[18], float buffer[10], const float smpl_time)
 {
-    using namespace Eigen;
-
     const float Jr = 0.885;
     float Kp = gains[4];
     float Kd = gains[5];
@@ -288,17 +286,17 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     // FT = --------------------------------, with a0 = 1!
     //        a0 s^3 + a1 s^2 + a2 s + a3
     // Usar Forma Canonica Controlavel... (Ogata pg. 596)
-    Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
-    Vector3f B; B << 0, 0, 1;
-    RowVector3f C; C << b3 - a3*b0, b2 - a2*b0, b1 - a1*b0;
+    Eigen::Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
+    Eigen::Vector3f B; B << 0, 0, 1;
+    Eigen::RowVector3f C; C << b3 - a3*b0, b2 - a2*b0, b1 - a1*b0;
     float D = b0;
     // Discretizacao 3 Ord:
     float Ts = smpl_time;
-    Matrix3f Ak = Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2 + (A*Ts).pow(3)/6;
-    Vector3f Bk = (Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6 + (A*Ts).pow(3)/24)*B*Ts;
+    Eigen::Matrix3f Ak = Eigen::Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2 + (A*Ts).pow(3)/6;
+    Eigen::Vector3f Bk = (Eigen::Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6 + (A*Ts).pow(3)/24)*B*Ts;
 
     float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
-    Vector3f xk; xk << buffer[0], buffer[1], buffer[2];
+    Eigen::Vector3f xk; xk << buffer[0], buffer[1], buffer[2];
     xk = Ak*xk + Bk*vel_error;
     float yk = C*xk + D*vel_error;
     buffer[0] = xk(0);
@@ -312,7 +310,7 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     //actuation = yk; // ...?
     // Feedforward:
     actuation += input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc;
-    return actuation;
+    return yk;
 }
 
 float constrain_float(float val, float min, float max)
