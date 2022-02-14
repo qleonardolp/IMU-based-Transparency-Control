@@ -18,6 +18,8 @@ void updateGains(ThrdStruct &data_struct){
   SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
 
+  const char* paramSignature = "Exo Tau Parameters File (cd97732888c9cc66b0a650d2fb5edfdc07161a78)";
+  char checkSignature[67];
   FILE* pFile;
   float gains[18];
   float rawgains[18];
@@ -45,14 +47,25 @@ void updateGains(ThrdStruct &data_struct){
     // TODO: Leitura do arquivo com ganhos...
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL) {
-      for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++)
-        fscanf(pFile, "%f\n", rawgains + i);
+      fscanf(pFile, "%s\n", checkSignature);
+      if (strcmp(paramSignature, checkSignature) == 0) {
+        for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++)
+          fscanf(pFile, "%f\n", rawgains + i);
+        // Scanning Transfer Function:
+        fscanf(pFile, "-> LS Transfer Funct <-\n[Or(den) >= Or(num)] (Matlab style):\nnum = [%f %f %f %f]\nden = [%f %f %f %f]",\
+               rawgains[10],rawgains[11],rawgains[12],rawgains[13],rawgains[14],rawgains[15],rawgains[16],rawgains[17]);
+      } 
+      else
+      {
+        for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++)
+          rawgains[i] = 0;
+      }
       fclose(pFile);
     }
 
     // Saturação para limitar valores (segurança):
     for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++) {
-      gains[i] = constrain_float(rawgains[i], 0.0f, 1.0e4f);
+      gains[i] = constrain_float(rawgains[i], -1.0e4f, 1.0e4f);
     }
     
     {   // sessao critica

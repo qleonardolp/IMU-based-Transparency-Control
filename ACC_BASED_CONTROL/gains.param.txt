@@ -1,3 +1,4 @@
+Exo Tau Parameters File (cd97732888c9cc66b0a650d2fb5edfdc07161a78)
 0.0001
 0.0001
 0.000
@@ -16,3 +17,7 @@
 0.160
 0.170
 0.180
+-> LS Transfer Funct <-
+[Or(den) >= Or(num)] (Matlab style):
+num = [1 2 3 4]
+den = [5 6 7 8]

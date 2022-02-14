@@ -36,7 +36,7 @@ float controle_junta(const states input, const float gains[18], float buffer[10]
 float controle_acc(const states input, const float gains[18], float buffer[10]);  // acc-based
 float controle_adm(const states input, const float gains[18], float buffer[10]);    // admittance
 float controle_sea(const states input, const float gains[18], float buffer[10]);    // SEA feedback
-float controle_lpshap(const states input, const float gains[18], float buffer[10]); // loop-haping
+float controle_lpshap(const states input, const float gains[18], float buffer[10], const float smpl_time); // loop-shaping
 
 float constrain_float(float val, float min, float max);
 
@@ -140,7 +140,6 @@ void Controle(ThrdStruct &data_struct){
         *data_struct.param0C_ = true;
     }
 
-
     // Filtros PB para alguns sensores EPOS:
     LowPassFilter2pFloat sensor_filters[4];
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
@@ -205,7 +204,7 @@ void Controle(ThrdStruct &data_struct){
             /* code */
             break;
         case LTC:
-            setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer);
+            setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer, data_struct.sampletime_);
             setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
@@ -264,12 +263,45 @@ float controle_adm(const states input, const float gains[18], float buffer[10]) 
 
 float controle_sea(const states input, const float gains[18], float buffer[10]) {return 0;} 
 
-float controle_lpshap(const states input, const float gains[18], float buffer[10])
+float controle_lpshap(const states input, const float gains[18], float buffer[10], const float smpl_time)
 {
+    using namespace Eigen;
+
     const float Jr = 0.885;
     float Kp = gains[4];
     float Kd = gains[5];
-    //buffer[4] = 1; util para Transfer Funct...
+    bool  update_tf = false;
+    float a0 = gains[14];
+    float b0 = gains[10]/a0;
+    float b1 = gains[11]/a0;
+    float b2 = gains[12]/a0;
+    float b3 = gains[13]/a0;
+    float a1 = gains[15]/a0;
+    float a2 = gains[16]/a0;
+    float a3 = gains[17]/a0; //... I'm tired
+
+    // Def.:
+    //        b0 s^3 + b1 s^2 + b2 s + b3
+    // FT = --------------------------------, with a0 = 1!
+    //        a0 s^3 + a1 s^2 + a2 s + a3
+    // Usar Forma Canonica Controlavel... (Ogata pg. 596)
+    Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
+    Vector3f B; B << 0, 0, 1;
+    RowVector3f C; C << b3 - a3*b0, b2 - a2*b0, b1 - a1*b0;
+    float D = b0;
+    // Discretizacao 3 Ord:
+    float Ts = smpl_time;
+    Matrix3f Ak = Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2 + (A*Ts).pow(3)/6;
+    Vector3f Bk = (Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6 + (A*Ts).pow(3)/24)*B*Ts;
+
+    float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
+    Vector3f xk; xk << buffer[0], buffer[1], buffer[2];
+    xk = Ak*xk + Bk*vel_error;
+    float yk = C*xk + D*vel_error;
+    buffer[0] = xk(0);
+    buffer[1] = xk(1);
+    buffer[2] = xk(2);
+
     float actuation(0);
     // Feedback
     actuation += Kp*(input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
