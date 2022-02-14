@@ -303,10 +303,11 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     buffer[2] = xk(2);
 
     float actuation(0);
-    // Feedback
+    // Feedback:
     actuation += Kp*(input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
                  Kd*(input.hum_rgtknee_acc - input.rbt_rgtknee_acc);
-    // Feedforward
+    //actuation = yk; // ...?
+    // Feedforward:
     actuation += input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc;
     return actuation;
 }
