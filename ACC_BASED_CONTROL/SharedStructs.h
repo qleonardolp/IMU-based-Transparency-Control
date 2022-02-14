@@ -11,6 +11,8 @@
 #include <thread>
 #include <mutex>
 
+#define IMUBYPASS 3
+
 typedef struct shared_struct {
     float sampletime_;
     int     exectime_;

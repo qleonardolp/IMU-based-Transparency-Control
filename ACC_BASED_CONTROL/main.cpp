@@ -29,7 +29,7 @@ void updateGains(ThrdStruct &data_struct);
 
 // Threads Sample Time:
 #define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
-#define ASGD_SMPLTM 0.0050 //  @200  Hz
+#define ASGD_SMPLTM IMU_SMPLTM //
 #define CTRL_SMPLTM 0.0010 //  @1000 Hz
 #define LOG_SMPLTM  0.0050 //  @200  Hz 
 #define GSCN_SMPLTM 4.0000 //  @ leitura de ganhos do arquivo a cada 4s 
@@ -92,6 +92,7 @@ int main()
   imu_struct.param00_  = IMU_PRIORITY;
   imu_struct.param0A_  = &imu_isready;
   *(imu_struct.datavec_) = imu_data;
+  *(imu_struct.datavecB_) = states_data;
   imu_struct.mtx_ = &comm_mtx;
 
   // F/T Sensor Struct
@@ -201,7 +202,7 @@ void Interface()
   cout << " Escolha uma opcao: \n";
   cout << " [01]: Controle com IMUs + F/T \n";
   cout << " [02]: Controle com IMUs \n";
-  cout << " [03]: Controle sem IMUs \n";
+  cout << " [03]: Controle 'IMU3 bypass' \n";
   cout << " [04]: Leitura IMUs \n";
   cout << " [05]: Leitura F/T  \n";
   cout << " [06]: Leitura Parametros  \n";
@@ -227,8 +228,9 @@ void Interface()
     ftsensor_isready = true;
     execution_end = false;
     break;
-  case 3:
-    asgd_isready = imu_isready = true;
+  case IMUBYPASS:
+    imu_isready = false;
+    asgd_isready = true;
     gscan_isready = false;
     logging_isready  = false;
     control_isready  = false;
@@ -271,6 +273,9 @@ void Interface()
     break;
   }
 
+  imu_struct.param39_ = option;
+  control_struct.param39_ = option;
+
   if (!execution_end) {
     cout << "\n Defina o tempo de execucao em segundos: ";
     cin >> execution_time;
@@ -292,6 +297,7 @@ void Interface()
       cout << " [05]: Markoviano Impedancia \n";
       cout << " [06]: Markoviano Torque \n";
       cout << " [07]: Markoviano Z(0) + RUIDO \n";
+      cout << " [33]: GyroscopeX 'IMU3 bypass' \n";
       cout << " ";
       cin >> option;
       control_struct.param01_ = option;

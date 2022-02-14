@@ -24,6 +24,8 @@
   #define RPM2RADS (M_PI/30) // rpm to rad/s
 #endif
 
+#define LPF_CUTOFF 7
+
 
 /// @file   LowPassFilter2p.h
 /// @brief  A class to implement a second order low pass filter

@@ -18,6 +18,7 @@
 #include <Eigen/Core>
 #include <unsupported/Eigen/MatrixFunctions>
 
+#define Id3 Eigen::Matrix3f::Identity()
 
 //	Torque Constant: 0.0603 N.m/A
 //	Speed Constant: 158 rpm/V
@@ -34,11 +35,11 @@ extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
 
-float controle_junta(const states input, const float gains[18], float buffer[10]);  // generico
-float controle_acc(const states input, const float gains[18], float buffer[10]);  // acc-based
-float controle_adm(const states input, const float gains[18], float buffer[10]);    // admittance
-float controle_sea(const states input, const float gains[18], float buffer[10]);    // SEA feedback
-float controle_lpshap(const states input, const float gains[18], float buffer[10], const float smpl_time); // loop-shaping
+float  controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm); // generico
+float    controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm); // acc-based
+float    controle_adm(const states input, const float gains[18], float buffer[10], const float sample_tm); // admittance
+float    controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm); // SEA feedback
+float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm); // loop-shaping
 
 float constrain_float(float val, float min, float max);
 
@@ -73,6 +74,7 @@ void Controle(ThrdStruct &data_struct){
         sea_bffr[i]  = 0;
         acc_bffr[i]  = 0;
     }
+
     // Inicialização por segurança:
     for (int i = 0; i < statesize; i++) states_data[i] = 0;
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
@@ -148,7 +150,7 @@ void Controle(ThrdStruct &data_struct){
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
     {
       float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
-      sensor_filters[i].set_cutoff_frequency(thread_frequency, 16);
+      sensor_filters[i].set_cutoff_frequency(thread_frequency, LPF_CUTOFF);
       sensor_filters[i].reset();
     }
 
@@ -191,20 +193,22 @@ void Controle(ThrdStruct &data_struct){
         switch (data_struct.param01_)
         {
         case ABC:
-            setpoint = controle_acc(sendto_control, gains_data, acc_bffr);
+            setpoint = controle_acc(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
             setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
             kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
             kneeRightMotor.WritePDO01();
             break;
         case ZTC:
-            setpoint = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
-            setpoint_rpm = constrain_float(setpoint, -7590, 7590); // No load speed
-            // simplesmente... esqueci a reducao do sistema!!!
+            setpoint = controle_adm(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
+            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
             kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
             kneeRightMotor.WritePDO02();
             break;
         case ITC:
-            /* code */
+            setpoint = controle_junta(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
+            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
+            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
+            kneeRightMotor.WritePDO02();
             break;
         case LTC:
             setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer, data_struct.sampletime_);
@@ -213,8 +217,16 @@ void Controle(ThrdStruct &data_struct){
             kneeRightMotor.WritePDO01();
             break;
         case SEA:
-            setpoint = controle_sea(sendto_control, gains_data, sea_bffr);
+            setpoint = controle_sea(sendto_control, gains_data, sea_bffr, data_struct.sampletime_);
             setpoint_rpm = constrain_float(RADS2RPM*sea_kr_ratio*setpoint, -7590, 7590);
+            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
+            kneeRightMotor.WritePDO02();
+            break;
+        case (11*IMUBYPASS):
+            // In this case 'hum_rgtknee_vel' is GyroscopeX from the 3º IMU!!!
+            // Useful for qASGD debug....
+            setpoint = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
+            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
             kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
             kneeRightMotor.WritePDO02();
             break;
@@ -246,9 +258,9 @@ void Controle(ThrdStruct &data_struct){
 }
 
 // Controladores (em essência):
-float controle_junta(const states input, const float gains[18], float buffer[10]) {return 0;} 
+float controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_acc(const states input, const float gains[18], float buffer[10])
+float controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm)
 {
     const float Jr = 0.885;
     float Kp = gains[0];
@@ -262,16 +274,15 @@ float controle_acc(const states input, const float gains[18], float buffer[10])
     return actuation;
 } 
 
-float controle_adm(const states input, const float gains[18], float buffer[10]) {return 0;} 
+float controle_adm(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_sea(const states input, const float gains[18], float buffer[10]) {return 0;} 
+float controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_lpshap(const states input, const float gains[18], float buffer[10], const float smpl_time)
+float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm)
+
 {
+    using namespace Eigen;
     const float Jr = 0.885;
-    float Kp = gains[4];
-    float Kd = gains[5];
-    bool  update_tf = false;
     float a0 = gains[14];
     float b0 = gains[10]/a0;
     float b1 = gains[11]/a0;
@@ -279,37 +290,31 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     float b3 = gains[13]/a0;
     float a1 = gains[15]/a0;
     float a2 = gains[16]/a0;
-    float a3 = gains[17]/a0; //... I'm tired
+    float a3 = gains[17]/a0; //... I'm tired, very...
 
     // Def.:
     //        b0 s^3 + b1 s^2 + b2 s + b3
     // FT = --------------------------------, with a0 = 1!
     //        a0 s^3 + a1 s^2 + a2 s + a3
-    // Usar Forma Canonica Controlavel... (Ogata pg. 596)
-    Eigen::Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
-    Eigen::Vector3f B; B << 0, 0, 1;
-    Eigen::RowVector3f C; C << b3 - a3*b0, b2 - a2*b0, b1 - a1*b0;
+    // Forma Canonica Controlavel | (Ogata pg. 596):
+    Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
+    Vector3f B(0, 0, 1);
+    RowVector3f C(b3 - a3*b0, b2 - a2*b0, b1 - a1*b0);
     float D = b0;
-    // Discretizacao 3 Ord:
-    float Ts = smpl_time;
-    Eigen::Matrix3f Ak = Eigen::Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2 + (A*Ts).pow(3)/6;
-    Eigen::Vector3f Bk = (Eigen::Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6 + (A*Ts).pow(3)/24)*B*Ts;
+    // Discretizacao 2 Ord:
+    float Ts = sample_tm;
+    Matrix3f Ak = Id3 + A*Ts + (A*Ts).pow(2)/2;
+    Vector3f Bk = (Id3 + A*Ts/2 + (A*Ts).pow(2)/6)*B*Ts;
 
     float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
-    Eigen::Vector3f xk; xk << buffer[0], buffer[1], buffer[2];
+    Vector3f xk(buffer[0], buffer[1], buffer[2]);
     xk = Ak*xk + Bk*vel_error;
     float yk = C*xk + D*vel_error;
     buffer[0] = xk(0);
     buffer[1] = xk(1);
     buffer[2] = xk(2);
 
-    float actuation(0);
-    // Feedback:
-    actuation += Kp*(input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
-                 Kd*(input.hum_rgtknee_acc - input.rbt_rgtknee_acc);
-    //actuation = yk; // ...?
-    // Feedforward:
-    actuation += input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc;
+    //return input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc + yk; // FF+FB
     return yk;
 }
 

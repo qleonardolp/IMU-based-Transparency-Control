@@ -222,15 +222,20 @@ void readIMUs(ThrdStruct &data_struct)
         vector<XsVector> accData(mtwCallbacks.size());
         vector<XsVector> gyroData(mtwCallbacks.size());
 
-        //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...
-
+        //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...?
+        float states_bypass[10];
+        for (size_t i = 0; i < sizeof(states_bypass)/sizeof(float); i++)
+        {
+            states_bypass[i] = 0;
+        }
+        
         float imus_data[18]; 
         // Filtros Passa Baixa para os dados das IMUs
         LowPassFilter2pFloat imu_filters[18];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
           float thread_frequency = desiredUpdateRate;
-          imu_filters[i].set_cutoff_frequency(thread_frequency, 16);
+          imu_filters[i].set_cutoff_frequency(thread_frequency, LPF_CUTOFF);
           imu_filters[i].reset();
         }
 
@@ -279,6 +284,10 @@ void readIMUs(ThrdStruct &data_struct)
                       }
                       unique_lock<mutex> _(*data_struct.mtx_);
                       memcpy(*data_struct.datavec_, imus_data, sizeof(imus_data));
+                      if (data_struct.param39_ == IMUBYPASS){
+                          states_bypass[1] = imus_data[12];
+                          memcpy(*data_struct.datavecB_, states_bypass, sizeof(states_bypass));
+                      }
                     }
                 }
             }

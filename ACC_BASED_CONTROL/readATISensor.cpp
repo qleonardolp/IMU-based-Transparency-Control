@@ -28,7 +28,7 @@ void readFTSensor(ThrdStruct &data_struct){
   char* atiSensorIp = "192.168.1.1";
   float sensor_data[6]; // Fx Fy Fz Tx Ty Tz
   float aux_data[10];
-  float cutoff_freq = 70;
+  float cutoff_freq = 16;
   bool  enable_filt = data_struct.param01_;
 
   // inicializa sensor F/T:
