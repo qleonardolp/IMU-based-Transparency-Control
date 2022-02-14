@@ -12,10 +12,12 @@
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
-#include <Eigen/Core>
 #include <iostream>
 #include <chrono>
 #include <math.h>
+#include <Eigen/Core>
+#include <unsupported/Eigen/MatrixFunctions>
+
 
 //	Torque Constant: 0.0603 N.m/A
 //	Speed Constant: 158 rpm/V
@@ -96,7 +98,8 @@ void Controle(ThrdStruct &data_struct){
             isready_asg = *data_struct.param0B_;
             isready_ati = *data_struct.param0E_;
         } 
-    } while (!isready_imu || !isready_asg || !isready_ati);
+    //} while (!isready_imu || !isready_asg || !isready_ati);
+    } while (!isready_imu || !isready_asg);
 
     // Sincroniza as epos
     {
