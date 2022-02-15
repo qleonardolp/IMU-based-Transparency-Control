@@ -43,6 +43,8 @@ void qASGD(ThrdStruct &data_struct)
     float q3 = 0;
     float imus_data[18];
     float states_data[10];
+    // Inicialização por segurança:
+    for (int i = 0; i < 10; i++) states_data[i] = 0;
     float euler_k[3] = {0,0,0};
     float omega_k[3] = {0,0,0};
     const float Ts = data_struct.sampletime_;
@@ -243,8 +245,10 @@ void qASGD(ThrdStruct &data_struct)
 
         { // sessao critica
             unique_lock<mutex> _(*data_struct.mtx_);
-            //unique_lock<mutex> _(*data_struct.mtx02_);
-            memcpy(*data_struct.datavecB_, states_data, sizeof(states_data));
+            *(*data_struct.datavecB_ + 0) = euler_ned(0);  // hum_rgtknee_pos
+            *(*data_struct.datavecB_ + 1) = omega_ned(0);  // hum_rgtknee_vel
+            *(*data_struct.datavecB_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+            //memcpy(*data_struct.datavecB_, states_data, sizeof(states_data));
         } // fim da sessao critica
 
         Timer.tak();

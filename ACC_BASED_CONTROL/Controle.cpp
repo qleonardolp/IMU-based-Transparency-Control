@@ -35,12 +35,15 @@ extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
 
+// Controllers:
 float  controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm); // generico
 float    controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm); // acc-based
 float    controle_adm(const states input, const float gains[18], float buffer[10], const float sample_tm); // admittance
 float    controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm); // SEA feedback
 float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm); // loop-shaping
-
+// Low Level abstraction:
+void SetEPOSTorque(float desired_torque);
+void SetEPOSVelocity(float desired_rads);
 float constrain_float(float val, float min, float max);
 
 void Controle(ThrdStruct &data_struct){
@@ -194,41 +197,28 @@ void Controle(ThrdStruct &data_struct){
         {
         case ABC:
             setpoint = controle_acc(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
-            setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
-            kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
-            kneeRightMotor.WritePDO01();
+            SetEPOSTorque(setpoint);
             break;
         case ZTC:
             setpoint = controle_adm(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
-            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
-            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
-            kneeRightMotor.WritePDO02();
+            SetEPOSVelocity(setpoint);
             break;
         case ITC:
             setpoint = controle_junta(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
-            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
-            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
-            kneeRightMotor.WritePDO02();
+            SetEPOSVelocity(setpoint);
             break;
         case LTC:
             setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer, data_struct.sampletime_);
-            setpoint_mA = constrain_float(1000*setpoint, -3100, 3100);
-            kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA);
-            kneeRightMotor.WritePDO01();
+            SetEPOSTorque(setpoint);
             break;
         case SEA:
             setpoint = controle_sea(sendto_control, gains_data, sea_bffr, data_struct.sampletime_);
-            setpoint_rpm = constrain_float(RADS2RPM*sea_kr_ratio*setpoint, -7590, 7590);
-            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
-            kneeRightMotor.WritePDO02();
+            SetEPOSVelocity(setpoint);
             break;
         case (11*IMUBYPASS):
             // In this case 'hum_rgtknee_vel' is GyroscopeX from the 3º IMU!!!
             // Useful for qASGD debug....
-            setpoint = RADS2RPM*sea_kr_ratio*sendto_control.hum_rgtknee_vel;
-            setpoint_rpm = constrain_float(setpoint, -7590, 7590);
-            kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
-            kneeRightMotor.WritePDO02();
+            SetEPOSVelocity(sendto_control.hum_rgtknee_vel);
             break;
         default:
             break;
@@ -257,7 +247,7 @@ void Controle(ThrdStruct &data_struct){
     DesabilitaEixo(0);
 }
 
-// Controladores (em essência):
+// Controladores, em essência! Trabalham com unidades no SI e sem precisar de conversoes do motor (Gear Ratio, Kt, Kw...)!
 float controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
 
 float controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm)
@@ -279,7 +269,6 @@ float controle_adm(const states input, const float gains[18], float buffer[10], 
 float controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
 
 float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm)
-
 {
     using namespace Eigen;
     const float Jr = 0.885;
@@ -314,8 +303,26 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     buffer[1] = xk(1);
     buffer[2] = xk(2);
 
-    //return input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc + yk; // FF+FB
+    //return input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc + yk; // FF + FB
     return yk;
+}
+
+// Low Level abstraction:
+
+void SetEPOSTorque(float desired_torque){
+    // Torque Constant: 0.0603 N.m/A
+    // Gear Ratio: 150
+    int setpoint_mA = 1000*(desired_torque/0.0603f)/150.0f; // -> '110.5583*desired_torque'
+    float setpoint_mA_limited = constrain_float(setpoint_mA, -3100, 3100);
+    kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA_limited);
+    kneeRightMotor.WritePDO01();
+}
+
+void SetEPOSVelocity(float desired_rads){
+    // Gear Ratio: 150!!
+    float setpoint_rpm = constrain_float(RADS2RPM*150*desired_rads, -7590, 7590);
+    kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
+    kneeRightMotor.WritePDO02();
 }
 
 float constrain_float(float val, float min, float max)
