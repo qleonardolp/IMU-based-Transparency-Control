@@ -51,6 +51,13 @@ short logging_isready(false);
 short ftsensor_isready(false);
 short gscan_isready(false);
 
+short imu_aborting      (false);
+short asgd_aborting     (false);
+short control_aborting  (false);
+short logging_aborting  (false);
+short ftsensor_aborting (false);
+short gscan_aborting    (false);
+
 bool execution_end(false);
 int  execution_time = EXEC_TIME;
 
@@ -99,6 +106,7 @@ int main()
   ftsensor_struct.sampletime_ = FT_SMPLTM;
   ftsensor_struct.param00_ = DEFAULT_PRIORITY;
   ftsensor_struct.param0E_ = &ftsensor_isready;
+  ftsensor_struct.param1E_ = &ftsensor_aborting;
   ftsensor_struct.param0A_ = &imu_isready;
   *(ftsensor_struct.datavecB_) = states_data;
   *(ftsensor_struct.datavecF_) = ati_data;

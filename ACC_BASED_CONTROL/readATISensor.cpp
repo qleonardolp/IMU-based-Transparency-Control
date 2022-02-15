@@ -36,69 +36,74 @@ void readFTSensor(ThrdStruct &data_struct){
   bool sensor_init = sensorAxia->init();
   { 
     unique_lock<mutex> _(*data_struct.mtx_);
-    *data_struct.param0E_ = sensor_init;
-    if (sensor_init) cout << "Sensor ATI F/T iniciado! \n";
-    else cout <<  "Falha ao iniciar Sensor ATI F/T !!! \n";
+    *data_struct.param0E_ = sensor_init;   // INVESTIGAR PQ RETORNA TRUE MSM COM SENSOR DESCONECTADO
+    *data_struct.param1E_ = !sensor_init; // ftsensor abort flag
+    if (sensor_init) cout << " Sensor ATI F/T iniciado! \n";
+    else cout <<  " Falha ao iniciar Sensor ATI F/T !!! \n";
   }
 
-  bool isready_imu(false);
-  do{ 
-    {   // confere IMU:
-      unique_lock<mutex> _(*data_struct.mtx_);
-      isready_imu = *data_struct.param0A_;
-    } 
-  } while (!isready_imu);
-
-  sensorAxia->bias();
-  this_thread::sleep_for(chrono::milliseconds(500));
-
-  // Filtros Passa Baixa para os dados:
-  LowPassFilter2pFloat sensor_filters[6];
-  for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
+  if(sensor_init)
   {
-    float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
-    sensor_filters[i].set_cutoff_frequency(thread_frequency, cutoff_freq);
-    sensor_filters[i].reset();
-  }
 
-  looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
-  // inicializa looptimer
-  Timer.start();
-  do
-  {
-    Timer.tik();
-    sensorAxia->peek();
+    bool isready_imu(false);
+    do{ 
+      {   // confere IMU:
+        unique_lock<mutex> _(*data_struct.mtx_);
+        isready_imu = *data_struct.param0A_;
+      } 
+    } while (!isready_imu);
 
-    if (!enable_filt){
-      sensor_data[0] = sensorAxia->values.Fx;
-      sensor_data[1] = sensorAxia->values.Fy;
-      sensor_data[2] = sensorAxia->values.Fz;
-      sensor_data[3] = sensorAxia->values.Tx;
-      sensor_data[4] = sensorAxia->values.Ty;
-      sensor_data[5] = sensorAxia->values.Tz;
-    } else {
-      sensor_data[0] = sensor_filters[0].apply(sensorAxia->values.Fx);
-      sensor_data[1] = sensor_filters[1].apply(sensorAxia->values.Fy);
-      sensor_data[2] = sensor_filters[2].apply(sensorAxia->values.Fz);
-      sensor_data[3] = sensor_filters[3].apply(sensorAxia->values.Tx);
-      sensor_data[4] = sensor_filters[4].apply(sensorAxia->values.Ty);
-      sensor_data[5] = sensor_filters[5].apply(sensorAxia->values.Tz);
+    sensorAxia->bias();
+    this_thread::sleep_for(chrono::milliseconds(500));
+
+    // Filtros Passa Baixa para os dados:
+    LowPassFilter2pFloat sensor_filters[6];
+    for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
+    {
+      float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
+      sensor_filters[i].set_cutoff_frequency(thread_frequency, cutoff_freq);
+      sensor_filters[i].reset();
     }
 
-    {   // sessao critica
+    looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    // inicializa looptimer
+    Timer.start();
+    do
+    {
+      Timer.tik();
+      sensorAxia->peek();
+
+      if (!enable_filt){
+        sensor_data[0] = sensorAxia->values.Fx;
+        sensor_data[1] = sensorAxia->values.Fy;
+        sensor_data[2] = sensorAxia->values.Fz;
+        sensor_data[3] = sensorAxia->values.Tx;
+        sensor_data[4] = sensorAxia->values.Ty;
+        sensor_data[5] = sensorAxia->values.Tz;
+      } else {
+        sensor_data[0] = sensor_filters[0].apply(sensorAxia->values.Fx);
+        sensor_data[1] = sensor_filters[1].apply(sensorAxia->values.Fy);
+        sensor_data[2] = sensor_filters[2].apply(sensorAxia->values.Fz);
+        sensor_data[3] = sensor_filters[3].apply(sensorAxia->values.Tx);
+        sensor_data[4] = sensor_filters[4].apply(sensorAxia->values.Ty);
+        sensor_data[5] = sensor_filters[5].apply(sensorAxia->values.Tz);
+      }
+
+      {   // sessao critica
+        unique_lock<mutex> _(*data_struct.mtx_);
+        //(*data_struct.datavecB_)[9] = sensor_data[1]; // nao funciona, mas:
+        memcpy(aux_data, *data_struct.datavecB_, sizeof(aux_data));
+        aux_data[7] = -sensor_data[0]; // "inter_rgtshank  = vector[7];"
+        memcpy(*data_struct.datavecB_, aux_data, sizeof(aux_data));
+        memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
+      }   // fim da sessao critica
+
+      Timer.tak();
+    } while (!Timer.end());
+
+    {   
       unique_lock<mutex> _(*data_struct.mtx_);
-      //(*data_struct.datavecB_)[9] = sensor_data[1]; // nao funciona, mas:
-      memcpy(aux_data, *data_struct.datavecB_, sizeof(aux_data));
-      aux_data[7] = -sensor_data[0]; // "inter_rgtshank  = vector[7];"
-      memcpy(*data_struct.datavecB_, aux_data, sizeof(aux_data));
-      memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
-    }   // fim da sessao critica
-
-    Timer.tak();
-  } while (!Timer.end());
-
-  {   
-    unique_lock<mutex> _(*data_struct.mtx_);
-    *data_struct.param0E_ = false;
+      *data_struct.param0E_ = false;
+    }
   }
 }

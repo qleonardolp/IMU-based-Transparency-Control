@@ -18,8 +18,6 @@
 #include <Eigen/Core>
 #include <unsupported/Eigen/MatrixFunctions>
 
-#define Id3 Eigen::Matrix3f::Identity()
-
 //	Torque Constant: 0.0603 N.m/A
 //	Speed Constant: 158 rpm/V
 //	Max current (@ 48 V)  ~3.1 A
@@ -218,7 +216,8 @@ void Controle(ThrdStruct &data_struct){
         case (11*IMUBYPASS):
             // In this case 'hum_rgtknee_vel' is GyroscopeX from the 3º IMU!!!
             // Useful for qASGD debug....
-            SetEPOSVelocity(sendto_control.hum_rgtknee_vel);
+            setpoint = sendto_control.hum_rgtknee_vel;
+            SetEPOSVelocity(setpoint);
             break;
         default:
             break;
@@ -228,7 +227,7 @@ void Controle(ThrdStruct &data_struct){
         if(isready_log) 
         {
             for (int i = 0; i < loggsize; i++) logging_data[i] = states_data[i];
-            logging_data[8] = 0.0603f*setpoint; // check LS output
+            logging_data[8] = setpoint; // check LS output
             // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
@@ -286,14 +285,15 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     // FT = --------------------------------, with a0 = 1!
     //        a0 s^3 + a1 s^2 + a2 s + a3
     // Forma Canonica Controlavel | (Ogata pg. 596):
-    Matrix3f A; A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
+    Matrix3f A; 
+    A << 0, 1, 0, 0, 0, 1, -a3, -a2, -a1;
     Vector3f B(0, 0, 1);
     RowVector3f C(b3 - a3*b0, b2 - a2*b0, b1 - a1*b0);
     float D = b0;
     // Discretizacao 2 Ord:
     float Ts = sample_tm;
-    Matrix3f Ak = Id3 + A*Ts + (A*Ts).pow(2)/2;
-    Vector3f Bk = (Id3 + A*Ts/2 + (A*Ts).pow(2)/6)*B*Ts;
+    Matrix3f Ak = Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2;
+    Vector3f Bk = (Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6)*B*Ts;
 
     float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
     Vector3f xk(buffer[0], buffer[1], buffer[2]);
