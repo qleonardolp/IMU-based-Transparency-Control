@@ -90,22 +90,36 @@ void Controle(ThrdStruct &data_struct){
     int zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
     int zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
 
+    bool control_abort(false);
     bool isready_imu(false);
+    bool aborting_imu(false);
     bool isready_asg(false);
     bool isready_ati(false);
+    bool aborting_ati(false);
     bool isready_log(false);
     bool isready_gsn(false);
     do{ 
         {   // Espera IMU / ASGD / FT Sensor (ATI) estarem prontos:
             unique_lock<mutex> _(*data_struct.mtx_);
             isready_imu = *data_struct.param0A_;
+            aborting_imu = *data_struct.param1A_;
             isready_asg = *data_struct.param0B_;
             isready_ati = *data_struct.param0E_;
+            aborting_ati = *data_struct.param1E_;
             isready_gsn = *data_struct.param0F_;
+            if(aborting_imu || aborting_ati)
+            {
+                control_abort = *data_struct.param1C_ = true;
+                break;
+            }
         } 
     //} while (!isready_imu || !isready_asg || !isready_ati);
     } while (!isready_imu || !isready_asg || !isready_gsn);
     //} while (!isready_imu || !isready_asg);
+
+    if (control_abort){
+        return;
+    }
 
     // Sincroniza as epos
     {
@@ -170,7 +184,12 @@ void Controle(ThrdStruct &data_struct){
             unique_lock<mutex> _(*data_struct.mtx_);
             memcpy(states_data, *data_struct.datavecB_, sizeof(states_data));
             memcpy(gains_data,  *data_struct.datavec_,  sizeof(gains_data));
-            isready_log = *data_struct.param0D_;
+            isready_log  = *data_struct.param0D_;
+            if(*data_struct.param1A_ || *data_struct.param1E_)
+            {
+                control_abort = *data_struct.param1C_ = true;
+                break;
+            }
         } // fim da sessao critica
 
         kneeRightEncoder.ReadPDO01();

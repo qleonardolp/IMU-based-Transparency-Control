@@ -250,6 +250,14 @@ void readIMUs(ThrdStruct &data_struct)
         do
         {
             xsensTimer.tik();
+            // IMU connection check for safety
+            int imus_connected = wirelessMasterCallback.getWirelessMTWs().size();
+            if (imus_connected < 2)
+            {
+                unique_lock<mutex> _(*data_struct.mtx_);
+                *data_struct.param1A_ = true; // aborting
+                break; // get out of the reading loop!
+            }
 
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
@@ -312,11 +320,19 @@ void readIMUs(ThrdStruct &data_struct)
     {
         cout << ex.what() << endl;
         cout << "****ABORT****" << endl;
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0A_ = false; // not ready anymore
+        *data_struct.param1A_ = true; // aborting
+        return;
     }
     catch (...)
     {
         cout << "An unknown fatal error has occured. Aborting." << endl;
         cout << "****ABORT****" << endl;
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0A_ = false; // not ready anymore
+        *data_struct.param1A_ = true; // aborting
+        return;
     }
 
     cout << "Closing XsControl..." << endl;

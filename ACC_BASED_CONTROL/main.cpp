@@ -98,25 +98,18 @@ int main()
   imu_struct.sampletime_ = IMU_SMPLTM;
   imu_struct.param00_  = IMU_PRIORITY;
   imu_struct.param0A_  = &imu_isready;
+  imu_struct.param1A_  = &imu_aborting;
   *(imu_struct.datavec_) = imu_data;
   *(imu_struct.datavecB_) = states_data;
   imu_struct.mtx_ = &comm_mtx;
-
-  // F/T Sensor Struct
-  ftsensor_struct.sampletime_ = FT_SMPLTM;
-  ftsensor_struct.param00_ = DEFAULT_PRIORITY;
-  ftsensor_struct.param0E_ = &ftsensor_isready;
-  ftsensor_struct.param1E_ = &ftsensor_aborting;
-  ftsensor_struct.param0A_ = &imu_isready;
-  *(ftsensor_struct.datavecB_) = states_data;
-  *(ftsensor_struct.datavecF_) = ati_data;
-  ftsensor_struct.mtx_ = &comm_mtx;
 
   // qASGD Struct:
   asgd_struct.sampletime_ = ASGD_SMPLTM;
   asgd_struct.param00_  = ASGD_PRIORITY;
   asgd_struct.param0B_  = &asgd_isready;
+  asgd_struct.param1B_  = &asgd_aborting;
   asgd_struct.param0A_  = &imu_isready;
+  asgd_struct.param1A_  = &imu_aborting;
   *(asgd_struct.datavec_) = imu_data;
   *(asgd_struct.datavecB_) = states_data;
   asgd_struct.mtx_ = &comm_mtx;
@@ -125,10 +118,13 @@ int main()
   control_struct.sampletime_ = CTRL_SMPLTM;
   control_struct.param00_  = CTRL_PRIORITY;
   control_struct.param0C_  = &control_isready;
+  control_struct.param1C_  = &control_aborting;
   control_struct.param0A_  = &imu_isready;
+  control_struct.param1A_  = &imu_aborting;
   control_struct.param0B_  = &asgd_isready;
   control_struct.param0D_  = &logging_isready;
   control_struct.param0E_  = &ftsensor_isready;
+  control_struct.param1E_  = &ftsensor_aborting;
   control_struct.param0F_  = &gscan_isready;
   *(control_struct.datavec_ ) = gains_data;
   *(control_struct.datavecA_) = logging_data;
@@ -140,6 +136,7 @@ int main()
   logging_struct.sampletime_ = LOG_SMPLTM;
   logging_struct.param00_  = LOG_PRIORITY;
   logging_struct.param0D_  = &logging_isready;
+  logging_struct.param1D_  = &logging_aborting;
   logging_struct.param0A_  = &imu_isready;
   logging_struct.param0B_  = &asgd_isready;
   logging_struct.param0C_  = &control_isready;
@@ -149,10 +146,21 @@ int main()
   *(logging_struct.datavecF_) = ati_data;
   logging_struct.mtx_ = &comm_mtx;
 
+  // F/T Sensor Struct
+  ftsensor_struct.sampletime_ = FT_SMPLTM;
+  ftsensor_struct.param00_ = DEFAULT_PRIORITY;
+  ftsensor_struct.param0E_ = &ftsensor_isready;
+  ftsensor_struct.param1E_ = &ftsensor_aborting;
+  ftsensor_struct.param0A_ = &imu_isready;
+  *(ftsensor_struct.datavecB_) = states_data;
+  *(ftsensor_struct.datavecF_) = ati_data;
+  ftsensor_struct.mtx_ = &comm_mtx;
+
   // updateGains Struct
   gscan_struct.sampletime_ = GSCN_SMPLTM;
   gscan_struct.param00_ = DEFAULT_PRIORITY;
   gscan_struct.param0F_ = &gscan_isready;
+  gscan_struct.param1F_ = &gscan_aborting;
   gscan_struct.param0D_ = &logging_isready;
   gscan_struct.param0C_ = &control_isready;
   *(gscan_struct.datavec_ ) = gains_data;
