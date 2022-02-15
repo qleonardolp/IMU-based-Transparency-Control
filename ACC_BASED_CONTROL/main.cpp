@@ -129,6 +129,7 @@ int main()
   control_struct.param0B_  = &asgd_isready;
   control_struct.param0D_  = &logging_isready;
   control_struct.param0E_  = &ftsensor_isready;
+  control_struct.param0F_  = &gscan_isready;
   *(control_struct.datavec_ ) = gains_data;
   *(control_struct.datavecA_) = logging_data;
   *(control_struct.datavecB_) = states_data;
@@ -214,6 +215,7 @@ void Interface()
   cout << " [04]: Leitura IMUs \n";
   cout << " [05]: Leitura F/T  \n";
   cout << " [06]: Leitura Parametros  \n";
+  cout << " [07]: Reset Falhas CAN \n";
   cout << " Ou zero (0) para finalizar. \n ";
   cin >> option;
 
@@ -269,6 +271,16 @@ void Interface()
     ftsensor_isready = true;
     execution_end = false;
     break;
+  case 7:
+    imu_isready   = true;
+    asgd_isready  = true;
+    gscan_isready = true;
+    logging_isready  = true;
+    control_isready  = true;
+    ftsensor_isready = true;
+    execution_end = false;
+    ResetRedeCan();
+    break;
   case 0:
   default:
     imu_isready   = true;
@@ -284,7 +296,7 @@ void Interface()
   imu_struct.param39_ = option;
   control_struct.param39_ = option;
 
-  if (!execution_end) {
+  if (!execution_end && option != 7) {
     cout << "\n Defina o tempo de execucao em segundos: ";
     cin >> execution_time;
     imu_struct.exectime_  = execution_time;

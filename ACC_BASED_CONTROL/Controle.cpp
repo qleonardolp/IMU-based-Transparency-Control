@@ -94,15 +94,18 @@ void Controle(ThrdStruct &data_struct){
     bool isready_asg(false);
     bool isready_ati(false);
     bool isready_log(false);
+    bool isready_gsn(false);
     do{ 
         {   // Espera IMU / ASGD / FT Sensor (ATI) estarem prontos:
             unique_lock<mutex> _(*data_struct.mtx_);
             isready_imu = *data_struct.param0A_;
             isready_asg = *data_struct.param0B_;
             isready_ati = *data_struct.param0E_;
+            isready_gsn = *data_struct.param0F_;
         } 
     //} while (!isready_imu || !isready_asg || !isready_ati);
-    } while (!isready_imu || !isready_asg);
+    } while (!isready_imu || !isready_asg || !isready_gsn);
+    //} while (!isready_imu || !isready_asg);
 
     // Sincroniza as epos
     {
@@ -272,13 +275,24 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     using namespace Eigen;
     const float Jr = 0.885;
     float a0 = gains[14];
-    float b0 = gains[10]/a0;
-    float b1 = gains[11]/a0;
-    float b2 = gains[12]/a0;
-    float b3 = gains[13]/a0;
-    float a1 = gains[15]/a0;
-    float a2 = gains[16]/a0;
-    float a3 = gains[17]/a0; //... I'm tired, very...
+    float b0 = gains[10];
+    float b1 = gains[11];
+    float b2 = gains[12];
+    float b3 = gains[13];
+    float a1 = gains[15];
+    float a2 = gains[16];
+    float a3 = gains[17];
+    // not tired anymore!!
+    if(a0 > 0.000001){
+      a0 /= a0;
+      b0 /= a0;
+      b1 /= a0;
+      b2 /= a0;
+      b3 /= a0;
+      a1 /= a0;
+      a2 /= a0;
+      a3 /= a0; 
+    }
 
     // Def.:
     //        b0 s^3 + b1 s^2 + b2 s + b3

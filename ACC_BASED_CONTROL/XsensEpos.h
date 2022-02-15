@@ -36,11 +36,12 @@ char* NET_ID_SERVO_04 = "5";
 //DECLARACAO DA REDE CAN:
 EPOS_NETWORK  epos(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER);
 //DECLARACAO DAS EPOS:
-AXIS kneeRightEncoder(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SENSOR_01);
-AXIS kneeRightMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
-AXIS kneeLeftMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
 AXIS hipRightMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_03);
 AXIS hipLeftMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_04);
+AXIS kneeRightMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
+AXIS kneeRightEncoder(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SENSOR_01);
+AXIS kneeLeftMotor(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
+
 
 /* "EPOS" FUNCTIONS */
 
@@ -56,68 +57,24 @@ void IniciaRedeCan()
   epos.StartPDOS(3); // ?
   epos.StartPDOS(4); // ?
   epos.StartPDOS(5); // ?
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
   for (int i = 0; i < 10; i++)
   {
     // Aguarda tempo
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     // Sincroniza as epos
     epos.sync();
     kneeRightEncoder.ReadPDO01();
     kneeRightMotor.ReadPDO01();
-    kneeLeftMotor.ReadPDO01();
-    hipRightMotor.ReadPDO01();
-    hipLeftMotor.ReadPDO01();
+    //kneeLeftMotor.ReadPDO01();
+    //hipRightMotor.ReadPDO01();
+    //hipLeftMotor.ReadPDO01();
 
     std::cout << ".";
   }
-
-  // EPOS 04
-  hipRightMotor.PDOsetControlWord_FaultReset(true);
-  hipRightMotor.WritePDO01();
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  hipRightMotor.PDOsetControlWord_FaultReset(false);
-  hipRightMotor.WritePDO01();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-  // EPOS 05
-  hipLeftMotor.PDOsetControlWord_FaultReset(true);
-  hipLeftMotor.WritePDO01();
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  hipLeftMotor.PDOsetControlWord_FaultReset(false);
-  hipLeftMotor.WritePDO01();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-  // EPOS 02
-  kneeRightEncoder.PDOsetControlWord_FaultReset(true);
-  kneeRightEncoder.WritePDO01();
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  kneeRightEncoder.PDOsetControlWord_FaultReset(false);
-  kneeRightEncoder.WritePDO01();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-  // EPOS 03
-  kneeLeftMotor.PDOsetControlWord_FaultReset(true);
-  kneeLeftMotor.WritePDO01();
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  kneeLeftMotor.PDOsetControlWord_FaultReset(false);
-  kneeLeftMotor.WritePDO01();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-  // EPOS 01
-  kneeRightMotor.PDOsetControlWord_FaultReset(true);
-  kneeRightMotor.WritePDO01();
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  kneeRightMotor.PDOsetControlWord_FaultReset(false);
-  kneeRightMotor.WritePDO01();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
   std::cout << " OK!" << std::endl;
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
 }
 
 void HabilitaEixo(int ID)
@@ -129,7 +86,7 @@ void HabilitaEixo(int ID)
     kneeRightMotor.PDOsetControlWord_QuickStop(true);
     kneeRightMotor.PDOsetControlWord_EnableOperation(false);
     kneeRightMotor.WritePDO01();
-
+    /*
     kneeLeftMotor.PDOsetControlWord_SwitchOn(false);
     kneeLeftMotor.PDOsetControlWord_EnableVoltage(true);
     kneeLeftMotor.PDOsetControlWord_QuickStop(true);
@@ -147,7 +104,7 @@ void HabilitaEixo(int ID)
     hipLeftMotor.PDOsetControlWord_QuickStop(true);
     hipLeftMotor.PDOsetControlWord_EnableOperation(false);
     hipLeftMotor.WritePDO01();
-
+    */
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     kneeRightMotor.PDOsetControlWord_SwitchOn(true);
@@ -155,7 +112,7 @@ void HabilitaEixo(int ID)
     kneeRightMotor.PDOsetControlWord_QuickStop(true);
     kneeRightMotor.PDOsetControlWord_EnableOperation(false);
     kneeRightMotor.WritePDO01();
-
+    /*
     kneeLeftMotor.PDOsetControlWord_SwitchOn(true);
     kneeLeftMotor.PDOsetControlWord_EnableVoltage(true);
     kneeLeftMotor.PDOsetControlWord_QuickStop(true);
@@ -173,7 +130,7 @@ void HabilitaEixo(int ID)
     hipLeftMotor.PDOsetControlWord_QuickStop(true);
     hipLeftMotor.PDOsetControlWord_EnableOperation(false);
     hipLeftMotor.WritePDO01();
-
+    */
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     kneeRightMotor.PDOsetControlWord_SwitchOn(true);
@@ -181,7 +138,7 @@ void HabilitaEixo(int ID)
     kneeRightMotor.PDOsetControlWord_QuickStop(true);
     kneeRightMotor.PDOsetControlWord_EnableOperation(true);
     kneeRightMotor.WritePDO01();
-
+    /*
     kneeLeftMotor.PDOsetControlWord_SwitchOn(true);
     kneeLeftMotor.PDOsetControlWord_EnableVoltage(true);
     kneeLeftMotor.PDOsetControlWord_QuickStop(true);
@@ -199,7 +156,7 @@ void HabilitaEixo(int ID)
     hipLeftMotor.PDOsetControlWord_QuickStop(true);
     hipLeftMotor.PDOsetControlWord_EnableOperation(true);
     hipLeftMotor.WritePDO01();
-
+    */
     std::cout << "Motores habilitados!" << std::endl;
   }
 }
@@ -213,7 +170,7 @@ void DesabilitaEixo(int ID)
     kneeRightMotor.PDOsetControlWord_QuickStop(true);
     kneeRightMotor.PDOsetControlWord_EnableOperation(false);
     kneeRightMotor.WritePDO01();
-
+    /*
     kneeLeftMotor.PDOsetControlWord_SwitchOn(true);
     kneeLeftMotor.PDOsetControlWord_EnableVoltage(true);
     kneeLeftMotor.PDOsetControlWord_QuickStop(true);
@@ -231,7 +188,7 @@ void DesabilitaEixo(int ID)
     hipLeftMotor.PDOsetControlWord_QuickStop(true);
     hipLeftMotor.PDOsetControlWord_EnableOperation(false);
     hipLeftMotor.WritePDO01();
-
+    */
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     kneeRightMotor.PDOsetControlWord_SwitchOn(false);
@@ -239,7 +196,7 @@ void DesabilitaEixo(int ID)
     kneeRightMotor.PDOsetControlWord_QuickStop(true);
     kneeRightMotor.PDOsetControlWord_EnableOperation(false);
     kneeRightMotor.WritePDO01();
-
+    /*
     kneeLeftMotor.PDOsetControlWord_SwitchOn(false);
     kneeLeftMotor.PDOsetControlWord_EnableVoltage(true);
     kneeLeftMotor.PDOsetControlWord_QuickStop(true);
@@ -257,9 +214,60 @@ void DesabilitaEixo(int ID)
     hipLeftMotor.PDOsetControlWord_QuickStop(true);
     hipLeftMotor.PDOsetControlWord_EnableOperation(false);
     hipLeftMotor.WritePDO01();
-
+    */
     std::cout << "Motores desabilitados!" << std::endl;
   }
+}
+
+void ResetRedeCan()
+{
+  // EPOS 04
+  hipRightMotor.PDOsetControlWord_FaultReset(true);
+  hipRightMotor.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  hipRightMotor.PDOsetControlWord_FaultReset(false);
+  hipRightMotor.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+  // EPOS 05
+  hipLeftMotor.PDOsetControlWord_FaultReset(true);
+  hipLeftMotor.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  hipLeftMotor.PDOsetControlWord_FaultReset(false);
+  hipLeftMotor.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  
+  // EPOS 02
+  kneeRightEncoder.PDOsetControlWord_FaultReset(true);
+  kneeRightEncoder.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  kneeRightEncoder.PDOsetControlWord_FaultReset(false);
+  kneeRightEncoder.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  
+  // EPOS 03
+  kneeLeftMotor.PDOsetControlWord_FaultReset(true);
+  kneeLeftMotor.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  kneeLeftMotor.PDOsetControlWord_FaultReset(false);
+  kneeLeftMotor.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  
+  // EPOS 01
+  kneeRightMotor.PDOsetControlWord_FaultReset(true);
+  kneeRightMotor.WritePDO01();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  kneeRightMotor.PDOsetControlWord_FaultReset(false);
+  kneeRightMotor.WritePDO01();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+  std::cout << " Reset OK!" << std::endl;
+  std::this_thread::sleep_for(std::chrono::milliseconds(700));
 }
 
 #endif // XSENSEPOS_H

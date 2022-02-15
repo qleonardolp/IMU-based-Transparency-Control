@@ -40,26 +40,12 @@ void updateGains(ThrdStruct &data_struct){
     fclose(pFile);
   }
 
-  do{ 
-    {   // Espera Controle e Log:
-      unique_lock<mutex> _(*data_struct.mtx_);
-      isready_ctr = *data_struct.param0C_;
-      isready_log = *data_struct.param0D_;
-    } 
-  } while (!isready_ctr || !isready_log);
-
-  { // Avisa que está pronto:
-    unique_lock<mutex> _(*data_struct.mtx_);
-    *data_struct.param0F_ = true;
-  }
-
   // inicializa looptimer
   Timer.start();
   do
   {
     Timer.tik();
 
-    // TODO: Leitura do arquivo com ganhos...
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL && file_isvalid) {
       char header[67];
@@ -79,6 +65,7 @@ void updateGains(ThrdStruct &data_struct){
 
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param0F_ = true;
       memcpy(*data_struct.datavec_, gains, sizeof(gains));
     }   // fim da sessao critica
     Timer.tak();
