@@ -245,13 +245,21 @@ void qASGD(ThrdStruct &data_struct)
 
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
-      *(*data_struct.datavecB_ + 0) = euler_ned(0);  // hum_rgtknee_pos
-      *(*data_struct.datavecB_ + 1) = omega_ned(0);  // hum_rgtknee_vel
-      *(*data_struct.datavecB_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
-      //memcpy(*data_struct.datavecB_, states_data, sizeof(states_data));
-      if (data_struct.param39_ == IMUBYPASS){
-        *(*data_struct.datavecB_ + 0) = euler_ned(0);  // hum_rgtknee_pos
+      switch (data_struct.param39_)
+      {
+      case IMUBYPASS:
+        *(*data_struct.datavecB_ + 0) = euler_ned(0);              // hum_rgtknee_pos
         *(*data_struct.datavecB_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        break;
+      case READIMUS:
+        *(*data_struct.datavecA_ + 0) = euler_ned(0);              // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 1) = omega_ned(0);              // hum_rgtknee_vel
+        *(*data_struct.datavecA_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+      default:
+        *(*data_struct.datavecB_ + 0) = euler_ned(0);              // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = omega_ned(0);              // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        break;
       }
     } // fim da sessao critica
 

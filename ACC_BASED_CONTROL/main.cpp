@@ -110,8 +110,9 @@ int main()
   asgd_struct.param1B_  = &asgd_aborting;
   asgd_struct.param0A_  = &imu_isready;
   asgd_struct.param1A_  = &imu_aborting;
-  *(asgd_struct.datavec_) = imu_data;
-  *(asgd_struct.datavecB_) = states_data;
+  *(asgd_struct.datavec_) = imu_data;     // from IMUs
+  *(asgd_struct.datavecA_) = logging_data;// to logging
+  *(asgd_struct.datavecB_) = states_data; // to control
   asgd_struct.mtx_ = &comm_mtx;
 
   // Control Struct
@@ -255,7 +256,7 @@ void Interface()
     ftsensor_isready = true;
     execution_end = false;
     break;
-  case 4:
+  case READIMUS:
     asgd_isready = imu_isready = false;
     gscan_isready = true;
     logging_isready  = false;

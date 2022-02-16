@@ -12,6 +12,7 @@
 #include <mutex>
 
 #define IMUBYPASS 3
+#define READIMUS  4
 
 typedef struct shared_struct {
     float sampletime_;
