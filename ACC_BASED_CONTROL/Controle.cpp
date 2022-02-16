@@ -164,7 +164,7 @@ void Controle(ThrdStruct &data_struct){
     }
 
     // Filtros PB para alguns sensores EPOS:
-    LowPassFilter2pFloat sensor_filters[4];
+    LowPassFilter2pFloat sensor_filters[5];
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
     {
       float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
@@ -204,13 +204,15 @@ void Controle(ThrdStruct &data_struct){
         states_data[6] = sea_kr_stiffness*(mtr_pos - exo_pos);
 
         kneeRightMotor.ReadPDO02();
-        states_data[4] = sensor_filters[2].apply( RPM2RADS*(kneeRightMotor.PDOgetActualVelocity()) );
+        states_data[4] = sensor_filters[2].apply( (RPM2RADS/sea_kr_ratio)*(kneeRightMotor.PDOgetActualVelocity()) ); // Gear Ratio!!!
         states_data[9] = states_data[4];
 
         kneeRightMotor.ReadPDO01();
         // Torque Constant: 0.0603 N.m/A
         states_data[8] = sensor_filters[3].apply( 0.0603f*float(kneeRightMotor.PDOgetActualCurrent())/1000 ); // [mA]
         states_data[5] = states_data[8]/motor_inertia;
+
+        states_data[3] = sensor_filters[4].apply(states_data[3]); // human acc filtering
 
         sendto_control.assign(states_data);
         switch (data_struct.param01_)

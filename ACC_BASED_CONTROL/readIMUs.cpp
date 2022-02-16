@@ -264,8 +264,15 @@ void readIMUs(ThrdStruct &data_struct)
                 if (mtwCallbacks[i]->dataAvailable())
                 {
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-                    accData[i] = packet->calibratedAcceleration();
-                    gyroData[i] = packet->calibratedGyroscopeData();
+                    if (packet->containsCalibratedGyroscopeData())
+                      gyroData[i] = packet->calibratedGyroscopeData();
+                    else
+                      gyroData[i] = packet->rawGyroscopeDataConverted();
+
+                    if (packet->containsCalibratedAcceleration())
+                      accData[i] = packet->calibratedAcceleration();
+                    else
+                      accData[i] = packet->rawAccelerationConverted();
 
                     mtwCallbacks[i]->deleteOldestPacket();
 
