@@ -1,5 +1,5 @@
 #include "mtwcallback.h"
-#include <iostream>
+//#include <iostream>
 #include <xsens/xsdevice.h>
 #include <xsens/xsdatapacket.h>
 
@@ -33,6 +33,14 @@ void MtwCallback::deleteOldestPacket()
 		m_packetBuffer.pop_front();
 	}
 
+XsDataPacket MtwCallback::fetchOldestPacket()
+	{
+		XsMutexLocker lock(m_mutex);
+		XsDataPacket packet = m_packetBuffer.front(); // read
+		m_packetBuffer.pop_front();					  // delete
+		return packet;
+	}
+
 int MtwCallback::getMtwIndex() const
 	{
 		return m_mtwIndex;
@@ -52,7 +60,7 @@ void MtwCallback::onLiveDataAvailable(XsDevice*, const XsDataPacket* packet)
 		m_packetBuffer.push_back(*packet);
 		if (m_packetBuffer.size() > 300)
 		{
-			std::cout << std::endl;
+			//std::cout << std::endl;
 			deleteOldestPacket();
 		}
 	}

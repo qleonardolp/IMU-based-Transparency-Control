@@ -251,30 +251,33 @@ void readIMUs(ThrdStruct &data_struct)
             // Avoid wirelessMasterCallback here, I dont know if their mutex is the same of
             // mtwCallbacks!!!
             //int imus_connected = wirelessMasterCallback.getWirelessMTWs().size();
-            if (mtwCallbacks.size() < 2)
+            if ((int)mtwCallbacks.size() < 2)
             {
                 unique_lock<mutex> _(*data_struct.mtx_);
                 *data_struct.param1A_ = true; // aborting
                 break; // get out of the reading loop!
             }
 
-            for (size_t i = 0; i < mtwCallbacks.size(); ++i)
+            for (size_t i = 0; i < (int)mtwCallbacks.size(); ++i)
             {
                 bool newDataAvailable = false;
                 if (mtwCallbacks[i]->dataAvailable())
                 {
                     newDataAvailable = true;
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-                    if (packet->containsCalibratedGyroscopeData())
+                    XsDataPacket packet_db = mtwCallbacks[i]->fetchOldestPacket();
+                    packet_db.calibratedAcceleration();
+                    
+                    if (packet->containsCalibratedGyroscopeData() && !packet->empty())
                       gyroData[i] = packet->calibratedGyroscopeData();
 
-                    if (packet->containsCalibratedAcceleration())
+                    if (packet->containsCalibratedAcceleration() && !packet->empty())
                       accData[i] = packet->calibratedAcceleration();
 
                     mtwCallbacks[i]->deleteOldestPacket();
                 }
 
-                if (newDataAvailable && mtwCallbacks.size() >= 2){
+                if (newDataAvailable && (int)mtwCallbacks.size() >= 2){
                     // Orientacao Exo: [3 -2 1]
                     // Orientacao Pessoa: [-3 2 1]
                     // Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
