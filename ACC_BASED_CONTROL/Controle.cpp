@@ -248,11 +248,19 @@ void Controle(ThrdStruct &data_struct){
         // Share states with Logging:
         if(isready_log) 
         {
-            for (int i = 0; i < loggsize; i++) logging_data[i] = states_data[i];
-            logging_data[8] = setpoint; // check LS output
             // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
-            memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
+            *(*data_struct.datavecA_ + 0) = *(*data_struct.datavecB_ + 0);
+            *(*data_struct.datavecA_ + 1) = *(*data_struct.datavecB_ + 1);
+            *(*data_struct.datavecA_ + 2) = *(*data_struct.datavecB_ + 2);
+            *(*data_struct.datavecA_ + 3) = states_data[3];
+            *(*data_struct.datavecA_ + 4) = states_data[4];
+            *(*data_struct.datavecA_ + 5) = states_data[5];
+            *(*data_struct.datavecA_ + 6) = states_data[6];
+            *(*data_struct.datavecA_ + 7) = *(*data_struct.datavecB_ + 7);
+            *(*data_struct.datavecA_ + 8) = setpoint; // check LS output
+            *(*data_struct.datavecA_ + 9) = states_data[9];
+            //memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
             // fim da sessao critica
         }
         
@@ -336,8 +344,8 @@ float controle_lpshap(const states input, const float gains[18], float buffer[10
     buffer[1] = xk(1);
     buffer[2] = xk(2);
 
-    //return input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc + yk; // FF + FB
-    return yk;
+    return input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc + yk; // FF + FB
+    //return yk;
 }
 
 // Low Level abstraction:

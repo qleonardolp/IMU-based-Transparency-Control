@@ -248,7 +248,7 @@ void Interface()
     break;
   case IMUBYPASS:
     imu_isready = false;
-    asgd_isready = true;
+    asgd_isready = false;
     gscan_isready = false;
     logging_isready  = false;
     control_isready  = false;
@@ -302,6 +302,7 @@ void Interface()
   }
 
   imu_struct.param39_ = option;
+  asgd_struct.param39_ = option;
   control_struct.param39_ = option;
 
   if (!execution_end && option != 7) {

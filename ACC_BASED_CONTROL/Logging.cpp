@@ -52,6 +52,7 @@ void Logging(ThrdStruct &data_struct){
     }
 
     looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    auto begin_timestamp = Timer.micro_now();
     // inicializa looptimer
     Timer.start();
     do
@@ -67,12 +68,10 @@ void Logging(ThrdStruct &data_struct){
 
         logFileHandle = fopen(filename,"a");
         if (logFileHandle != NULL){
-            fprintf(logFileHandle, "%lld", Timer.micro_now());
-            for (size_t i = 0; i < (vecsize); i++)
+            float timestamp = float(Timer.micro_now() - begin_timestamp)/MILLION;
+            fprintf(logFileHandle, "%.5f", timestamp);
+            for (size_t i = 0; i < sizeof(log_states)/sizeof(float); i++)
                 fprintf(logFileHandle, ", %.4f", log_states[i]);
-            fprintf(logFileHandle, ", %f", -log_ftsensor[0]);
-            fprintf(logFileHandle, ", %.3f", log_gains[0]);
-            fprintf(logFileHandle, ", %.3f", log_gains[13]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);
         }

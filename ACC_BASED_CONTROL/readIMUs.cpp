@@ -293,8 +293,9 @@ void readIMUs(ThrdStruct &data_struct)
                       unique_lock<mutex> _(*data_struct.mtx_);
                       memcpy(*data_struct.datavec_, imus_data, sizeof(imus_data));
                       if (data_struct.param39_ == IMUBYPASS){
-                          states_bypass[1] = imus_data[12];
-                          memcpy(*data_struct.datavecB_, states_bypass, sizeof(states_bypass));
+                          *(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
+                          //states_bypass[1] = imus_data[12];
+                          //memcpy(*data_struct.datavecB_, states_bypass, sizeof(states_bypass));
                       }
                     }
                 }
