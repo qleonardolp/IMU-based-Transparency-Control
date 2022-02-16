@@ -262,7 +262,6 @@ void Controle(ThrdStruct &data_struct){
             *(*data_struct.datavecA_ + 7) = *(*data_struct.datavecB_ + 7);
             *(*data_struct.datavecA_ + 8) = setpoint; // check LS output
             *(*data_struct.datavecA_ + 9) = states_data[9];
-            //memcpy(*data_struct.datavecA_, logging_data, sizeof(logging_data));
             // fim da sessao critica
         }
         

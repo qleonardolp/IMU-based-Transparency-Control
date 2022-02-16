@@ -223,15 +223,12 @@ void readIMUs(ThrdStruct &data_struct)
         vector<XsVector> gyroData(mtwCallbacks.size());
 
         //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...?
-        float states_bypass[10];
-        for (size_t i = 0; i < sizeof(states_bypass)/sizeof(float); i++)
-        {
-            states_bypass[i] = 0;
-        }
         
-        float imus_data[18]; 
+        float imus_data[36];
+        for (int i = 0; i < sizeof(imus_data)/sizeof(float); i++) imus_data[i] = 0;
+
         // Filtros Passa Baixa para os dados das IMUs
-        LowPassFilter2pFloat imu_filters[18];
+        LowPassFilter2pFloat imu_filters[36];
         for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
         {
           float thread_frequency = desiredUpdateRate;
@@ -251,8 +248,10 @@ void readIMUs(ThrdStruct &data_struct)
         {
             xsensTimer.tik();
             // IMU connection check for safety
-            int imus_connected = wirelessMasterCallback.getWirelessMTWs().size();
-            if (imus_connected < 2)
+            // Avoid wirelessMasterCallback here, I dont know if their mutex is the same of
+            // mtwCallbacks!!!
+            //int imus_connected = wirelessMasterCallback.getWirelessMTWs().size();
+            if (mtwCallbacks.size() < 2)
             {
                 unique_lock<mutex> _(*data_struct.mtx_);
                 *data_struct.param1A_ = true; // aborting
@@ -261,49 +260,47 @@ void readIMUs(ThrdStruct &data_struct)
 
             for (size_t i = 0; i < mtwCallbacks.size(); ++i)
             {
+                bool newDataAvailable = false;
                 if (mtwCallbacks[i]->dataAvailable())
                 {
+                    newDataAvailable = true;
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-                    if (packet->containsCalibratedGyroscopeData())
+                    //if (packet->containsCalibratedGyroscopeData())
                       gyroData[i] = packet->calibratedGyroscopeData();
-                    else
-                      gyroData[i] = packet->rawGyroscopeDataConverted();
 
-                    if (packet->containsCalibratedAcceleration())
+                    //if (packet->containsCalibratedAcceleration())
                       accData[i] = packet->calibratedAcceleration();
-                    else
-                      accData[i] = packet->rawAccelerationConverted();
 
                     mtwCallbacks[i]->deleteOldestPacket();
+                }
 
-                    if (mtwCallbacks.size() >= 3)
-                    {
-                      // Orientacao Exo: [3 -2 1]
-                      // Orientacao Pessoa: [-3 2 1]
-
-                      if (i == 0 || i == 1){
-                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
-                      }
-                      if (i == 2){
-                        imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                        imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                        imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                        imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                        imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                        imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
-                      }
-                      unique_lock<mutex> _(*data_struct.mtx_);
-                      memcpy(*data_struct.datavec_, imus_data, sizeof(imus_data));
-                      if (data_struct.param39_ == IMUBYPASS){
-                          *(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
-                          //states_bypass[1] = imus_data[12];
-                          //memcpy(*data_struct.datavecB_, states_bypass, sizeof(states_bypass));
-                      }
+                if (newDataAvailable && mtwCallbacks.size() >= 2){
+                    // Orientacao Exo: [3 -2 1]
+                    // Orientacao Pessoa: [-3 2 1]
+                    // Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
+                    // due to the 'assert' inside these operators on xsvector.h !!!
+                    vector<XsReal> gyroVector = gyroData[i].toVector();
+                    vector<XsReal> accVector  = accData[i].toVector();
+                    if (i == 0 || i == 1){ // Pessoa!
+                      imus_data[6*i+0] = imu_filters[6*i+0].apply(-gyroVector[2] );
+                      imus_data[6*i+1] = imu_filters[6*i+1].apply( gyroVector[1] );
+                      imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroVector[0] );
+                      imus_data[6*i+3] = imu_filters[6*i+3].apply( -accVector[2] );
+                      imus_data[6*i+4] = imu_filters[6*i+4].apply(  accVector[1] );
+                      imus_data[6*i+5] = imu_filters[6*i+5].apply(  accVector[0] );
+                    }
+                    if (i == 2){ // Exo!
+                      imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroVector[2] );
+                      imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroVector[1] );
+                      imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroVector[0] );
+                      imus_data[6*i+3] = imu_filters[6*i+3].apply(  accVector[2] );
+                      imus_data[6*i+4] = imu_filters[6*i+4].apply( -accVector[1] );
+                      imus_data[6*i+5] = imu_filters[6*i+5].apply(  accVector[0] );
+                    }
+                    unique_lock<mutex> _(*data_struct.mtx_);
+                    memcpy(*data_struct.datavec_, imus_data, sizeof(*data_struct.datavec_));
+                    if (data_struct.param39_ == IMUBYPASS){
+                        *(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
                     }
                 }
             }
