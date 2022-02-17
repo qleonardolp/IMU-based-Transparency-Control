@@ -26,6 +26,8 @@ void removeYaw(Eigen::Vector4f* quat);
 Eigen::Vector3f quatDelta2Euler(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m);
 Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, \
                             const Eigen::Vector3f* omg_r, const Eigen::Vector3f* omg_m);
+Eigen::Vector3f RelVector(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, \
+                            const Eigen::Vector3f* vec_r, const Eigen::Vector3f* vec_m);
 
 void qASGD(ThrdStruct &data_struct)
 {
@@ -41,10 +43,8 @@ void qASGD(ThrdStruct &data_struct)
   float q1 = 0;
   float q2 = 0;
   float q3 = 0;
-  float imus_data[18];
-  float states_data[10];
-  // Inicialização por segurança:
-  for (int i = 0; i < 10; i++) states_data[i] = 0;
+  float imus_data[DTVC_SZ];
+  for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
   float euler_k[3] = {0,0,0};
   float omega_k[3] = {0,0,0};
   const float Ts = data_struct.sampletime_;
@@ -100,7 +100,7 @@ void qASGD(ThrdStruct &data_struct)
   do
   {
     Timer.tik();
-    { // sessao critica: minimo codigo necessario para pegar datavec_
+    { // sessao critica:
       unique_lock<mutex> _(*data_struct.mtx_);
       memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
     } // fim da sessao critica
@@ -239,10 +239,6 @@ void qASGD(ThrdStruct &data_struct)
     omega_k[2] = omega_k[1]; 
     omega_k[1] = omega_k[0]; 
 
-    states_data[0] = euler_ned(0);  // hum_rgtknee_pos
-    states_data[1] = omega_ned(0);  // hum_rgtknee_vel
-    states_data[2] = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
-
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       switch (data_struct.param39_)
@@ -356,6 +352,42 @@ Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f
   Vector3f Omega2 = Rot*(*omg_m);
 
   return Omega2 - Omega1;
+}
+
+Eigen::Vector3f RelVector(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, \
+                            const Eigen::Vector3f* vec_r, const Eigen::Vector3f* vec_m)
+{
+  using namespace Eigen;
+
+  float qr0 = (*quat_r)(0);
+  float qr1 = (*quat_r)(1);
+  float qr2 = (*quat_r)(2);
+  float qr3 = (*quat_r)(3);
+  // q_m conjugate (*q_m):
+  float qm0 =  (*quat_m)(0);
+  float qm1 = -(*quat_m)(1);
+  float qm2 = -(*quat_m)(2);
+  float qm3 = -(*quat_m)(3);
+  // quaternion product: q_r x *q_m:
+  float q0 = qr0*qm0 - qr1*qm1 - qr2*qm2 - qr3*qm3;
+  float q1 = qr0*qm1 + qr1*qm0 + qr2*qm3 - qr3*qm2;
+  float q2 = qr0*qm2 - qr1*qm3 + qr2*qm0 + qr3*qm1;
+  float q3 = qr0*qm3 + qr1*qm2 - qr2*qm1 + qr3*qm0;
+
+  Matrix3f Rot = Matrix3f::Identity();
+
+  Rot(0,0) = (q0*q0 + q1*q1 - q2*q2 - q3*q3);
+  Rot(0,1) = 2*(q1*q2 - q0*q3);
+  Rot(0,2) = 2*(q1*q3 + q0*q2);
+  Rot(1,0) = 2*(q1*q2 + q0*q3);
+  Rot(1,1) = (q0*q0 - q1*q1 + q2*q2 - q3*q3);
+  Rot(1,2) = 2*(q2*q3 - q0*q1);
+  Rot(2,0) = 2*(q1*q3 - q0*q2);
+  Rot(2,1) = 2*(q2*q3 + q0*q1);
+  Rot(2,2) = (q0*q0 - q1*q1 - q2*q2 - q3*q3); 
+  
+  Vector3f dvector = (*vec_m) - Rot*(*vec_r);
+  return  dvector;
 }
 
 

@@ -79,13 +79,13 @@ int main()
   IniciaRedeCan();
 
   mutex comm_mtx;
-  float imu_data[18];
-  float gains_data[18];
-  float logging_data[10];
-  float states_data[10];
-  float ati_data[6];
+  float imu_data[DTVC_SZ];
+  float gains_data[DTVC_SZ];
+  float logging_data[DTVCA_SZ];
+  float states_data[DTVCB_SZ];
+  float ati_data[DTVCF_SZ];
   //initialize data vectors (safety):
-  for (int i = 0; i < sizeof(imu_data)/sizeof(float); i++){
+  for (int i = 0; i < DTVC_SZ; i++){
     imu_data[i] = gains_data[i] = 0;
     if (i < 10) logging_data[i] = states_data[i] = 0;
     if (i < 6) ati_data[i] = 0;

@@ -14,15 +14,20 @@
 #define IMUBYPASS 3
 #define READIMUS  4
 
+#define DTVC_SZ 36
+#define DTVCA_SZ 10
+#define DTVCB_SZ 10
+#define DTVCF_SZ 6
+
 typedef struct shared_struct {
     float sampletime_;
     int     exectime_;
     float      *data_;
     std::mutex  *mtx_;
-    float *datavec_[18];
-    float *datavecA_[10];
-    float *datavecB_[10];
-    float *datavecF_[6];
+    float *datavec_[DTVC_SZ];
+    float *datavecA_[DTVCA_SZ];
+    float *datavecB_[DTVCB_SZ];
+    float *datavecF_[DTVCF_SZ];
 
     // 64 parameters for data/options/flags exchange:
     // parameters, 1� block:

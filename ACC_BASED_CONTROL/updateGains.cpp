@@ -21,9 +21,9 @@ void updateGains(ThrdStruct &data_struct){
   const char* paramSignature = "Exo Tau Parameters File (cd97732888c9cc66b0a650d2fb5edfdc07161a78)";
   char checkSignature[67];
   FILE* pFile;
-  float gains[18];
-  float rawgains[18];
-  for (size_t i = 0; i < sizeof(rawgains)/sizeof(float); i++) rawgains[i] = 0;
+  float gains[DTVC_SZ];
+  float rawgains[DTVC_SZ];
+  for (size_t i = 0; i < DTVC_SZ; i++) rawgains[i] = 0;
   bool isready_ctr(false);
   bool isready_log(false);
   bool file_isvalid(false);
@@ -50,7 +50,7 @@ void updateGains(ThrdStruct &data_struct){
     if (pFile != NULL && file_isvalid) {
       char header[67];
       fscanf(pFile, "%67c", header); // empurrando o ponteiro de leitura para depois do cabecalho 'paramSignature'
-      for (size_t i = 0; i < sizeof(rawgains)/sizeof(float); i++)
+      for (size_t i = 0; i < 18; i++) // ATENCAO AQUI, LIMITADO EM 18 DEVIDO A FORMATACAO DO TXT
         fscanf(pFile, "%f\n", rawgains + i);
       // Scanning Transfer Function:
       fscanf(pFile, "Transfer Funct Matlab\nnum [%f %f %f %f]\nden [%f %f %f %f]\n", \
@@ -59,14 +59,14 @@ void updateGains(ThrdStruct &data_struct){
     }
 
     // Saturação para limitar valores (segurança):
-    for (size_t i = 0; i < sizeof(gains)/sizeof(float); i++) {
+    for (size_t i = 0; i < DTVC_SZ; i++) {
       gains[i] = constrain_float(rawgains[i], -1.0e4f, 1.0e4f);
     }
 
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       *data_struct.param0F_ = true;
-      memcpy(*data_struct.datavec_, gains, sizeof(gains));
+      memcpy(*data_struct.datavec_, gains, sizeof(*data_struct.datavec_));
     }   // fim da sessao critica
     Timer.tak();
   } while (!Timer.end());

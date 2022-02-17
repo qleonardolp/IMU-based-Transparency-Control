@@ -34,11 +34,11 @@ extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
 
 // Controllers:
-float  controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm); // generico
-float    controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm); // acc-based
-float    controle_adm(const states input, const float gains[18], float buffer[10], const float sample_tm); // admittance
-float    controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm); // SEA feedback
-float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm); // loop-shaping
+float  controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // generico
+float    controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // acc-based
+float    controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // admittance
+float    controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // SEA feedback
+float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // loop-shaping
 // Low Level abstraction:
 void SetEPOSTorque(float desired_torque);
 void SetEPOSVelocity(float desired_rads);
@@ -59,10 +59,9 @@ void Controle(ThrdStruct &data_struct){
     const int motor_kr_steps = 4096;
     const size_t statesize = 10;
     const size_t loggsize  = 10;
-    const size_t gainsize  = 18;
     float states_data[statesize];
     float logging_data[loggsize];
-    float gains_data[gainsize];
+    float gains_data[DTVC_SZ];
     float setpoint(0);
     int   setpoint_rpm(0);
     int   setpoint_mA(0);
@@ -79,7 +78,7 @@ void Controle(ThrdStruct &data_struct){
     // Inicialização por segurança:
     for (int i = 0; i < statesize; i++) states_data[i] = 0;
     for (int i = 0; i < loggsize; i++) logging_data[i] = 0;
-    for (int i = 0; i < gainsize; i++)   gains_data[i] = 0;
+    for (int i = 0; i < DTVC_SZ; i++)   gains_data[i] = 0;
 
     States sendto_control;
     // Zeros EPOS:
@@ -278,9 +277,9 @@ void Controle(ThrdStruct &data_struct){
 }
 
 // Controladores, em essência! Trabalham com unidades no SI e sem precisar de conversoes do motor (Gear Ratio, Kt, Kw...)!
-float controle_junta(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
+float controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_acc(const states input, const float gains[18], float buffer[10], const float sample_tm)
+float controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm)
 {
     const float Jr = 0.885;
     float Kp = gains[0];
@@ -294,11 +293,11 @@ float controle_acc(const states input, const float gains[18], float buffer[10], 
     return actuation;
 } 
 
-float controle_adm(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
+float controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_sea(const states input, const float gains[18], float buffer[10], const float sample_tm) {return 0;} 
+float controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
 
-float controle_lpshap(const states input, const float gains[18], float buffer[10], const float sample_tm)
+float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm)
 {
     using namespace Eigen;
     const float Jr = 0.885;

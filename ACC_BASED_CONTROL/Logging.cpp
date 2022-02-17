@@ -26,12 +26,9 @@ void Logging(ThrdStruct &data_struct){
     if (logFileHandle != NULL) fclose(logFileHandle);
 
     float rad2deg = 180/(M_PI);
-    const size_t ftsize   = 6;
-    const size_t vecsize  = 10;
-    const size_t gainsize = 18;
-    float log_states[vecsize];
-    float log_gains[gainsize];
-    float log_ftsensor[ftsize];
+    float log_states[DTVCA_SZ];
+    float log_gains[DTVC_SZ];
+    float log_ftsensor[DTVCF_SZ];
 
     bool isready_imu(false);
     bool isready_asg(false);
@@ -70,7 +67,7 @@ void Logging(ThrdStruct &data_struct){
         if (logFileHandle != NULL){
             float timestamp = float(Timer.micro_now() - begin_timestamp)/MILLION;
             fprintf(logFileHandle, "%.5f", timestamp);
-            for (size_t i = 0; i < sizeof(log_states)/sizeof(float); i++)
+            for (size_t i = 0; i < DTVCA_SZ; i++)
                 fprintf(logFileHandle, ", %.4f", log_states[i]);
             fprintf(logFileHandle, "\n");
             fclose(logFileHandle);

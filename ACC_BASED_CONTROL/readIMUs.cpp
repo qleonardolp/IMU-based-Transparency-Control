@@ -205,18 +205,21 @@ void readIMUs(ThrdStruct &data_struct)
         }
 
         cout << "Attaching callback handlers to MTWs..." << endl;
+        vector<string> imu_names(mtwDevices.size());
         mtwCallbacks.resize(mtwDevices.size());
         for (int i = 0; i < (int)mtwDevices.size(); ++i)
         {
             mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
             mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
-            string imu_id = mtwDevices[i]->deviceId().toString().toStdString();
-            if (i == 0)
-                cout << "IMU Usuario Coxa: " << imu_id << "\n";
-            if (i == 1)
-                cout << "IMU Usuario Canela: " << imu_id << "\n";
-            if (i == 2)
-                cout << "IMU Exo: " << imu_id << "\n";
+            imu_names[i] = mtwDevices[i]->deviceId().toString().toStdString();
+            if (imu_names[i].compare("00B412DF") == 0)
+                cout << "IMU Coxa Direita: " << imu_names[i] << "\n";
+            if (imu_names[i].compare("00B410D2") == 0)
+                cout << "IMU Canela Direita: " << imu_names[i] << "\n";
+            if (imu_names[i].compare("00B41244") == 0)
+                cout << "IMU Coxa Esquerda: " << imu_names[i] << "\n";
+            if (imu_names[i].compare("00B4108C") == 0)
+                cout << "IMU Canela Esquerda: " << imu_names[i] << "\n";
         }
 
         vector<XsVector> accData(mtwCallbacks.size());
@@ -224,12 +227,12 @@ void readIMUs(ThrdStruct &data_struct)
 
         //wirelessMasterCallback.mtw_event.clear(); // XsMutex here...?
         
-        float imus_data[36];
-        for (int i = 0; i < sizeof(imus_data)/sizeof(float); i++) imus_data[i] = 0;
+        float imus_data[DTVC_SZ];
+        for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
 
         // Filtros Passa Baixa para os dados das IMUs
-        LowPassFilter2pFloat imu_filters[36];
-        for (int i = 0; i < sizeof(imu_filters)/sizeof(LowPassFilter2pFloat); i++)
+        LowPassFilter2pFloat imu_filters[DTVC_SZ];
+        for (int i = 0; i < DTVC_SZ; i++)
         {
           float thread_frequency = desiredUpdateRate;
           imu_filters[i].set_cutoff_frequency(thread_frequency, LPF_CUTOFF);
@@ -265,40 +268,61 @@ void readIMUs(ThrdStruct &data_struct)
                 {
                     newDataAvailable = true;
                     XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
-                    XsDataPacket packet_db = mtwCallbacks[i]->fetchOldestPacket();
-                    packet_db.calibratedAcceleration();
+                    XsDataPacket packet_db = mtwDevices[i]->lastAvailableLiveData(); // debugging packet
                     
-                    if (packet->containsCalibratedGyroscopeData() && !packet->empty())
-                      gyroData[i] = packet->calibratedGyroscopeData();
+                    //if (packet->containsCalibratedGyroscopeData())
+                    //  gyroData[i] = packet->calibratedGyroscopeData();
 
-                    if (packet->containsCalibratedAcceleration() && !packet->empty())
-                      accData[i] = packet->calibratedAcceleration();
+                    //if (packet->containsCalibratedAcceleration())
+                    //  accData[i] = packet->calibratedAcceleration();
+
+                    if (packet_db.containsCalibratedGyroscopeData())
+                      gyroData[i] = packet_db.calibratedGyroscopeData();
+
+                    if (packet_db.containsCalibratedAcceleration())
+                      accData[i] = packet_db.calibratedAcceleration();
 
                     mtwCallbacks[i]->deleteOldestPacket();
                 }
 
                 if (newDataAvailable && (int)mtwCallbacks.size() >= 2){
-                    // Orientacao Exo: [3 -2 1]
-                    // Orientacao Pessoa: [-3 2 1]
+                    // Orientacao Perna DIR: [-3 2 1]
+                    // Orientacao Perna ESQ: [3 -2 1]
                     // Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
                     // due to the 'assert' inside these operators on xsvector.h !!!
                     vector<XsReal> gyroVector = gyroData[i].toVector();
                     vector<XsReal> accVector  = accData[i].toVector();
-                    if (i == 0 || i == 1){ // Pessoa!
-                      imus_data[6*i+0] = imu_filters[6*i+0].apply(-gyroVector[2] );
-                      imus_data[6*i+1] = imu_filters[6*i+1].apply( gyroVector[1] );
-                      imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroVector[0] );
-                      imus_data[6*i+3] = imu_filters[6*i+3].apply( -accVector[2] );
-                      imus_data[6*i+4] = imu_filters[6*i+4].apply(  accVector[1] );
-                      imus_data[6*i+5] = imu_filters[6*i+5].apply(  accVector[0] );
+                    if(imu_names[i].compare(3, 4, "12DF") == 0){
+                        imus_data[0] = imu_filters[0].apply(-gyroVector[2] );
+                        imus_data[1] = imu_filters[1].apply( gyroVector[1] );
+                        imus_data[2] = imu_filters[2].apply( gyroVector[0] );
+                        imus_data[3] = imu_filters[3].apply( -accVector[2] );
+                        imus_data[4] = imu_filters[4].apply(  accVector[1] );
+                        imus_data[5] = imu_filters[5].apply(  accVector[0] );
                     }
-                    if (i == 2){ // Exo!
-                      imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroVector[2] );
-                      imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroVector[1] );
-                      imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroVector[0] );
-                      imus_data[6*i+3] = imu_filters[6*i+3].apply(  accVector[2] );
-                      imus_data[6*i+4] = imu_filters[6*i+4].apply( -accVector[1] );
-                      imus_data[6*i+5] = imu_filters[6*i+5].apply(  accVector[0] );
+                    if(imu_names[i].compare(3, 4, "10D2") == 0){
+                        imus_data[6]  = imu_filters[6].apply(-gyroVector[2] );
+                        imus_data[7]  = imu_filters[7].apply( gyroVector[1] );
+                        imus_data[8]  = imu_filters[8].apply( gyroVector[0] );
+                        imus_data[9]  = imu_filters[9].apply( -accVector[2] );
+                        imus_data[10] = imu_filters[10].apply(  accVector[1] );
+                        imus_data[11] = imu_filters[11].apply(  accVector[0] );
+                    }
+                    if(imu_names[i].compare(3, 4, "1244") == 0){
+                        imus_data[12] = imu_filters[12].apply( gyroVector[2] );
+                        imus_data[13] = imu_filters[13].apply(-gyroVector[1] );
+                        imus_data[14] = imu_filters[14].apply( gyroVector[0] );
+                        imus_data[15] = imu_filters[15].apply(  accVector[2] );
+                        imus_data[16] = imu_filters[16].apply( -accVector[1] );
+                        imus_data[17] = imu_filters[17].apply(  accVector[0] );
+                    }
+                    if(imu_names[i].compare(3, 4, "108C") == 0){
+                        imus_data[18] = imu_filters[18].apply( gyroVector[2] );
+                        imus_data[19] = imu_filters[19].apply(-gyroVector[1] );
+                        imus_data[20] = imu_filters[20].apply( gyroVector[0] );
+                        imus_data[21] = imu_filters[21].apply(  accVector[2] );
+                        imus_data[22] = imu_filters[22].apply( -accVector[1] );
+                        imus_data[23] = imu_filters[23].apply(  accVector[0] );
                     }
                     unique_lock<mutex> _(*data_struct.mtx_);
                     memcpy(*data_struct.datavec_, imus_data, sizeof(*data_struct.datavec_));
