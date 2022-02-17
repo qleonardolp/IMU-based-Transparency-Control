@@ -28,6 +28,7 @@ Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f
                             const Eigen::Vector3f* omg_r, const Eigen::Vector3f* omg_m);
 Eigen::Vector3f RelVector(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, \
                             const Eigen::Vector3f* vec_r, const Eigen::Vector3f* vec_m);
+Eigen::Vector3f RelAngularAcc(const Eigen::Vector3f gyro, const Eigen::Vector3f acc);
 
 void qASGD(ThrdStruct &data_struct)
 {
@@ -212,6 +213,26 @@ void qASGD(ThrdStruct &data_struct)
     // Relative Omega between IMUs:
     Vector3f omega_ned = RelOmegaNED(&qASGD1_qk, &qASGD2_qk, &gyro1, &gyro2);
 
+    // Relative Omega in the 2º IMU reference frame:
+    Vector3f left_shank2thigh_omg = RelVector(&qASGD1_qk, &qASGD2_qk, &gyro1, &gyro2);
+
+    // Relative Acc (Linear) in the 2º IMU reference frame:
+    Vector3f left_shank2thigh_acc = RelVector(&qASGD1_qk, &qASGD2_qk, &acc1, &acc2);
+
+    // Relative Acc (Angular) in the 2º IMU reference frame:
+    Vector3f left_shank2thigh_alpha = RelAngularAcc(left_shank2thigh_omg, left_shank2thigh_acc);
+
+    q0 = qASGD2_qk(0);
+    q1 = qASGD2_qk(1);
+    q2 = qASGD2_qk(2);
+    q3 = qASGD2_qk(3);
+
+    float R11 = (q0*q0 + q1*q1 - q2*q2 - q3*q3);
+    float R12 = 2*(q1*q2 - q0*q3);
+    float R13 = 2*(q1*q3 + q0*q2);
+
+    float alphaX_ned = left_shank2thigh_alpha.dot(Vector3f(R11, R12, R13));
+
     /*
     // por enquanto so para o joelho direito:
     hum_rgtknee_pos = vector[0]; v
@@ -250,7 +271,7 @@ void qASGD(ThrdStruct &data_struct)
       case READIMUS:
         *(*data_struct.datavecA_ + 0) = euler_ned(0);              // hum_rgtknee_pos
         *(*data_struct.datavecA_ + 1) = omega_ned(0);              // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        *(*data_struct.datavecA_ + 2) = alphaX_ned; // hum_rgtknee_acc
       default:
         *(*data_struct.datavecB_ + 0) = euler_ned(0);              // hum_rgtknee_pos
         *(*data_struct.datavecB_ + 1) = omega_ned(0);              // hum_rgtknee_vel
@@ -388,6 +409,41 @@ Eigen::Vector3f RelVector(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* 
   
   Vector3f dvector = (*vec_m) - Rot*(*vec_r);
   return  dvector;
+}
+
+Eigen::Vector3f RelAngularAcc(const Eigen::Vector3f rel_ang_vel, const Eigen::Vector3f rel_linear_acc)
+{
+  using namespace Eigen;
+
+  float omg_x = rel_ang_vel(0);
+  float omg_y = rel_ang_vel(1);
+  float omg_z = rel_ang_vel(2);
+  float acc_x = rel_linear_acc(0);
+  float acc_y = rel_linear_acc(1);
+  float acc_z = rel_linear_acc(2);
+
+  // a_t ---- acc_y
+  // a_r ---- acc_z
+  // logo a_t = a_r * acc_y/acc_z
+  // Como a_t = alpha_x*R e a_r = (omg_x)^2 *R:
+  // alpha_x = (omg_x)^2 * acc_y/acc_z 
+  float alpha_x = (omg_x*omg_x) * acc_y/acc_z;
+
+  // a_t ---- acc_x
+  // a_r ---- -acc_z
+  // logo a_t = -a_r * acc_x/acc_z
+  // Como a_t = alpha_y*R e a_r = (omg_y)^2 *R:
+  // alpha_y = -(omg_y)^2 * acc_x/acc_z !!!
+  float alpha_y = -(omg_y*omg_y) * acc_x/acc_z;
+
+  // a_t ---- acc_y
+  // a_r ---- -acc_x
+  // logo a_t = -a_r * acc_y/acc_x
+  // Como a_t = alpha_z*R e a_r = (omg_z)^2 *R:
+  // alpha_z = -(omg_z)^2 * acc_y/acc_x 
+  float alpha_z = -(omg_z*omg_z) * acc_y/acc_x;
+
+  return Vector3f(alpha_x, alpha_y, alpha_z);
 }
 
 
