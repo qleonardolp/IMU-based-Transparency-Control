@@ -6,10 +6,13 @@
 //\///////////////////////\// //// \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\
 
+#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+
+#if CAN_ENABLE
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
+#endif
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
@@ -23,7 +26,7 @@
 //	Max current (@ 48 V)  ~3.1 A
 //	Stall current (@ 48 V)  42.4 A
 //  Rotor Inertia: 137 gcm^2
-
+#if CAN_ENABLE
 extern AXIS kneeRightMotor;
 extern AXIS kneeRightEncoder;
 extern AXIS kneeLeftMotor;
@@ -32,6 +35,7 @@ extern AXIS hipLeftMotor;
 extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
+#endif
 
 // Controllers:
 float  controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // generico
@@ -121,6 +125,7 @@ void Controle(ThrdStruct &data_struct){
     }
 
     // Sincroniza as epos
+#if CAN_ENABLE
     {
     epos.sync();
     this_thread::sleep_for(chrono::milliseconds(1000));
@@ -156,6 +161,7 @@ void Controle(ThrdStruct &data_struct){
     this_thread::sleep_for(chrono::milliseconds(2000));
     HabilitaEixo(2);
     }
+#endif
 
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
@@ -177,7 +183,9 @@ void Controle(ThrdStruct &data_struct){
     do
     {
         Timer.tik();
+#if CAN_ENABLE
         epos.sync();
+#endif
 
         { // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
@@ -190,7 +198,7 @@ void Controle(ThrdStruct &data_struct){
                 break;
             }
         } // fim da sessao critica
-
+#if CAN_ENABLE
         kneeRightEncoder.ReadPDO01();
         float exo_pos = 2*M_PI*float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc)/encoder_kr_steps;
         kneeRightMotor.ReadPDO01();
@@ -210,7 +218,7 @@ void Controle(ThrdStruct &data_struct){
         // Torque Constant: 0.0603 N.m/A
         states_data[8] = sensor_filters[3].apply( 0.0603f*float(kneeRightMotor.PDOgetActualCurrent())/1000 ); // [mA]
         states_data[5] = states_data[8]/motor_inertia;
-
+#endif
         states_data[3] = sensor_filters[4].apply(states_data[3]); // human acc filtering
 
         sendto_control.assign(states_data);
@@ -271,9 +279,10 @@ void Controle(ThrdStruct &data_struct){
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = false;
     }
-
+#if CAN_ENABLE
     epos.sync();
     DesabilitaEixo(0);
+#endif
 }
 
 // Controladores, em essência! Trabalham com unidades no SI e sem precisar de conversoes do motor (Gear Ratio, Kt, Kw...)!
@@ -351,24 +360,28 @@ float controle_lpshap(const states input, const float gains[DTVC_SZ], float buff
 // Low Level abstraction:
 
 void SetEPOSTorque(float desired_torque){
+#if CAN_ENABLE
     // Torque Constant: 0.0603 N.m/A
     // Gear Ratio: 150
     int setpoint_mA = 1000*(desired_torque/0.0603f)/150.0f; // -> '110.5583*desired_torque'
     float setpoint_mA_limited = constrain_float(setpoint_mA, -3100, 3100);
     kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA_limited);
     kneeRightMotor.WritePDO01();
+#endif
 }
 
 void SetEPOSVelocity(float desired_rads){
+#if CAN_ENABLE
     // Gear Ratio: 150!!
     float setpoint_rpm = constrain_float(RADS2RPM*150*desired_rads, -7590, 7590);
     kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
     kneeRightMotor.WritePDO02();
+#endif
 }
 
 float constrain_float(float val, float min, float max)
 {
-	if (_isnan(val)) return (min + max)/2;
+	if (isnan(val)) return (min + max)/2;
 
 	if (val < min) return min;
 

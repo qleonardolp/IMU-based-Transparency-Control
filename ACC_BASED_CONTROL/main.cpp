@@ -6,9 +6,11 @@
 //\///////////////////////\// //// \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\
 
-#include "XsensEpos.h"
-#include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#if CAN_ENABLE
+#include "XsensEpos.h"
+#endif
+#include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include <processthreadsapi.h>
 #include <stdexcept>
 #include <iostream>
@@ -75,8 +77,10 @@ int main()
   }
 #endif
 
+#if CAN_ENABLE
   cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << endl;
   IniciaRedeCan();
+#endif
 
   mutex comm_mtx;
   float imu_data[DTVC_SZ];
@@ -197,7 +201,9 @@ int main()
 
   } while (!execution_end);
 
+#if CAN_ENABLE
   epos.StopPDOS(1);
+#endif
   cout << " Successful exit." << endl;
   this_thread::sleep_for(chrono::milliseconds(700));
   return 0;
@@ -288,7 +294,9 @@ void Interface()
     control_isready  = true;
     ftsensor_isready = true;
     execution_end = false;
+#if CAN_ENABLE
     ResetRedeCan();
+#endif
     break;
   case 0:
   default:
