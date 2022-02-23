@@ -1,5 +1,4 @@
 #include "mtwcallback.h"
-//#include <iostream>
 #include <xsens/xsdevice.h>
 #include <xsens/xsdatapacket.h>
 

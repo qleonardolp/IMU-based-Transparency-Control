@@ -148,6 +148,7 @@ int main()
   logging_struct.param0E_  = &ftsensor_isready;
   *(logging_struct.datavec_ ) = gains_data;
   *(logging_struct.datavecA_) = logging_data;
+  *(logging_struct.datavecB_) = states_data;
   *(logging_struct.datavecF_) = ati_data;
   logging_struct.mtx_ = &comm_mtx;
 
@@ -313,6 +314,7 @@ void Interface()
   imu_struct.param39_ = option;
   asgd_struct.param39_ = option;
   control_struct.param39_ = option;
+  logging_struct.param39_ = option;
 
   if (!execution_end && option != 7) {
     cout << "\n Defina o tempo de execucao em segundos: ";
