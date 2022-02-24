@@ -119,7 +119,7 @@ bodeb('Transparency',freq_range,Gamma0,'b',Gamma1,'r',GammaMin,'k--')
 legend('$\Gamma_{ATC}$','$\Gamma_{MTC}$','$\Gamma_{min}$',...
        'Interpreter','latex')
     
-% Transparency metric:...
+
 %% Parameters Analysis:
 EPOS = 11.9 + 1.19/s;
 FeedbackPD = 100.0 + 0.0225*s;
