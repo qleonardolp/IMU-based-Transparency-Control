@@ -9,6 +9,7 @@ N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
 Ka  = Ks/20;         % Nm/rad (???)
+Ba  = 3.00;
 % Ka  = 1387.6;
 Jh  = 0.0437;        % Kg.m^2   (check KneeJointParameters.m)
 Le  = 0.432;          % m      (???)
@@ -380,14 +381,14 @@ plot(cac_log_eval.time, cac_log_eval.signals(2).values, 'LineWidth',1), grid on
 xlabel('time (s)'), legend('\bf T_i')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
-%%
+%% GERAR FIG DE POSIÇOES:
 figure('Name','Interaction Torque Comparison','Color',[1 1 1]), % compare int torque:
 
 ax =subplot(2,1,1);
 plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,1),'LineWidth',1), hold on
 plot(abc_log_eval.time, abc_log_eval.signals(1).values(:,2),'--', 'LineWidth',1.3), grid on
 title('MTC'), ylabel('Position (deg)')
-legend('\bf \theta_h','\bf \theta_e','Orientation','horizontal')
+legend('\bf x_h','\bf x_r','Orientation','vertical')
 ax.FontSize = 12; ax.LineWidth = 0.7; ax.GridAlpha = 0.5;
 
 ax =subplot(2,1,2);
