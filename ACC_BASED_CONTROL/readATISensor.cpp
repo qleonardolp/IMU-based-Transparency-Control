@@ -51,12 +51,22 @@ void readFTSensor(ThrdStruct &data_struct){
   {
 
     bool isready_imu(false);
+    bool aborting_imu(false);
+    bool ati_abort(false);
     do{ 
       {   // confere IMU:
         unique_lock<mutex> _(*data_struct.mtx_);
         isready_imu = *data_struct.param0A_;
+        aborting_imu = *data_struct.param1A_;
+        if (aborting_imu)
+        {
+            ati_abort = *data_struct.param1E_ = true;
+            break;
+        }
       } 
     } while (!isready_imu);
+
+    if (ati_abort) return;
 
 #if CAN_ENABLE
     sensorAxia->bias();
@@ -108,7 +118,7 @@ void readFTSensor(ThrdStruct &data_struct){
       {   // sessao critica
         unique_lock<mutex> _(*data_struct.mtx_);
         *(*data_struct.datavecB_ + 7) = -sensor_data[0]; // "inter_rgtshank  = vector[7];"
-        memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
+        memcpy(*data_struct.datavecF_, sensor_data, DTVCF_SZ*sizeof(float)); // para log
       }   // fim da sessao critica
 
       Timer.tak();

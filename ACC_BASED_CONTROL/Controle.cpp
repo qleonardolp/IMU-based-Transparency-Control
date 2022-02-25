@@ -116,9 +116,7 @@ void Controle(ThrdStruct &data_struct){
                 break;
             }
         } 
-    //} while (!isready_imu || !isready_asg || !isready_ati);
     } while (!isready_imu || !isready_asg || !isready_gsn);
-    //} while (!isready_imu || !isready_asg);
 
     if (control_abort){
         return;

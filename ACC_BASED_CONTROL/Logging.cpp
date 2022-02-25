@@ -33,6 +33,10 @@ void Logging(ThrdStruct& data_struct) {
 	bool isready_imu(false);
 	bool isready_asg(false);
 	bool isready_ctr(false);
+	bool aborting_imu(false);
+	bool aborting_asg(false);
+	bool aborting_ctr(false);
+	bool logging_abort(false);
 
 	do {
 		{   // Loggging confere IMU, ASGD e CONTROLE
@@ -40,8 +44,18 @@ void Logging(ThrdStruct& data_struct) {
 			isready_imu = *data_struct.param0A_;
 			isready_asg = *data_struct.param0B_;
 			isready_ctr = *data_struct.param0C_;
+			aborting_imu = *data_struct.param1A_;
+			aborting_asg = *data_struct.param1B_;
+			aborting_ctr = *data_struct.param1C_;
+			if (aborting_imu || aborting_asg || aborting_ctr)
+			{
+				logging_abort = *data_struct.param1D_ = true;
+				break;
+			}
 		}
 	} while (!isready_imu || !isready_asg || !isready_ctr);
+
+	if (logging_abort) return; // quit!
 
 	{   // Loggging avisa que esta pronto!
 		unique_lock<mutex> _(*data_struct.mtx_);

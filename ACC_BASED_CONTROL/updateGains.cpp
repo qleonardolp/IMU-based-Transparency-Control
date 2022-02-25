@@ -66,7 +66,7 @@ void updateGains(ThrdStruct &data_struct){
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       *data_struct.param0F_ = true;
-      memcpy(*data_struct.datavec_, gains, DTVC_SZ);
+      memcpy(*data_struct.datavec_, gains, DTVC_SZ*sizeof(float));
     }   // fim da sessao critica
     Timer.tak();
   } while (!Timer.end());

@@ -143,8 +143,11 @@ int main()
   logging_struct.param0D_  = &logging_isready;
   logging_struct.param1D_  = &logging_aborting;
   logging_struct.param0A_  = &imu_isready;
+  logging_struct.param1A_ = &imu_aborting;
   logging_struct.param0B_  = &asgd_isready;
+  logging_struct.param1B_  = &asgd_aborting;
   logging_struct.param0C_  = &control_isready;
+  logging_struct.param1C_ = &control_aborting;
   logging_struct.param0E_  = &ftsensor_isready;
   *(logging_struct.datavec_ ) = gains_data;
   *(logging_struct.datavecA_) = logging_data;
@@ -158,6 +161,7 @@ int main()
   ftsensor_struct.param0E_ = &ftsensor_isready;
   ftsensor_struct.param1E_ = &ftsensor_aborting;
   ftsensor_struct.param0A_ = &imu_isready;
+  ftsensor_struct.param1A_ = &imu_aborting;
   *(ftsensor_struct.datavecB_) = states_data;
   *(ftsensor_struct.datavecF_) = ati_data;
   ftsensor_struct.mtx_ = &comm_mtx;

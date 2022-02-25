@@ -28,6 +28,13 @@ public:
         lpInMicroseconds = MILLION*lpInSeconds;
         QueryPerformanceFrequency(&qpcFrequency);
         loopPeriodMSinTicks = qpcFrequency.QuadPart * lpInMicroseconds;
+        // Avoid warnings:
+        QueryPerformanceCounter(&tikCounter);
+        QueryPerformanceCounter(&takCounter);
+        QueryPerformanceCounter(&timeCounter);
+        execBegin = micro_now();
+        beginning_t = 0;
+        end_t = 0;
 #endif
 
 #ifdef linux
