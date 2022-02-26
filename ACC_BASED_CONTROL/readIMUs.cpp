@@ -62,7 +62,7 @@ void readIMUs(ThrdStruct& data_struct)
 	|  12  |            50 Hz        |
 	|__18__|____________40 Hz________| */
 
-	const int desiredUpdateRate = 75; // (data_struct.sampletime_)^-1 !!!
+	const int desiredUpdateRate = 100; //
 	const int desiredRadioChannel = 25;
 	const float sampleTime = 1 / float(desiredUpdateRate);
 
@@ -223,9 +223,9 @@ void readIMUs(ThrdStruct& data_struct)
 			if (imu_names[i].compare("00B410D2") == 0)
 				cout << "IMU Canela Direita: " << imu_names[i] << "\n";
 			if (imu_names[i].compare("00B41244") == 0)
-				cout << "IMU Coxa Esquerda: " << imu_names[i] << "\n";
+				cout << "IMU Pe Direito: " << imu_names[i] << "\n";
 			if (imu_names[i].compare("00B4108C") == 0)
-				cout << "IMU Canela Esquerda: " << imu_names[i] << "\n";
+				cout << "IMU Canela ExoTau: " << imu_names[i] << "\n";
 			if (imu_names[i].compare("00342322") == 0)
 				cout << "IMU 01: " << imu_names[i] << "\n";
 			if (imu_names[i].compare("00342323") == 0)
@@ -319,12 +319,12 @@ void readIMUs(ThrdStruct& data_struct)
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00B41244") == 0) {
-						imus_data[12] = imu_filters[12].apply(gyroVector[2]);
-						imus_data[13] = imu_filters[13].apply(-gyroVector[1]);
-						imus_data[14] = imu_filters[14].apply(gyroVector[0]);
-						imus_data[15] = imu_filters[15].apply(accVector[2]);
-						imus_data[16] = imu_filters[16].apply(-accVector[1]);
-						imus_data[17] = imu_filters[17].apply(accVector[0]);
+						imus_data[12] = imu_filters[12].apply( gyroVector[1]);
+						imus_data[13] = imu_filters[13].apply(-gyroVector[0]);
+						imus_data[14] = imu_filters[14].apply( gyroVector[2]);
+						imus_data[15] = imu_filters[15].apply( accVector[1]);
+						imus_data[16] = imu_filters[16].apply(-accVector[0]);
+						imus_data[17] = imu_filters[17].apply( accVector[2]);
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00B4108C") == 0) {
