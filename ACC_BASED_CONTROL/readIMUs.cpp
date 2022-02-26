@@ -275,6 +275,7 @@ void readIMUs(ThrdStruct& data_struct)
 
 			for (size_t i = 0; i < (int)mtwCallbacks.size(); ++i)
 			{
+				if (mtwCallbacks[i] == NULL) continue;
 				bool newDataAvailable = false;
 				if (mtwCallbacks[i]->dataAvailable())
 				{
@@ -294,7 +295,7 @@ void readIMUs(ThrdStruct& data_struct)
 				if (newDataAvailable) {
 					// Orientacao Perna DIR: [-3 2 1]
 					// Orientacao Perna ESQ: [3 -2 1]
-					// Orientacao Pé DIR:    [2 -1 3]
+					// Orientacao Pï¿½ DIR:    [2 -1 3]
 					// Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
 					// due to the 'assert' inside these operators on xsvector.h !!!
 					vector<XsReal> gyroVector = gyroData[i].toVector();
@@ -356,7 +357,7 @@ void readIMUs(ThrdStruct& data_struct)
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00342324") == 0) { 
-						// Orientacao Pé DIR: [2 -1 3]
+						// Orientacao Pï¿½ DIR: [2 -1 3]
 						imus_data[12] = imu_filters[12].apply( gyroVector[1]);
 						imus_data[13] = imu_filters[13].apply(-gyroVector[0]);
 						imus_data[14] = imu_filters[14].apply( gyroVector[2]);
