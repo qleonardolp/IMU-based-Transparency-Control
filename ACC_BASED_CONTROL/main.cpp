@@ -236,6 +236,7 @@ void Interface()
   cout << " [05]: Leitura F/T  \n";
   cout << " [06]: Leitura Parametros  \n";
   cout << " [07]: Reset Falhas CAN \n";
+  cout << " [08]: Controle sem IMUs (MF SEA) \n";
   cout << " Ou zero (0) para finalizar. \n ";
   cin >> option;
 
@@ -301,8 +302,18 @@ void Interface()
     execution_end = false;
 #if CAN_ENABLE
     ResetRedeCan();
+    HabilitaEixo(2);
+    DesabilitaEixo(2);
 #endif
     break;
+  case 8:
+      asgd_isready = imu_isready = true;
+      gscan_isready = false;
+      logging_isready = false;
+      control_isready = false;
+      ftsensor_isready = true;
+      execution_end = false;
+      break;
   case 0:
   default:
     imu_isready   = true;
@@ -341,6 +352,7 @@ void Interface()
       cout << " [05]: Markoviano Impedancia \n";
       cout << " [06]: Markoviano Torque \n";
       cout << " [07]: Markoviano Z(0) + RUIDO \n";
+      cout << " [08]: Malha Fechada SEA (MF SEA) \n";
       cout << " [33]: GyroscopeX 'IMU3 bypass' \n";
       cout << " ";
       cin >> option;

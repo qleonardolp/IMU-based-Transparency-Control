@@ -254,6 +254,7 @@ void readIMUs(ThrdStruct& data_struct)
 		{   // readIMUs nao espera as outras threads:
 			unique_lock<mutex> _(*data_struct.mtx_);
 			*data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
+			cout << " Reading IMUs!\n";
 		}
 
 		looptimer xsensTimer(sampleTime, data_struct.exectime_);

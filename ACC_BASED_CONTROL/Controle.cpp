@@ -68,7 +68,7 @@ void rollBuffer(float buffer[10], const size_t length);
 
 //  -- > "Global Vars" < -- 
 // (static declaration because I wanna NOBODY messing with these vars ouside this file!)
-static LowPassFilter2pFloat sensor_filters[5]; // Filtros PB para alguns sensores EPOS
+static LowPassFilter2pFloat sensor_filters[10]; // Filtros PB para alguns sensores EPOS
 static float ctrlSamplePeriod(0.001);                        // Control Sample Period
 
 void Controle(ThrdStruct &data_struct){
@@ -149,13 +149,14 @@ void Controle(ThrdStruct &data_struct){
     zero_kr_enc = kneeRightEncoder.PDOgetActualPosition();
     kneeRightMotor.ReadPDO01();
     zero_kr = kneeRightMotor.PDOgetActualPosition();
+    /*
     kneeLeftMotor.ReadPDO01();
     zero_kl = kneeLeftMotor.PDOgetActualPosition();
     hipRightMotor.ReadPDO01();
     zero_hr = hipRightMotor.PDOgetActualPosition();
     hipLeftMotor.ReadPDO01();
     zero_hl = hipLeftMotor.PDOgetActualPosition();
-
+    */
     // Definindo modo de operacao das EPOS:
     auto ctrl_id = data_struct.param01_;
     if (ctrl_id == LTC || ctrl_id == ABC){
@@ -163,15 +164,16 @@ void Controle(ThrdStruct &data_struct){
     } else{
         kneeRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
     }
-    kneeLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
-    hipRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
-    hipLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+
+    //kneeLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    //hipRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    //hipLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
 
     kneeRightEncoder.ReadPDO01();
     kneeRightMotor.ReadPDO01();
-    kneeLeftMotor.ReadPDO01();
-    hipRightMotor.ReadPDO01();
-    hipLeftMotor.ReadPDO01();
+    //kneeLeftMotor.ReadPDO01();
+    //hipRightMotor.ReadPDO01();
+    //hipLeftMotor.ReadPDO01();
 
     this_thread::sleep_for(chrono::milliseconds(2000));
     HabilitaEixo(2);
@@ -181,6 +183,7 @@ void Controle(ThrdStruct &data_struct){
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = true;
+        cout << " Control Running!\n";
     }
 
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
@@ -318,11 +321,15 @@ float controle_adm(const states input, const float gains[DTVC_SZ], float buffer[
     float Adj   = gains[3]; // adjust Gravity Compensation
 
     float grav_compensation = abs(Adj * Mgl * cosf(input.rbt_rgtknee_pos));
+    float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
+    float vel_error_dot = (vel_error - buffer[9]) / ctrlSamplePeriod;
+    vel_error_dot = sensor_filters[5].apply(vel_error_dot);
+    buffer[8] = vel_error; // rollBuffer will pass this data to buffer[9]...
+
     // Feedback+Feedforward (Outer):
-    float outer_loop = Jr * input.hum_rgtknee_acc + Kp * (input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
-                                                    Kd * (input.hum_rgtknee_acc - input.rbt_rgtknee_acc);
+    float outer_loop = Jr * input.hum_rgtknee_acc + Kp * vel_error + Kd * vel_error_dot;
     // Inner Loop: (Admittance with desired damping only)
-    float actuation = invBd * (outer_loop + grav_compensation - input.sea_rgtshank);
+    float actuation = invBd * (0*outer_loop + grav_compensation - input.sea_rgtshank);
     buffer[0] = actuation;
     float actuation_dot = (3 * buffer[0] - 4 * buffer[1] + buffer[2]) / (2 * ctrlSamplePeriod); // actuation 3pt FD derivative
     rollBuffer(buffer, 10);
@@ -330,7 +337,21 @@ float controle_adm(const states input, const float gains[DTVC_SZ], float buffer[
     return actuation;
 } 
 
-float controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10]) {return 0;} 
+float controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10]) 
+{
+    // MF por Admitancia:
+    const float Jr = 0.885;
+    const float Mgl = 4.7421 * 9.8066 * 0.43;
+    float invBd = gains[2]; // Desired Damping ^(-1) !!!
+    float Adj = gains[3]; // adjust Gravity Compensation
+    float grav_compensation = abs(Adj * Mgl * cosf(input.rbt_rgtknee_pos));
+    // Admittance with desired damping only
+    float actuation = invBd * ( grav_compensation - input.sea_rgtshank);
+    buffer[0] = actuation;
+    float actuation_dot = (3 * buffer[0] - 4 * buffer[1] + buffer[2]) / (2 * ctrlSamplePeriod); // actuation 3pt FD derivative
+    rollBuffer(buffer, 10);
+    return actuation;
+} 
 float controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10]) { return 0; }
 
 float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10])

@@ -115,6 +115,7 @@ void qASGD(ThrdStruct &data_struct)
   {   // qASGD avisa que esta pronto!
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0B_ = true;
+    cout << " qASGD Running!\n";
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -357,20 +358,21 @@ void qASGD(ThrdStruct &data_struct)
       switch (data_struct.param39_)
       {
       case IMUBYPASS:
-        *(*data_struct.datavecB_ + 0) = knee_euler(0);              // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 2) = (1.4*acc_euler + 0.6*acc_omega)/2; // hum_rgtknee_acc
+        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
         break;
       case READIMUS:
-        *(*data_struct.datavecA_ + 0) = knee_euler(0);              // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
         *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = acc_omega;
-        *(*data_struct.datavecA_ + 3) = ankle_euler(0); // esta "negativo" ->TODO
-        *(*data_struct.datavecA_ + 4) = ankle_omega(0);
+        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
+        //*(*data_struct.datavecA_ + 3) = -ankle_euler(0); // esta "negativo" ->TODO
+        //*(*data_struct.datavecA_ + 4) = -ankle_omega(0);
         break;
       default:
-        *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecB_ + 2) = (acc_euler + acc_omega)/2; // hum_rgtknee_acc
+        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
         break;
       }
     } // fim da sessao critica
