@@ -30,7 +30,7 @@ void updateGains(ThrdStruct &data_struct);
 #define EXEC_TIME   50
 
 // Threads Sample Time:
-#define IMU_SMPLTM  0.0100 // "@100 Hz", actually is defined by Xsens 'desiredUpdateRate'
+#define IMU_SMPLTM  0.01333 // "@75 Hz", actually is defined by Xsens 'desiredUpdateRate'
 #define ASGD_SMPLTM IMU_SMPLTM //
 #define CTRL_SMPLTM 0.0010 //  @1000 Hz
 #define LOG_SMPLTM  0.0050 //  @200  Hz 
