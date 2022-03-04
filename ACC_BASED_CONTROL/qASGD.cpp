@@ -286,8 +286,9 @@ void qASGD(ThrdStruct &data_struct)
 
 
     // Remove arbitrary IMU attitude:
-    if (Timer.micro_now() - t_begin <  2*MILLION) // 2 segundos
+    if (Timer.micro_now() - t_begin <  1*MILLION) // 1 segundos
     {
+        float incrmnt = data_struct.sampletime_ / 1;
         q12Off.w() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(0);
         q12Off.x() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(1);
         q12Off.y() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(2);
