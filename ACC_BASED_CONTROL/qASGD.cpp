@@ -30,6 +30,9 @@ Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f
 Eigen::Vector3f RelVector(const Eigen::Vector4f rel_quat, const Eigen::Vector3f vec_r, const Eigen::Vector3f vec_m);
 Eigen::Vector3f RelAngAcc(const Eigen::Vector4f rel_quat, const Eigen::Vector3f rel_ang_vel, const Eigen::Vector3f rel_linear_acc);
 
+extern void rollBuffer(float buffer[10], const size_t length);
+
+
 void qASGD(ThrdStruct &data_struct)
 {
   using namespace std;
@@ -341,8 +344,7 @@ void qASGD(ThrdStruct &data_struct)
 
     euler_k[0] = knee_euler(0);
     float acc_euler = (euler_k[0] - 2*euler_k[1] + euler_k[2])/(Ts*Ts);
-    euler_k[2] = euler_k[1]; 
-    euler_k[1] = euler_k[0];
+    rollBuffer(euler_k, 3);
 
 
     omega_k[0] = knee_omega(0);
