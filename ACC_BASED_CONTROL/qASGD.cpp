@@ -358,9 +358,9 @@ void qASGD(ThrdStruct &data_struct)
       switch (data_struct.param39_)
       {
       case IMUBYPASS:
-        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
         break;
       case READIMUS:
         *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
@@ -370,9 +370,9 @@ void qASGD(ThrdStruct &data_struct)
         //*(*data_struct.datavecA_ + 4) = -ankle_omega(0);
         break;
       default:
-        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
         break;
       }
     } // fim da sessao critica

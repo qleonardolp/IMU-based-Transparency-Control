@@ -302,11 +302,15 @@ float controle_acc(const states input, const float gains[DTVC_SZ], float buffer[
     float Kp = gains[0];
     float Kd = gains[1];
     float actuation(0);
-    // Feedback
-    actuation += Kp*(input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
-                 Kd*(input.hum_rgtknee_acc - input.rbt_rgtknee_acc);
-    // Feedforward
-    actuation += input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc;
+
+    float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
+    float vel_error_dot = (vel_error - buffer[9]) / ctrlSamplePeriod;
+    vel_error_dot = sensor_filters[5].apply(vel_error_dot);
+    buffer[8] = vel_error; // rollBuffer will pass this data to buffer[9]...
+    rollBuffer(buffer, 10);
+
+    // Feedback+Feedforward:
+    actuation = input.mtr_rgtknee_tau + Jr * input.hum_rgtknee_acc + Kp * vel_error + Kd * vel_error_dot;
     return actuation;
 } 
 
@@ -440,7 +444,8 @@ void GetMotorTorque(float& value) {
 #if CAN_ENABLE
     kneeRightMotor.ReadPDO01();
     // Torque Constant: 0.0603 N.m/A
-    value = sensor_filters[3].apply(0.0603f * float(kneeRightMotor.PDOgetActualCurrent()) / 1000); // [mA]
+    // Gear Ratio: 150
+    value = 150.0f * sensor_filters[3].apply(0.0603f * float(kneeRightMotor.PDOgetActualCurrent()) / 1000); // [mA]
 #endif
 }
 
