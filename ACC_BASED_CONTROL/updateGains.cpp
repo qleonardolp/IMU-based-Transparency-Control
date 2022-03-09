@@ -49,11 +49,11 @@ void updateGains(ThrdStruct &data_struct){
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL && file_isvalid) {
       char header[67];
-      fscanf(pFile, "%67c", header); // empurrando o ponteiro de leitura para depois do cabecalho 'paramSignature'
+      auto _bla = fscanf(pFile, "%67c", header); // empurrando o ponteiro de leitura para depois do cabecalho 'paramSignature'
       for (size_t i = 0; i < 18; i++) // ATENCAO AQUI, LIMITADO EM 18 DEVIDO A FORMATACAO DO TXT
-        fscanf(pFile, "%f\n", rawgains + i);
+        auto _bla = fscanf(pFile, "%f\n", rawgains + i);
       // Scanning Transfer Function:
-      fscanf(pFile, "Transfer Funct Matlab\nnum [%f %f %f %f]\nden [%f %f %f %f]\n", \
+      _bla = fscanf(pFile, "Transfer Funct Matlab\nnum [%f %f %f %f]\nden [%f %f %f %f]\n", \
       rawgains+10, rawgains+11, rawgains+12, rawgains+13, rawgains+14, rawgains+15, rawgains+16, rawgains+17);
       fclose(pFile);
     }
@@ -66,7 +66,7 @@ void updateGains(ThrdStruct &data_struct){
     {   // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       *data_struct.param0F_ = true;
-      memcpy(*data_struct.datavec_, gains, sizeof(*data_struct.datavec_));
+      memcpy(*data_struct.datavec_, gains, DTVC_SZ*sizeof(float));
     }   // fim da sessao critica
     Timer.tak();
   } while (!Timer.end());

@@ -1,15 +1,15 @@
-//////////////////////////////////////////\/////////\/
-// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
-// EESC-USP                      / _____ ___  ___  //|
-// RehabLab                     /  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
-//\///////////////////////\// //// \_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
 
+#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+
+#if CAN_ENABLE
 #include "AXIS.h"
 #include "EPOS_NETWORK.h"
+#endif
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
@@ -23,7 +23,9 @@
 //	Max current (@ 48 V)  ~3.1 A
 //	Stall current (@ 48 V)  42.4 A
 //  Rotor Inertia: 137 gcm^2
-
+#if CAN_ENABLE
+// 'extern' because they are declared and defined in 'XsensEpos.h' header 
+// and I don't need to overhead this file including it!
 extern AXIS kneeRightMotor;
 extern AXIS kneeRightEncoder;
 extern AXIS kneeLeftMotor;
@@ -33,19 +35,42 @@ extern EPOS_NETWORK epos;
 extern void HabilitaEixo(int ID);
 extern void DesabilitaEixo(int ID);
 
+// Zeros EPOS:
+int zero_kr(0);      // kneeRightMotor zero  (epos)
+int zero_kl(0);      // kneeLeftMotor  zero  (epos)
+int zero_hr(0);      // hipRightMotor  zero  (epos)
+int zero_hl(0);      // hipLeftMotor   zero  (epos)
+int zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
+int zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
+
+#endif
+
+//  -- > "Methods" < --
 // Controllers:
-float  controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // generico
-float    controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // acc-based
-float    controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // admittance
-float    controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // SEA feedback
-float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm); // loop-shaping
+float  controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10]); // generico
+float    controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10]); // acc-based
+float    controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10]); // admittance
+float    controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10]); // SEA feedback
+float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10]); // loop-shaping
 // Low Level abstraction:
 void SetEPOSTorque(float desired_torque);
 void SetEPOSVelocity(float desired_rads);
+void GetTorqueSEA(float& value);
+void GetMotorTorque(float& value);
+void GetMotorVelocity(float& value);
+void GetJointPosition(float& value);
+float GetJointPosition();
 float constrain_float(float val, float min, float max);
+void rollBuffer(float buffer[10], const size_t length);
+
+//  -- > "Global Vars" < -- 
+// (static declaration because I wanna NOBODY messing with these vars ouside this file!)
+static LowPassFilter2pFloat sensor_filters[10]; // Filtros PB para alguns sensores EPOS
+static float ctrlSamplePeriod(0.001);                        // Control Sample Period
 
 void Controle(ThrdStruct &data_struct){
     using namespace std;
+    ctrlSamplePeriod = data_struct.sampletime_;
 #if PRIORITY
     SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
@@ -53,10 +78,10 @@ void Controle(ThrdStruct &data_struct){
     enum  controller{ _, ABC, ZTC, LTC, ITC, MKZ, MKT, MK0R, SEA};
     //Rotor Inertia: 137 gcm^2 = 0.137 Kg(0.01m)^2 =  0.137e-4 Kgm^2
     const float motor_inertia = 0.137e-4;
-    const int sea_kr_stiffness = 104; // [N.m/rad]
-    const int sea_kr_ratio = 150; // 
-    const int encoder_kr_steps = 2048;
-    const int motor_kr_steps = 4096;
+    //const int sea_kr_stiffness = 104; // [N.m/rad]
+    //const int sea_kr_ratio = 150; // 
+    //const int encoder_kr_steps = 2048;
+    //const int motor_kr_steps = 4096;
     const size_t statesize = 10;
     const size_t loggsize  = 10;
     float states_data[statesize];
@@ -81,13 +106,6 @@ void Controle(ThrdStruct &data_struct){
     for (int i = 0; i < DTVC_SZ; i++)   gains_data[i] = 0;
 
     States sendto_control;
-    // Zeros EPOS:
-    int zero_kr(0);      // kneeRightMotor zero  (epos)
-    int zero_kl(0);      // kneeLeftMotor  zero  (epos)
-    int zero_hr(0);      // hipRightMotor  zero  (epos)
-    int zero_hl(0);      // hipLeftMotor   zero  (epos)
-    int zero_kr_enc(0);  // kneeRightEncoder '0' (epos)
-    int zero_kl_enc(0);  // kneeLeftEncoder  '0' (epos)
 
     bool control_abort(false);
     bool isready_imu(false);
@@ -112,15 +130,14 @@ void Controle(ThrdStruct &data_struct){
                 break;
             }
         } 
-    //} while (!isready_imu || !isready_asg || !isready_ati);
     } while (!isready_imu || !isready_asg || !isready_gsn);
-    //} while (!isready_imu || !isready_asg);
 
     if (control_abort){
         return;
     }
 
     // Sincroniza as epos
+#if CAN_ENABLE
     {
     epos.sync();
     this_thread::sleep_for(chrono::milliseconds(1000));
@@ -129,13 +146,14 @@ void Controle(ThrdStruct &data_struct){
     zero_kr_enc = kneeRightEncoder.PDOgetActualPosition();
     kneeRightMotor.ReadPDO01();
     zero_kr = kneeRightMotor.PDOgetActualPosition();
+    /*
     kneeLeftMotor.ReadPDO01();
     zero_kl = kneeLeftMotor.PDOgetActualPosition();
     hipRightMotor.ReadPDO01();
     zero_hr = hipRightMotor.PDOgetActualPosition();
     hipLeftMotor.ReadPDO01();
     zero_hl = hipLeftMotor.PDOgetActualPosition();
-
+    */
     // Definindo modo de operacao das EPOS:
     auto ctrl_id = data_struct.param01_;
     if (ctrl_id == LTC || ctrl_id == ABC){
@@ -143,27 +161,28 @@ void Controle(ThrdStruct &data_struct){
     } else{
         kneeRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
     }
-    kneeLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
-    hipRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
-    hipLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+
+    //kneeLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    //hipRightMotor.VCS_SetOperationMode(VELOCITY_MODE);
+    //hipLeftMotor.VCS_SetOperationMode(VELOCITY_MODE);
 
     kneeRightEncoder.ReadPDO01();
     kneeRightMotor.ReadPDO01();
-    kneeLeftMotor.ReadPDO01();
-    hipRightMotor.ReadPDO01();
-    hipLeftMotor.ReadPDO01();
+    //kneeLeftMotor.ReadPDO01();
+    //hipRightMotor.ReadPDO01();
+    //hipLeftMotor.ReadPDO01();
 
     this_thread::sleep_for(chrono::milliseconds(2000));
     HabilitaEixo(2);
     }
+#endif
 
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = true;
+        cout << " Control Running!\n";
     }
 
-    // Filtros PB para alguns sensores EPOS:
-    LowPassFilter2pFloat sensor_filters[5];
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
     {
       float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
@@ -177,7 +196,9 @@ void Controle(ThrdStruct &data_struct){
     do
     {
         Timer.tik();
+#if CAN_ENABLE
         epos.sync();
+#endif
 
         { // sessao critica:
             unique_lock<mutex> _(*data_struct.mtx_);
@@ -191,49 +212,39 @@ void Controle(ThrdStruct &data_struct){
             }
         } // fim da sessao critica
 
-        kneeRightEncoder.ReadPDO01();
-        float exo_pos = 2*M_PI*float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc)/encoder_kr_steps;
-        kneeRightMotor.ReadPDO01();
-        float mtr_pos = 2*M_PI*float( kneeRightMotor.PDOgetActualPosition() - zero_kr)/(motor_kr_steps*sea_kr_ratio);
+#if CAN_ENABLE
 
-        exo_pos = sensor_filters[0].apply(exo_pos);
-        mtr_pos = sensor_filters[1].apply(mtr_pos);
-
-        states_data[3] = exo_pos;
-        states_data[6] = sea_kr_stiffness*(mtr_pos - exo_pos);
-
-        kneeRightMotor.ReadPDO02();
-        states_data[4] = sensor_filters[2].apply( (RPM2RADS/sea_kr_ratio)*(kneeRightMotor.PDOgetActualVelocity()) ); // Gear Ratio!!!
+        GetJointPosition(states_data[3]);
+        GetMotorVelocity(states_data[4]);
         states_data[9] = states_data[4];
+        GetTorqueSEA(states_data[6]);
 
-        kneeRightMotor.ReadPDO01();
-        // Torque Constant: 0.0603 N.m/A
-        states_data[8] = sensor_filters[3].apply( 0.0603f*float(kneeRightMotor.PDOgetActualCurrent())/1000 ); // [mA]
-        states_data[5] = states_data[8]/motor_inertia;
-
+        GetMotorTorque(states_data[8]);
+        states_data[5] = states_data[8]/motor_inertia; // motor acceleration
+#endif
         states_data[3] = sensor_filters[4].apply(states_data[3]); // human acc filtering
 
         sendto_control.assign(states_data);
         switch (data_struct.param01_)
         {
         case ABC:
-            setpoint = controle_acc(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
+            setpoint = controle_acc(sendto_control, gains_data, acc_bffr);
             SetEPOSTorque(setpoint);
             break;
         case ZTC:
-            setpoint = controle_adm(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
+            setpoint = controle_adm(sendto_control, gains_data, acc_bffr);
             SetEPOSVelocity(setpoint);
             break;
         case ITC:
-            setpoint = controle_junta(sendto_control, gains_data, acc_bffr, data_struct.sampletime_);
+            setpoint = controle_junta(sendto_control, gains_data, acc_bffr);
             SetEPOSVelocity(setpoint);
             break;
         case LTC:
-            setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer, data_struct.sampletime_);
+            setpoint = controle_lpshap(sendto_control, gains_data, lp_buffer);
             SetEPOSTorque(setpoint);
             break;
         case SEA:
-            setpoint = controle_sea(sendto_control, gains_data, sea_bffr, data_struct.sampletime_);
+            setpoint = controle_sea(sendto_control, gains_data, sea_bffr);
             SetEPOSVelocity(setpoint);
             break;
         case (11*IMUBYPASS):
@@ -259,8 +270,8 @@ void Controle(ThrdStruct &data_struct){
             *(*data_struct.datavecA_ + 5) = states_data[5];
             *(*data_struct.datavecA_ + 6) = states_data[6];
             *(*data_struct.datavecA_ + 7) = *(*data_struct.datavecB_ + 7);
-            *(*data_struct.datavecA_ + 8) = setpoint; // check LS output
-            *(*data_struct.datavecA_ + 9) = states_data[9];
+            *(*data_struct.datavecA_ + 8) = states_data[8];
+            *(*data_struct.datavecA_ + 9) = setpoint;
             // fim da sessao critica
         }
         
@@ -271,33 +282,80 @@ void Controle(ThrdStruct &data_struct){
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = false;
     }
-
+#if CAN_ENABLE
     epos.sync();
     DesabilitaEixo(0);
+#endif
 }
 
 // Controladores, em essência! Trabalham com unidades no SI e sem precisar de conversoes do motor (Gear Ratio, Kt, Kw...)!
-float controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
+// The Control Magic Lives Here! Enjoy.
 
-float controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm)
+
+float controle_acc(const states input, const float gains[DTVC_SZ], float buffer[10])
 {
+    // MTC:
     const float Jr = 0.885;
     float Kp = gains[0];
     float Kd = gains[1];
     float actuation(0);
-    // Feedback
-    actuation += Kp*(input.hum_rgtknee_vel - input.rbt_rgtknee_vel) + \
-                 Kd*(input.hum_rgtknee_acc - input.rbt_rgtknee_acc);
-    // Feedforward
-    actuation += input.mtr_rgtknee_tau + Jr*input.hum_rgtknee_acc;
+
+    float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
+    float vel_error_dot = (vel_error - buffer[9]) / ctrlSamplePeriod;
+    vel_error_dot = sensor_filters[5].apply(vel_error_dot);
+    buffer[8] = vel_error; // rollBuffer will pass this data to buffer[9]...
+    rollBuffer(buffer, 10);
+
+    // Feedback+Feedforward:
+    actuation = input.mtr_rgtknee_tau + Jr * input.hum_rgtknee_acc + Kp * vel_error + Kd * vel_error_dot;
     return actuation;
 } 
 
-float controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
+float controle_adm(const states input, const float gains[DTVC_SZ], float buffer[10]) 
+{   
+    // ATC:
+    const float Jr = 0.885;
+    const float Mgl = 4.7421 * 9.8066 * 0.43;
+    float Kp    = gains[0];
+    float Kd    = gains[1];
+    float invBd = gains[2]; // Desired Damping ^(-1) !!!
+    float Adj   = gains[3]; // adjust Gravity Compensation
 
-float controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm) {return 0;} 
+    float grav_compensation = abs(Adj * Mgl * cosf(input.rbt_rgtknee_pos));
+    float vel_error = input.hum_rgtknee_vel - input.rbt_rgtknee_vel;
+    float vel_error_dot = (vel_error - buffer[9]) / ctrlSamplePeriod;
+    vel_error_dot = sensor_filters[5].apply(vel_error_dot);
+    buffer[8] = vel_error; // rollBuffer will pass this data to buffer[9]...
 
-float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10], const float sample_tm)
+    // Feedback+Feedforward (Outer):
+    float outer_loop = Jr * input.hum_rgtknee_acc + Kp * vel_error + Kd * vel_error_dot;
+    // Inner Loop: (Admittance with desired damping only)
+    float actuation = invBd * (0*outer_loop + grav_compensation - input.sea_rgtshank);
+    buffer[0] = actuation;
+    float actuation_dot = (3 * buffer[0] - 4 * buffer[1] + buffer[2]) / (2 * ctrlSamplePeriod); // actuation 3pt FD derivative
+    rollBuffer(buffer, 10);
+
+    return actuation;
+} 
+
+float controle_sea(const states input, const float gains[DTVC_SZ], float buffer[10]) 
+{
+    // MF por Admitancia:
+    const float Jr = 0.885;
+    const float Mgl = 4.7421 * 9.8066 * 0.43;
+    float invBd = gains[2]; // Desired Damping ^(-1) !!!
+    float Adj = gains[3]; // adjust Gravity Compensation
+    float grav_compensation = abs(Adj * Mgl * cosf(input.rbt_rgtknee_pos));
+    // Admittance with desired damping only
+    float actuation = invBd * ( grav_compensation - input.sea_rgtshank);
+    buffer[0] = actuation;
+    float actuation_dot = (3 * buffer[0] - 4 * buffer[1] + buffer[2]) / (2 * ctrlSamplePeriod); // actuation 3pt FD derivative
+    rollBuffer(buffer, 10);
+    return actuation;
+} 
+float controle_junta(const states input, const float gains[DTVC_SZ], float buffer[10]) { return 0; }
+
+float controle_lpshap(const states input, const float gains[DTVC_SZ], float buffer[10])
 {
     using namespace Eigen;
     const float Jr = 0.885;
@@ -332,7 +390,7 @@ float controle_lpshap(const states input, const float gains[DTVC_SZ], float buff
     RowVector3f C(b3 - a3*b0, b2 - a2*b0, b1 - a1*b0);
     float D = b0;
     // Discretizacao 2 Ord:
-    float Ts = sample_tm;
+    float Ts = ctrlSamplePeriod;
     Matrix3f Ak = Matrix3f::Identity() + A*Ts + (A*Ts).pow(2)/2;
     Vector3f Bk = (Matrix3f::Identity() + A*Ts/2 + (A*Ts).pow(2)/6)*B*Ts;
 
@@ -348,31 +406,86 @@ float controle_lpshap(const states input, const float gains[DTVC_SZ], float buff
     //return yk;
 }
 
-// Low Level abstraction:
+// Low Level abstraction (HAL):
 
 void SetEPOSTorque(float desired_torque){
+#if CAN_ENABLE
     // Torque Constant: 0.0603 N.m/A
     // Gear Ratio: 150
     int setpoint_mA = 1000*(desired_torque/0.0603f)/150.0f; // -> '110.5583*desired_torque'
     float setpoint_mA_limited = constrain_float(setpoint_mA, -3100, 3100);
     kneeRightMotor.PDOsetCurrentSetpoint(setpoint_mA_limited);
     kneeRightMotor.WritePDO01();
+#endif
 }
 
 void SetEPOSVelocity(float desired_rads){
+#if CAN_ENABLE
     // Gear Ratio: 150!!
     float setpoint_rpm = constrain_float(RADS2RPM*150*desired_rads, -7590, 7590);
     kneeRightMotor.PDOsetVelocitySetpoint(setpoint_rpm);
     kneeRightMotor.WritePDO02();
+#endif
 }
+
+void GetTorqueSEA(float& value) {
+#if CAN_ENABLE
+    kneeRightMotor.ReadPDO01();
+    float mtr_pos = 2 * M_PI * float(kneeRightMotor.PDOgetActualPosition() - zero_kr) / (4096 * 150);
+    mtr_pos = sensor_filters[1].apply(mtr_pos);
+    value = 104 * (mtr_pos - GetJointPosition());
+#endif
+}
+
+void GetMotorTorque(float& value) {
+#if CAN_ENABLE
+    kneeRightMotor.ReadPDO01();
+    // Torque Constant: 0.0603 N.m/A
+    // Gear Ratio: 150
+    value = 150.0f * sensor_filters[3].apply(0.0603f * float(kneeRightMotor.PDOgetActualCurrent()) / 1000); // [mA]
+#endif
+}
+
+void GetMotorVelocity(float& value) { // in [rad/s] and uses the Gear Ratio!!!
+#if CAN_ENABLE
+    kneeRightMotor.ReadPDO02();
+    value = sensor_filters[2].apply((RPM2RADS / 150) * (kneeRightMotor.PDOgetActualVelocity()));
+#endif
+}
+
+void GetJointPosition(float& value) { // exo_pos
+#if CAN_ENABLE
+    kneeRightEncoder.ReadPDO01();
+    value = 2 * M_PI * float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc) / 2048;
+#endif
+}
+
+float GetJointPosition() { // exo_pos (return)
+#if CAN_ENABLE
+    kneeRightEncoder.ReadPDO01();
+    float exo_pos = 2 * M_PI * float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc) / 2048;
+    return sensor_filters[0].apply(exo_pos);
+#else
+    return 0;
+#endif
+}
+
+// Utilities:
 
 float constrain_float(float val, float min, float max)
 {
-	if (_isnan(val)) return (min + max)/2;
+	if (isnan(val)) return (min + max)/2;
 
 	if (val < min) return min;
 
 	if(val > max) return max;
 	
 	return val;
+}
+
+void rollBuffer(float buffer[10], const size_t length) {
+    for (size_t i = 0; i < (length - 1); i++)
+    {
+        buffer[(length - 1) - i] = buffer[(length - 2) - i];
+    }
 }

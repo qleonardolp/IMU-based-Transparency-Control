@@ -222,48 +222,58 @@ void DesabilitaEixo(int ID)
 void ResetRedeCan()
 {
   // EPOS 04
+  std::cout << " 0%";
   hipRightMotor.PDOsetControlWord_FaultReset(true);
   hipRightMotor.WritePDO01();
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   hipRightMotor.PDOsetControlWord_FaultReset(false);
   hipRightMotor.WritePDO01();
 
+  std::cout << "  10%";
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
   // EPOS 05
+  std::cout << "  20%";
   hipLeftMotor.PDOsetControlWord_FaultReset(true);
   hipLeftMotor.WritePDO01();
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   hipLeftMotor.PDOsetControlWord_FaultReset(false);
   hipLeftMotor.WritePDO01();
 
+  std::cout << "  30%";
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   
   // EPOS 02
+  std::cout << "  40%";
   kneeRightEncoder.PDOsetControlWord_FaultReset(true);
   kneeRightEncoder.WritePDO01();
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   kneeRightEncoder.PDOsetControlWord_FaultReset(false);
   kneeRightEncoder.WritePDO01();
 
+  std::cout << "  50%";
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   
   // EPOS 03
+  std::cout << "  60%";
   kneeLeftMotor.PDOsetControlWord_FaultReset(true);
   kneeLeftMotor.WritePDO01();
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   kneeLeftMotor.PDOsetControlWord_FaultReset(false);
   kneeLeftMotor.WritePDO01();
 
+  std::cout << "  70%";
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   
   // EPOS 01
+  std::cout << "  80%";
   kneeRightMotor.PDOsetControlWord_FaultReset(true);
   kneeRightMotor.WritePDO01();
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   kneeRightMotor.PDOsetControlWord_FaultReset(false);
   kneeRightMotor.WritePDO01();
 
+  std::cout << "  90%";
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
   std::cout << " Reset OK!" << std::endl;

@@ -6,10 +6,11 @@
 //\///////////////////////\// //// \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\
 
-
-#include "Axia80M50.h"        // Vem primeiro para nao conflitar com <windows.h>
-#include "QpcLoopTimer.h"     // ja inclui <windows.h>
 #include "SharedStructs.h"    // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#if CAN_ENABLE
+#include "Axia80M50.h"        // Vem primeiro para nao conflitar com <windows.h>
+#endif
+#include "QpcLoopTimer.h"     // ja inclui <windows.h>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
@@ -32,8 +33,12 @@ void readFTSensor(ThrdStruct &data_struct){
   bool  enable_filt = data_struct.param01_;
 
   // inicializa sensor F/T:
+#if CAN_ENABLE
   Axia80M50* sensorAxia = new Axia80M50(atiSensorIp);
   bool sensor_init = sensorAxia->init();
+#else
+  bool sensor_init = true;
+#endif
   { 
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0E_ = sensor_init;   // INVESTIGAR PQ RETORNA TRUE MSM COM SENSOR DESCONECTADO
@@ -46,15 +51,27 @@ void readFTSensor(ThrdStruct &data_struct){
   {
 
     bool isready_imu(false);
+    bool aborting_imu(false);
+    bool ati_abort(false);
     do{ 
       {   // confere IMU:
         unique_lock<mutex> _(*data_struct.mtx_);
         isready_imu = *data_struct.param0A_;
+        aborting_imu = *data_struct.param1A_;
+        if (aborting_imu)
+        {
+            ati_abort = *data_struct.param1E_ = true;
+            break;
+        }
       } 
     } while (!isready_imu);
 
+    if (ati_abort) return;
+
+#if CAN_ENABLE
     sensorAxia->bias();
     this_thread::sleep_for(chrono::milliseconds(500));
+#endif
 
     // Filtros Passa Baixa para os dados:
     LowPassFilter2pFloat sensor_filters[6];
@@ -71,6 +88,7 @@ void readFTSensor(ThrdStruct &data_struct){
     do
     {
       Timer.tik();
+#if CAN_ENABLE
       sensorAxia->peek();
 
       if (!enable_filt){
@@ -88,11 +106,19 @@ void readFTSensor(ThrdStruct &data_struct){
         sensor_data[4] = sensor_filters[4].apply(sensorAxia->values.Ty);
         sensor_data[5] = sensor_filters[5].apply(sensorAxia->values.Tz);
       }
+#else
+      sensor_data[0] = 1.23;
+      sensor_data[1] = 1.23;
+      sensor_data[2] = 1.23;
+      sensor_data[3] = 1.23;
+      sensor_data[4] = 1.23;
+      sensor_data[5] = 1.23;
+#endif
 
       {   // sessao critica
         unique_lock<mutex> _(*data_struct.mtx_);
         *(*data_struct.datavecB_ + 7) = -sensor_data[0]; // "inter_rgtshank  = vector[7];"
-        memcpy(*data_struct.datavecF_, sensor_data, sizeof(sensor_data)); // para log
+        memcpy(*data_struct.datavecF_, sensor_data, DTVCF_SZ*sizeof(float)); // para log
       }   // fim da sessao critica
 
       Timer.tak();
