@@ -1,10 +1,7 @@
-//////////////////////////////////////////\/////////\/
-// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
-// EESC-USP                      / _____ ___  ___  //|
-// RehabLab                     /  | |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
-//\///////////////////////\// //// \_'_/\_`_/__|   ///
-///\///////////////////////\ //////////////////\/////\
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
 
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 
@@ -468,6 +465,8 @@ float GetJointPosition() { // exo_pos (return)
     kneeRightEncoder.ReadPDO01();
     float exo_pos = 2 * M_PI * float(-kneeRightEncoder.PDOgetActualPosition() - zero_kr_enc) / 2048;
     return sensor_filters[0].apply(exo_pos);
+#else
+    return 0;
 #endif
 }
 
