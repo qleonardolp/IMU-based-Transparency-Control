@@ -60,6 +60,7 @@ void Logging(ThrdStruct& data_struct) {
 	{   // Loggging avisa que esta pronto!
 		unique_lock<mutex> _(*data_struct.mtx_);
 		*data_struct.param0D_ = true;
+		*data_struct.param3F_ = false;
 	}
 
 	looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -92,5 +93,6 @@ void Logging(ThrdStruct& data_struct) {
 	{
 		unique_lock<mutex> _(*data_struct.mtx_);
 		*data_struct.param0D_ = false;
+		*data_struct.param3F_ = true;
 	}
 }
