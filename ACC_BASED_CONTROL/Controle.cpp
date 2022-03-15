@@ -133,6 +133,9 @@ void Controle(ThrdStruct &data_struct){
     } while (!isready_imu || !isready_asg || !isready_gsn);
 
     if (control_abort){
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0C_ = false; // safety redundance
+        *data_struct.param3F_ = true;  // finished 
         return;
     }
 
@@ -187,7 +190,7 @@ void Controle(ThrdStruct &data_struct){
     {   // Controle avisa que esta pronto!
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = true;
-        cout << " Control Running!\n";
+        cout << " Control [Mode " << data_struct.param01_ << "] Running!\n";
     }
 
     looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -281,6 +284,7 @@ void Controle(ThrdStruct &data_struct){
     {   // Fim da execução
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = false;
+        *data_struct.param3F_ = true;
     }
 #if CAN_ENABLE
     epos.sync();

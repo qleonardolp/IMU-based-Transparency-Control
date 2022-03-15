@@ -76,6 +76,22 @@ bool gscan_start(false);
 
 int  execution_time = EXEC_TIME;
 
+// utility structure for realtime plot
+struct RollingBuffer {
+	float Span;
+	ImVector<ImVec2> Data;
+	RollingBuffer() {
+		Span = 10.0f;
+		Data.reserve(2000);
+	}
+	void AddPoint(float x, float y) {
+		float xmod = fmodf(x, Span);
+		if (!Data.empty() && xmod < Data.back().x)
+			Data.shrink(0);
+		Data.push_back(ImVec2(xmod, y));
+	}
+};
+
 static void glfw_error_callback(int error, const char* description)
 {
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
@@ -114,12 +130,12 @@ int main(int, char**)
 		if (i < 6) ati_data[i] = 0;
 	}
 
-	static short imu_isready(true);
-	static short asgd_isready(true);
-	static short control_isready(true);
-	static short logging_isready(true);
-	static short ftsensor_isready(true);
-	static short gscan_isready(true);
+	static short imu_isready(false);
+	static short asgd_isready(false);
+	static short control_isready(false);
+	static short logging_isready(false);
+	static short ftsensor_isready(false);
+	static short gscan_isready(false);
 
 	static short imu_aborting(false);
 	static short asgd_aborting(false);
@@ -291,6 +307,8 @@ int main(int, char**)
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(0.6f, 0.6f, 0.6f, 1.00f);
 
+	bool show_imu_window = false;
+	bool show_ctrl_window = false;
 
 	// Main loop
 	while (!glfwWindowShouldClose(window))
@@ -380,8 +398,15 @@ int main(int, char**)
 			asgd_struct.param39_ = option;
 			control_struct.param39_ = option;
 			logging_struct.param39_ = option;
-
-
+			// Fill structs exectime:
+			{
+				imu_struct.exectime_ = execution_time;
+				asgd_struct.exectime_ = execution_time;
+				gscan_struct.exectime_ = execution_time;
+				control_struct.exectime_ = execution_time;
+				logging_struct.exectime_ = execution_time;
+				ftsensor_struct.exectime_ = execution_time;
+			}
 			//ImGui::Text("Tempo de execução (s):");
 			//ImGui::SameLine();
 			if (ImGui::InputInt("segundos", &execution_time, 1, 20)) {
@@ -429,8 +454,9 @@ int main(int, char**)
 		}
 
 		// Escolher tipo de controle:
-		if (!control_isready) {
-			ImGui::Begin("Controlador");
+		if (control_start || show_ctrl_window) {
+			show_ctrl_window = true;
+			ImGui::Begin("Controlador", &show_ctrl_window);
 			ImGui::Text(" Escolha uma controlador:");
 			static short option = -1;
 			if (ImGui::Button("Acc-based Transparency (PD)")) option = 1;
@@ -444,6 +470,48 @@ int main(int, char**)
 			control_struct.param01_ = option;
 			logging_struct.param10_ = option;
 			ftsensor_struct.param01_ = true; // F/T filtering on/off
+			ImGui::End();
+		}
+
+		// Janela de graficos (realtime) IMUs:
+		if (imu_start || show_imu_window)
+		{
+			show_imu_window = true;
+			ImGui::Begin("Joint Angle Estimator", &show_imu_window);
+			ImGui::BulletText("This example assumes 60 FPS. Higher FPS requires larger buffer size.");
+			static RollingBuffer   dataKneePos, dataAnklePos;
+			ImVec2 mouse = ImGui::GetMousePos();
+			static float t = 0;
+			t += ImGui::GetIO().DeltaTime;
+			//dataKneePos.AddPoint(t, mouse.x * 0.0005f);
+			//dataAnklePos.AddPoint(t, mouse.y * 0.0005f);
+
+			static float history = 10.0f;
+			ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
+			dataKneePos.Span = history;
+			dataAnklePos.Span = history;
+
+			static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
+
+			if (ImPlot::BeginPlot("Joint Positions", ImVec2(-1, 150))) {
+				
+				unique_lock<mutex> _(comm_mtx);
+				float right_knee_pos  = states_data[0];
+				float right_ankle_pos = states_data[3];
+				dataKneePos.AddPoint(t, right_knee_pos * 180.0f / 3.14159f);
+				dataAnklePos.AddPoint(t, right_ankle_pos * 180.0f / 3.14159f);
+
+				// IMU Abort close this window:
+				//show_imu_window = !(*imu_struct.param1A_);
+
+				ImPlot::SetupAxes(NULL, NULL, flags, flags);
+				ImPlot::SetupAxisLimits(ImAxis_X1, 0, history, ImGuiCond_Always);
+				ImPlot::SetupAxisLimits(ImAxis_Y1, -100, 100, ImGuiCond_Always);
+				ImPlot::PlotLine("Knee", &dataKneePos.Data[0].x, &dataKneePos.Data[0].y, dataKneePos.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Ankle", &dataAnklePos.Data[0].x, &dataAnklePos.Data[0].y, dataAnklePos.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::EndPlot();
+			}
+			ImGui::End();
 		}
 
 		// 3. Show another simple window.
@@ -457,6 +525,7 @@ int main(int, char**)
 			ImGui::End();
 		}
 
+		// TODO: alguma thread esta rodando sem a outra que eh dependente rodar...
 		// Fire Threads:
 		if (imu_start) {
 			thr_imus = thread(readIMUs, imu_struct);
@@ -489,26 +558,32 @@ int main(int, char**)
 			if (*imu_struct.param3F_) {
 				thr_imus.join();
 				*imu_struct.param3F_ = 0; // restart
+				cout << "-> readIMU jointed!" << endl;
 			}
 			if (*asgd_struct.param3F_) {
 				thr_qasgd.join();
 				*asgd_struct.param3F_ = 0;
+				cout << "-> qASGD jointed!" << endl;
 			}
 			if (*logging_struct.param3F_) {
 				thr_logging.join();
 				*logging_struct.param3F_ = 0;
+				cout << "-> Logging jointed!" << endl;
 			}
 			if (*control_struct.param3F_) {
 				thr_controle.join();
 				*control_struct.param3F_ = 0;
+				cout << "-> Control jointed!" << endl;
 			}
 			if (*ftsensor_struct.param3F_) {
 				thr_ftsensor.join();
 				*ftsensor_struct.param3F_ = 0;
+				cout << "-> FT Sensor jointed!" << endl;
 			}
 			if (*gscan_struct.param3F_) {
 				thr_gainscan.join();
 				*gscan_struct.param3F_ = 0;
+				cout << "-> GainScan jointed!" << endl;
 			}
 		}
 

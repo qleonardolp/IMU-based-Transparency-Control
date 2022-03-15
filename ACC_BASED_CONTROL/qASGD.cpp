@@ -42,6 +42,17 @@ void qASGD(ThrdStruct &data_struct)
   SetThreadPriority(GetCurrentThread(), data_struct.param00_);
 #endif
 
+  {
+      unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param0A_ = false; // not ready
+      *data_struct.param1A_ = false;  // not aborting
+      *data_struct.param3F_ = false;  // not finished
+  }
+
+  mutex    imu_mtx[10];
+  Vector3f imuGyroscope[10];
+  Vector3f imuAccelerometer[10];
+
   // Declarations
   float q0 = 0;
   float q1 = 0;
@@ -110,12 +121,18 @@ void qASGD(ThrdStruct &data_struct)
     } 
   } while (!isready_imu);
 
-  if (asgd_abort) return;
+  if (asgd_abort) {
+      unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param3F_ = true; // finished
+      return;
+  }
+
+  // TODO: cada subthread sera declarada e associada a uma instancia da classe 'asgdKalmanFilter'
 
   {   // qASGD avisa que esta pronto!
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0B_ = true;
-    cout << " qASGD Running!\n";
+    cout << "-> qASGD Running!\n";
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -125,10 +142,20 @@ void qASGD(ThrdStruct &data_struct)
   do
   {
     Timer.tik();
-    { // sessao critica:
+    { // sessao critica (externa):
       unique_lock<mutex> _(*data_struct.mtx_);
       memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
-    } // fim da sessao critica
+    } // fim da sessao critica (ext)
+
+    for (size_t i = 0; i < 3; i++)
+    {
+        unique_lock<mutex> _(imu_mtx[i]); // sessao critica (interna):
+        imuGyroscope[i]     << imus_data[6*i + 0], imus_data[6*i + 1], imus_data[6*i + 2];
+        imuAccelerometer[i] << imus_data[6*i + 3], imus_data[6*i + 4], imus_data[6*i + 5];
+    }
+
+    // TODO: cada subthread chama 'asgdKalmanFilter.update()' aqui....
+
 
     gyro1 << imus_data[0], imus_data[1], imus_data[2];
     acc1 << imus_data[3], imus_data[4], imus_data[5];
@@ -362,17 +389,18 @@ void qASGD(ThrdStruct &data_struct)
         *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
         break;
-      case READIMUS:
+      default:
         *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
         *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
         *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
-        //*(*data_struct.datavecA_ + 3) = -ankle_euler(0); // esta "negativo" ->TODO
-        //*(*data_struct.datavecA_ + 4) = -ankle_omega(0);
-        break;
-      default:
+        *(*data_struct.datavecA_ + 3) = -ankle_euler(0); // esta "negativo" ->TODO
+        *(*data_struct.datavecA_ + 4) = -ankle_omega(0);
+
         *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
         *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 3) = -ankle_euler(0); // hum_rgtankle_pos
+        *(*data_struct.datavecB_ + 4) = -ankle_omega(0); // hum_rgtankle_vel
         break;
       }
     } // fim da sessao critica
@@ -383,6 +411,7 @@ void qASGD(ThrdStruct &data_struct)
   {   
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0B_ = false;
+    *data_struct.param3F_ = true;
   }
 }
 
