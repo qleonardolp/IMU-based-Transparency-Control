@@ -111,7 +111,7 @@ int main(int, char**)
 		if (i < 10) logging_data[i] = states_data[i] = 0;
 		if (i < 6) ati_data[i] = 0;
 	}
-	
+
 	static short imu_isready(true);
 	static short asgd_isready(true);
 	static short control_isready(true);
@@ -126,7 +126,7 @@ int main(int, char**)
 	static short ftsensor_aborting(false);
 	static short gscan_aborting(false);
 
-	short finished[10] = {0}; // finished flags
+	short finished[10] = { 0 }; // finished flags
 	bool th_running = false; // TODO: flag para evitar que na GUI uma nova execucao seja iniciada enquanto ha um rodando...
 
 	ThrdStruct imu_struct, asgd_struct, ftsensor_struct;
@@ -140,7 +140,7 @@ int main(int, char**)
 		imu_struct.param00_ = IMU_PRIORITY;
 		imu_struct.param0A_ = &imu_isready;
 		imu_struct.param1A_ = &imu_aborting;
-		imu_struct.param3F_ = finished+0;
+		imu_struct.param3F_ = finished + 0;
 		*(imu_struct.datavec_) = imu_data;
 		*(imu_struct.datavecB_) = states_data;
 		imu_struct.mtx_ = &comm_mtx;
@@ -152,7 +152,7 @@ int main(int, char**)
 		asgd_struct.param1B_ = &asgd_aborting;
 		asgd_struct.param0A_ = &imu_isready;
 		asgd_struct.param1A_ = &imu_aborting;
-		asgd_struct.param3F_ = finished+1;
+		asgd_struct.param3F_ = finished + 1;
 		*(asgd_struct.datavec_) = imu_data;     // from IMUs
 		*(asgd_struct.datavecA_) = logging_data;// to logging
 		*(asgd_struct.datavecB_) = states_data; // to control
@@ -170,7 +170,7 @@ int main(int, char**)
 		control_struct.param0E_ = &ftsensor_isready;
 		control_struct.param1E_ = &ftsensor_aborting;
 		control_struct.param0F_ = &gscan_isready;
-		control_struct.param3F_ = finished+2;
+		control_struct.param3F_ = finished + 2;
 		*(control_struct.datavec_) = gains_data;
 		*(control_struct.datavecA_) = logging_data;
 		*(control_struct.datavecB_) = states_data;
@@ -189,7 +189,7 @@ int main(int, char**)
 		logging_struct.param0C_ = &control_isready;
 		logging_struct.param1C_ = &control_aborting;
 		logging_struct.param0E_ = &ftsensor_isready;
-		logging_struct.param3F_ = finished+3;
+		logging_struct.param3F_ = finished + 3;
 		*(logging_struct.datavec_) = gains_data;
 		*(logging_struct.datavecA_) = logging_data;
 		*(logging_struct.datavecB_) = states_data;
@@ -203,7 +203,7 @@ int main(int, char**)
 		ftsensor_struct.param1E_ = &ftsensor_aborting;
 		ftsensor_struct.param0A_ = &imu_isready;
 		ftsensor_struct.param1A_ = &imu_aborting;
-		ftsensor_struct.param3F_ = finished+4;
+		ftsensor_struct.param3F_ = finished + 4;
 		*(ftsensor_struct.datavecB_) = states_data;
 		*(ftsensor_struct.datavecF_) = ati_data;
 		ftsensor_struct.mtx_ = &comm_mtx;
@@ -215,7 +215,7 @@ int main(int, char**)
 		gscan_struct.param1F_ = &gscan_aborting;
 		gscan_struct.param0D_ = &logging_isready;
 		gscan_struct.param0C_ = &control_isready;
-		gscan_struct.param3F_ = finished+5;
+		gscan_struct.param3F_ = finished + 5;
 		*(gscan_struct.datavec_) = gains_data;
 		gscan_struct.mtx_ = &comm_mtx;
 	}
@@ -389,6 +389,38 @@ int main(int, char**)
 				ftsensor_struct.exectime_ = execution_time;
 			}
 
+			// Fill an array of contiguous float values to plot
+			// Tip: If your float aren't contiguous but part of a structure, you can pass a pointer to your first float
+			// and the sizeof() of your structure in the "stride" parameter.
+			static bool animate = true;
+			static float values[90] = {};
+			static int values_offset = 0;
+			static double refresh_time = 0.0;
+			if (!animate || refresh_time == 0.0)
+				refresh_time = ImGui::GetTime();
+			while (refresh_time < ImGui::GetTime()) // Create data at fixed 60 Hz rate for the demo
+			{
+				static float phase = 0.0f;
+				values[values_offset] = cosf(phase);
+				values_offset = (values_offset + 1) % IM_ARRAYSIZE(values);
+				phase += 0.05f * values_offset;
+				refresh_time += 1.0f / 60.0f;
+			}
+
+			// Plots can display overlay texts
+			// (in this example, we will display an average value)
+			{
+				float average = 0.0f;
+				for (int n = 0; n < IM_ARRAYSIZE(values); n++)
+					average += values[n] * values[n];
+				average /= (float)IM_ARRAYSIZE(values);
+				average = sqrtf(average);
+				char overlay[32];
+				sprintf(overlay, "rms %f", average);
+				ImGui::PlotLines("Lines", values, IM_ARRAYSIZE(values), values_offset, overlay, -1.0f, 1.0f, ImVec2(0, 80.0f));
+			}
+			ImGui::Checkbox("Animate", &animate);
+
 			ImGui::End();
 		}
 
@@ -446,7 +478,7 @@ int main(int, char**)
 			thr_gainscan = thread(updateGains, gscan_struct);
 			gscan_start = false;
 		}
-		
+
 		// Join Threads:
 		{
 			unique_lock<mutex> _(comm_mtx);
