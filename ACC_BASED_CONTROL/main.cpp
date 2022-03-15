@@ -21,6 +21,8 @@
 //#endif
 // comentado pois baixei a glfw3.lib mais recente para VS2022!
 
+#include "implot.h"
+
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #if CAN_ENABLE
 #include "XsensEpos.h"
@@ -256,7 +258,7 @@ int main(int, char**)
 #endif
 
 	// Create window with graphics context
-	GLFWwindow* window = glfwCreateWindow(1820, 1080, "Project Hylonome -- D.ImGui [GLFW | OpenGL3]", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1820, 1080, "Project Hylonome | D.ImGui[GLFW/OpenGL3]+ImPlot", NULL, NULL);
 	if (window == NULL) return 1;
 	glfwSetWindowPos(window, 0, 38);
 	glfwMakeContextCurrent(window);
@@ -268,6 +270,8 @@ int main(int, char**)
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	ImPlot::CreateContext();
 
 	ImGui::LoadIniSettingsFromDisk("imgui.ini");
 	// Setup Dear ImGui style
@@ -527,6 +531,7 @@ int main(int, char**)
 	// ImGui cleanup:
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
+	ImPlot::DestroyContext();
 	ImGui::DestroyContext();
 
 	glfwDestroyWindow(window);
