@@ -317,18 +317,18 @@ void qASGD(ThrdStruct &data_struct)
 
 
     // Remove arbitrary IMU attitude:
-    if (Timer.micro_now() - t_begin <  1*MILLION) // 1 segundos
+    if (Timer.micro_now() - t_begin <  int(0.750*MILLION)) // .750 segundo
     {
-        float incrmnt = data_struct.sampletime_ / 1;
-        q12Off.w() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(0);
-        q12Off.x() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(1);
-        q12Off.y() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(2);
-        q12Off.z() += (data_struct.sampletime_/2) * qDelta(qASGD2_qk, qASGD1_qk)(3);
+        float incrmnt = Ts / 0.750;
+        q12Off.w() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(0);
+        q12Off.x() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(1);
+        q12Off.y() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(2);
+        q12Off.z() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(3);
 
-        q23Off.w() += (data_struct.sampletime_/2) * qDelta(qASGD3_qk, qASGD2_qk)(0);
-        q23Off.x() += (data_struct.sampletime_/2) * qDelta(qASGD3_qk, qASGD2_qk)(1);
-        q23Off.y() += (data_struct.sampletime_/2) * qDelta(qASGD3_qk, qASGD2_qk)(2);
-        q23Off.z() += (data_struct.sampletime_/2) * qDelta(qASGD3_qk, qASGD2_qk)(3);
+        q23Off.w() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(0);
+        q23Off.x() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(1);
+        q23Off.y() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(2);
+        q23Off.z() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(3);
     }
     else
     {
