@@ -64,8 +64,9 @@ void qASGD(ThrdStruct &data_struct)
   float euler_k[3] = {0,0,0};
   float omega_k[3] = {0,0,0};
   const float Ts = data_struct.sampletime_;
-  const float mi0 = 0.36;
-  const float Beta = 10.0;
+  const int offst_period_us = int(0.260 * MILLION);
+  float mi0 = 0.36;
+  float Beta = 10.0;
   const Matrix4f H = Matrix4f::Identity();
   const Matrix4f R = Matrix4f::Identity() * 2.5e-5;
 
@@ -317,9 +318,10 @@ void qASGD(ThrdStruct &data_struct)
 
 
     // Remove arbitrary IMU attitude:
-    if (Timer.micro_now() - t_begin <  int(0.750*MILLION)) // .750 segundo
+    auto elapsedTime = Timer.micro_now() - t_begin;
+    if (elapsedTime < offst_period_us) //
     {
-        float incrmnt = Ts / 0.750;
+        float incrmnt = Ts*MILLION / offst_period_us;
         q12Off.w() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(0);
         q12Off.x() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(1);
         q12Off.y() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(2);
@@ -329,11 +331,20 @@ void qASGD(ThrdStruct &data_struct)
         q23Off.x() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(1);
         q23Off.y() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(2);
         q23Off.z() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(3);
+        // Prioritize static dynamics (accelerometer):
+        mi0 = 7.20;
+        Beta = 0.1;
     }
-    else
+    if (elapsedTime < (offst_period_us + static_cast<long long>(7*Ts*MILLION)) 
+                                            && elapsedTime >= offst_period_us) //
     {
         q12Off.normalize();
         q23Off.normalize();
+        mi0 = 0.36;
+        Beta = 10.0;
+    }
+    else
+    {   // Attitude without arbitrary IMU orientation:
         Vector4f q12(q12Off.w(), q12Off.x(), q12Off.y(), q12Off.z());
         Vector4f q23(q23Off.w(), q23Off.x(), q23Off.y(), q23Off.z());
         knee_euler  = quatDelta2Euler(qDelta(qASGD2_qk,q12), qASGD1_qk);
@@ -369,16 +380,11 @@ void qASGD(ThrdStruct &data_struct)
     */
 
     // Finite Difference Acc approximation:
-
-    euler_k[0] = knee_euler(0);
-    float acc_euler = (euler_k[0] - 2*euler_k[1] + euler_k[2])/(Ts*Ts);
-    rollBuffer(euler_k, 3);
-
-
     omega_k[0] = knee_omega(0);
     float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
-    omega_k[2] = omega_k[1]; 
-    omega_k[1] = omega_k[0]; 
+    rollBuffer(omega_k, 3);
+    //omega_k[2] = omega_k[1]; 
+    //omega_k[1] = omega_k[0]; 
 
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
