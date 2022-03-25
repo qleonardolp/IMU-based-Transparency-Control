@@ -4,7 +4,7 @@ function bodemaghold(str ,range, varargin)
 % Inputs are frequency range and sys with line string format: 
 % e.g. bodeb(figname,{0.01,1000},G1,'b', G2,'--r')
        % Forcing x-ticks 10^2 delta:
-    omg_ticks = floor(log10(range{1})):2:ceil(log10(range{end}));
+    omg_ticks = floor(log10(range{1})):1:ceil(log10(range{end}));
     omg_ticks = 10.^(omg_ticks);
 %     figure('Name', str, 'Color',[1 1 1])
     for k=1:floor(length(varargin)/3)

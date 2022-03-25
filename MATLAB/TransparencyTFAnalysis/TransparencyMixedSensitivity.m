@@ -140,7 +140,7 @@ K4 = FeedbackPD;
 FeedbackPD = 100.0 + 0.0225*s;
 K5 = FeedbackPD;
 
-close all
+% close all
 clc
 
 controllers = [K0 K1 K2];
@@ -205,3 +205,49 @@ legend('$k_{s}^d = 52.0$','$k_{s}^d = 10.4$','$k_{s}^d = 1.04$',...
        '$k_d = 2.00$','$k_d = 0.20$','$k_d = 0.02$',...
        'Interpreter','latex','NumColumns',2)
 hold off
+
+%% Parameters Analysis (Only T(s)):
+EPOS = 11.9 + 1.19/s;
+FeedbackPD = 100.0 + 0.0225*s;
+stiffness_d = K_s/2;
+Admittance = (1 - stiffness_d/K_s)*s/(s*0.1 + stiffness_d);
+K0 = EPOS*Admittance*FeedbackPD;
+stiffness_d = K_s/10;
+Admittance = (1 - stiffness_d/K_s)*s/(s*0.1 + stiffness_d);
+K1 = EPOS*Admittance*FeedbackPD;
+stiffness_d = K_s/100;
+Admittance = (1 - stiffness_d/K_s)*s/(s*0.1 + stiffness_d);
+K2 = EPOS*Admittance*FeedbackPD;
+
+FeedbackPD = 100.0 + 2.00*s;
+K3 = FeedbackPD;
+FeedbackPD = 100.0 + 0.20*s;
+K4 = FeedbackPD; 
+FeedbackPD = 100.0 + 0.0225*s;
+K5 = FeedbackPD;
+
+close all
+clc
+
+freq_range = {5e-3,5e3};
+
+controllers = [K0 K1 K2 K3 K4 K5];
+name = 'Complementary Sensitivity';
+figure('Name', name, 'Color',[1 1 1])
+for i = 1:6
+    T = feedback(controllers(i)*G1, 1);
+    if (i <= 3)
+        color = [(255-80*(i-1)) 10*i 80*(i)]/255;
+        bodemaghold(name,freq_range, T,color,'-')
+    else
+        color = [(255-80*(i-4)) 10*(i-3) 80*(i-3)]/255;
+        bodemaghold(name,freq_range, T,color,'-.')
+    end
+    hold on
+end
+legend('$k_{s}^d = 52.0$','$k_{s}^d = 10.4$',...
+       '$k_{s}^d = 1.04$', '$k_d = 2.00$', '$k_d = 0.20$', '$k_d = 0.02$',...
+       'Interpreter','latex','NumColumns',2)
+hold off
+
+%...
