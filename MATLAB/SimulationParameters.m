@@ -8,8 +8,8 @@ g   = 9.80665;       % m/ss
 N   = 150;           % Gear Ratio
 KI  = 0.0603;        % Nm/A
 Ks  = 104;           % Nm/rad
-Ka  = Ks/20;         % Nm/rad (???)
-Ba  = 3.00;
+Ka  = Ks/20;         % Nm/rad (???) (k_c)
+Ba  = 3.00;          %              (b_c)
 % Ka  = 1387.6;
 Jh  = 0.0437;        % Kg.m^2   (check KneeJointParameters.m)
 Le  = 0.432;          % m      (???)
@@ -20,6 +20,8 @@ Ja  = 0.47;          % Kg.m^2
 
 Threaded_Ts = 0.001;
 CURRENT_MAX = pi;
+Kp_acc = 0.5436;
+Ki_acc = 11.560;
 %%
 % State vector is  [x_h x_e x_a \dot{x_h} \dot{x_e} \dot{x_a}]
 % Sensor vector is [tau_i \dot{x_h} x_e x_m \dot{x_e} \dot{x_m}]

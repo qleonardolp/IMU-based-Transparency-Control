@@ -144,6 +144,7 @@ K5 = FeedbackPD;
 clc
 
 controllers = [K0 K1 K2];
+%{
 name = 'Sensitivity';
 figure('Name', name, 'Color',[1 1 1])
 for i = 1:3
@@ -176,7 +177,7 @@ legend('$k_d = 2.00$','$k_d = 2.00$',...
        '$k_d = 0.02$','$k_d = 0.02$',...
        'Interpreter','latex','NumColumns',3,'Color','none')
 hold off
-
+%}
 % Transparency TF eh Gamma(s) no artigo:
 Gamma0 = -K0/Lambda_;
 Gamma1 = -K1/Lambda_;
@@ -185,10 +186,10 @@ Gamma3 = -K3/Lambda_;
 Gamma4 = -K4/Lambda_;
 Gamma5 = -K5/Lambda_;
 
-Gamma = [Gamma0 Gamma1 Gamma2 Gamma3 Gamma4 Gamma5 GammaMin];
+Gamma = [Gamma0 Gamma1 Gamma2 Gamma3 Gamma4 Gamma5];
 name = 'Transparency';
 figure('Name', name, 'Color',[1 1 1])
-for i = 1:7
+for i = 1:6
     color = [(255-51*(i-1)) 10*i 51*(i)];
     color = color/max(color);
     linestyle = '-';
@@ -201,8 +202,9 @@ for i = 1:7
     bodemaghold(name,freq_range,Gamma(i),color,linestyle)
     hold on
 end
-legend('$k_{s}^d = 52.0$','$k_{s}^d = 10.4$','$k_{s}^d = 1.04$',...
-       '$k_d = 2.00$','$k_d = 0.20$','$k_d = 0.02$',...
+ylabel ('\textbf{$|F_i(s)/V_h(s)|$ (dB)}','Interpreter','latex')
+legend('$k_{Y} = 52.0$','$k_{Y} = 10.4$','$k_{Y} = 1.04$',...
+       '$d_C = 2.00$', '$d_C = 0.20$', '$d_C = 0.02$',...
        'Interpreter','latex','NumColumns',2)
 hold off
 
@@ -230,7 +232,7 @@ close all
 clc
 
 freq_range = {5e-3,5e3};
-
+plt_hndler = [];
 controllers = [K0 K1 K2 K3 K4 K5];
 name = 'Complementary Sensitivity';
 figure('Name', name, 'Color',[1 1 1])
@@ -245,9 +247,9 @@ for i = 1:6
     end
     hold on
 end
-legend('$k_{s}^d = 52.0$','$k_{s}^d = 10.4$',...
-       '$k_{s}^d = 1.04$', '$k_d = 2.00$', '$k_d = 0.20$', '$k_d = 0.02$',...
-       'Interpreter','latex','NumColumns',2)
+
+legend('$k_{Y} = 52.0$','$k_{Y} = 10.4$','$k_{Y} = 1.04$',...
+       '$d_C = 2.00$', '$d_C = 0.20$', '$d_C = 0.02$','Interpreter','latex','NumColumns',2)
 hold off
 
 %...
