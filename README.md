@@ -32,9 +32,9 @@ This solution has been developed on VS Express 2012. Follow the steps below to c
 ```
 //////////////////////////////////////////\/////////\//
 // Leonardo Felipe Lima Santos dos Santos /\     ////\/
-// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
-// github/bitbucket qleonardolp /	| |  | . \/   \  /|
-// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
-//\///////////////////////\// ////	\_'_/\_`_/__|   ///
+// leonardo.felipe.santos@usp.br    _____ ___  ___  //|
+// github/bitbucket qleonardolp /   | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //   | |   \ \   |_|  /|
+//\///////////////////////\// ////  \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\/
 ```
