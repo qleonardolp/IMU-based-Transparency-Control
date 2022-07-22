@@ -98,11 +98,11 @@ typedef struct shared_struct {
     short  param38_;
     short  param39_;
     short *param3A_;
-    short *param3B_;
-    short *param3C_;
-    short *param3D_;
-    short *param3E_;
-    short *param3F_; 
+    short* param3B_;
+    short* param3C_;
+    short* param3D_;
+    short* param3E_;
+    short* param3F_; // _finished    (flag) 
 
 } ThrdStruct;
 

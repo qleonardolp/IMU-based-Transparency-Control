@@ -40,6 +40,12 @@ void updateGains(ThrdStruct &data_struct){
     fclose(pFile);
   }
 
+  {
+      unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param0F_ = true;
+      *data_struct.param3F_ = false;
+  }
+
   // inicializa looptimer
   Timer.start();
   do
@@ -74,5 +80,6 @@ void updateGains(ThrdStruct &data_struct){
   {   
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0F_ = false;
+    *data_struct.param3F_ = true;
   }
 }

@@ -1,0 +1,86 @@
+(?)
+[ Copy "Hello, world!" to clipboard ]
+### Window options ###
+| [ ] No titlebar | [ ] No scrollbar | [ ] No menu |
+| [ ] No move | [ ] No resize | [ ] No collapse |
+| [ ] No close | [ ] No nav | [ ] No background |
+| [ ] No bring to front | [ ] Unsaved document |
+### Widgets ###
+### Layout & Scrolling ###
+### Popups & Modal windows ###
+### Tables & Columns ###
+### Filtering ###
+### Inputs, Navigation & Focus ###
+WantCaptureMouse: 1
+WantCaptureMouseUnlessPopupClose: 1
+WantCaptureKeyboard: 1
+WantTextInput: 0
+WantSetMousePos: 0
+NavActive: 0, NavVisible: 0
+> Mouse State
+    Mouse pos: (795, 536)
+    Mouse delta: (0, 0)
+    Mouse down:
+    Mouse clicked:
+    Mouse released: b0
+    Mouse wheel: 0.0
+    Pen Pressure: 0.0
+> Keyboard, Gamepad & Navigation State
+    Keys down:
+    Keys pressed:
+    Keys released:
+    Keys mods: 
+    Chars queue:
+    NavInputs down:
+    NavInputs pressed:
+> Capture override
+    [ Hovering me sets the
+    keyboard capture flag ] [ Holding me clears the
+    the keyboard capture flag ]
+> Tabbing
+    Use TAB/SHIFT+TAB to cycle through keyboard editable fields.
+    { hello } 1
+    { hello } 2
+    { hello } 3
+    { hello } 4 (tab skip) (?)
+    { hello } 5
+> Focus from code
+    [ Focus on 1 ] [ Focus on 2 ] [ Focus on 3 ]
+    { click on a button to set focus } 1
+    { click on a button to set focus } 2
+    { click on a button to set focus } 3 (tab skip) (?)
+    Item with focus: <none>
+    [ Focus on X ] [ Focus on Y ] [ Focus on Z ]
+    { 0.000 } { 0.000 } { 0.000 } Float3
+    NB: Cursor & selection are preserved when refocusing last used item in code.
+> Dragging
+    You can use ImGui::GetMouseDragDelta(0) to query for the dragged amount on any widget.
+    IsMouseDragging(0):
+      w/ default threshold: 0,
+      w/ zero threshold: 0,
+      w/ large threshold: 0,
+    IsMouseDragging(1):
+      w/ default threshold: 0,
+      w/ zero threshold: 0,
+      w/ large threshold: 0,
+    IsMouseDragging(2):
+      w/ default threshold: 0,
+      w/ zero threshold: 0,
+      w/ large threshold: 0,
+    [ Drag Me ]
+    GetMouseDragDelta(0):
+      w/ default threshold: (0.0, 0.0)
+      w/ zero threshold: (0.0, 0.0)
+    io.MouseDelta: (0.0, 0.0)
+> Mouse cursors
+    Current mouse cursor = 0: Arrow
+    Hover to see mouse cursors: (?)
+    Mouse cursor 0: Arrow
+    Mouse cursor 1: TextInput
+    Mouse cursor 2: ResizeAll
+    Mouse cursor 3: ResizeNS
+    Mouse cursor 4: ResizeEW
+    Mouse cursor 5: ResizeNESW
+    Mouse cursor 6: ResizeNWSE
+    Mouse cursor 7: Hand
+    Mouse cursor 8: NotAllowed

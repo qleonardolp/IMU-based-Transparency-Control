@@ -133,6 +133,9 @@ void Controle(ThrdStruct &data_struct){
     } while (!isready_imu || !isready_asg || !isready_gsn);
 
     if (control_abort){
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0C_ = false; // safety redundance
+        *data_struct.param3F_ = true;  // finished 
         return;
     }
 
@@ -177,17 +180,17 @@ void Controle(ThrdStruct &data_struct){
     }
 #endif
 
-    {   // Controle avisa que esta pronto!
-        unique_lock<mutex> _(*data_struct.mtx_);
-        *data_struct.param0C_ = true;
-        cout << " Control Running!\n";
-    }
-
     for (int i = 0; i < sizeof(sensor_filters)/sizeof(LowPassFilter2pFloat); i++)
     {
       float thread_frequency = 1/(data_struct.sampletime_); // Hz !!!
       sensor_filters[i].set_cutoff_frequency(thread_frequency, LPF_CUTOFF);
       sensor_filters[i].reset();
+    }
+
+    {   // Controle avisa que esta pronto!
+        unique_lock<mutex> _(*data_struct.mtx_);
+        *data_struct.param0C_ = true;
+        cout << " Control [Mode " << data_struct.param01_ << "] Running!\n";
     }
 
     looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -281,6 +284,7 @@ void Controle(ThrdStruct &data_struct){
     {   // Fim da execução
         unique_lock<mutex> _(*data_struct.mtx_);
         *data_struct.param0C_ = false;
+        *data_struct.param3F_ = true;
     }
 #if CAN_ENABLE
     epos.sync();

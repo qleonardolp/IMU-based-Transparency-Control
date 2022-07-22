@@ -6,10 +6,11 @@
 //\///////////////////////\// //// \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\
 
-// Copyright (c) 2003-2016 Xsens Technologies B.V.
-// or subsidiaries worldwide. All rights reserved.
 #include "mastercallback.h" // Inclui Xsens device API header
 #include "mtwcallback.h"
+// Copyright (c) 2003-2016 Xsens Technologies B.V.
+// or subsidiaries worldwide. All rights reserved.
+
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
@@ -51,6 +52,13 @@ void readIMUs(ThrdStruct& data_struct)
 	if (logFileHandle != NULL) fclose(logFileHandle);
 #endif
 
+	{
+		unique_lock<mutex> _(*data_struct.mtx_);
+		*data_struct.param0A_ = false; // not ready
+		*data_struct.param1A_ = false;  // not aborting
+		*data_struct.param3F_ = false;  // not finished
+	}
+
 	/* Xsens Awinda Station management
 	__________________________________
 	| MTw  | desiredUpdateRate (max) |
@@ -62,7 +70,7 @@ void readIMUs(ThrdStruct& data_struct)
 	|  12  |            50 Hz        |
 	|__18__|____________40 Hz________| */
 
-	const int desiredUpdateRate = 100; //
+	const int desiredUpdateRate = 75; //
 	const int desiredRadioChannel = 25;
 	const float sampleTime = 1 / float(desiredUpdateRate);
 
@@ -77,8 +85,15 @@ void readIMUs(ThrdStruct& data_struct)
 
 	try
 	{
-		XsPortInfoArray detectedDevices = XsScanner::scanPorts();
+		XsPortInfoArray SerialPorts = XsScanner::enumerateSerialPorts();
+		XsPortInfoArray::iterator SPt = SerialPorts.begin();
+		while (SPt != SerialPorts.end())
+		{
+			cout << *SPt << endl;
+			++SPt;
+		}
 
+		XsPortInfoArray detectedDevices = XsScanner::scanPorts();
 		XsPortInfoArray::const_iterator wirelessMasterPort = detectedDevices.begin();
 		while (wirelessMasterPort != detectedDevices.end() && !wirelessMasterPort->deviceId().isWirelessMaster())
 		{
@@ -109,6 +124,8 @@ void readIMUs(ThrdStruct& data_struct)
 			error << "Failed to goto config mode: " << *wirelessMasterDevice;
 			throw runtime_error(error.str());
 		}
+
+		//detectedDevices.clear();
 
 		wirelessMasterDevice->addCallbackHandler(&wirelessMasterCallback);
 
@@ -254,7 +271,7 @@ void readIMUs(ThrdStruct& data_struct)
 		{   // readIMUs nao espera as outras threads:
 			unique_lock<mutex> _(*data_struct.mtx_);
 			*data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
-			cout << " Reading IMUs!\n";
+			cout << "-> Reading IMUs!\n";
 		}
 
 		looptimer xsensTimer(sampleTime, data_struct.exectime_);
@@ -320,12 +337,12 @@ void readIMUs(ThrdStruct& data_struct)
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00B41244") == 0) {
-						imus_data[12] = imu_filters[12].apply( gyroVector[1]);
+						imus_data[12] = imu_filters[12].apply(gyroVector[1]);
 						imus_data[13] = imu_filters[13].apply(-gyroVector[0]);
-						imus_data[14] = imu_filters[14].apply( gyroVector[2]);
-						imus_data[15] = imu_filters[15].apply( accVector[1]);
+						imus_data[14] = imu_filters[14].apply(gyroVector[2]);
+						imus_data[15] = imu_filters[15].apply(accVector[1]);
 						imus_data[16] = imu_filters[16].apply(-accVector[0]);
-						imus_data[17] = imu_filters[17].apply( accVector[2]);
+						imus_data[17] = imu_filters[17].apply(accVector[2]);
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00B4108C") == 0) {
@@ -357,14 +374,14 @@ void readIMUs(ThrdStruct& data_struct)
 						imus_data[11] = imu_filters[11].apply(accVector[0]);
 						//cout << imu_names[i] << endl;
 					}
-					if (imu_names[i].compare("00342324") == 0) { 
+					if (imu_names[i].compare("00342324") == 0) {
 						// Orientacao P� DIR: [2 -1 3]
-						imus_data[12] = imu_filters[12].apply( gyroVector[1]);
+						imus_data[12] = imu_filters[12].apply(gyroVector[1]);
 						imus_data[13] = imu_filters[13].apply(-gyroVector[0]);
-						imus_data[14] = imu_filters[14].apply( gyroVector[2]);
-						imus_data[15] = imu_filters[15].apply( accVector[1] );
-						imus_data[16] = imu_filters[16].apply(-accVector[0] );
-						imus_data[17] = imu_filters[17].apply( accVector[2] );
+						imus_data[14] = imu_filters[14].apply(gyroVector[2]);
+						imus_data[15] = imu_filters[15].apply(accVector[1]);
+						imus_data[16] = imu_filters[16].apply(-accVector[0]);
+						imus_data[17] = imu_filters[17].apply(accVector[2]);
 						//cout << imu_names[i] << endl;
 					}
 #if IMU_DBG_LOG
@@ -380,7 +397,7 @@ void readIMUs(ThrdStruct& data_struct)
 #endif // IMU_DBG_LOG
 
 					unique_lock<mutex> _(*data_struct.mtx_);
-					memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ*sizeof(float)));
+					memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));
 					if (data_struct.param39_ == IMUBYPASS) {
 						*(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
 					}
@@ -410,6 +427,7 @@ void readIMUs(ThrdStruct& data_struct)
 		unique_lock<mutex> _(*data_struct.mtx_);
 		*data_struct.param0A_ = false; // not ready anymore
 		*data_struct.param1A_ = true; // aborting
+		*data_struct.param3F_ = true; // finished
 		return;
 	}
 	catch (...)
@@ -419,6 +437,7 @@ void readIMUs(ThrdStruct& data_struct)
 		unique_lock<mutex> _(*data_struct.mtx_);
 		*data_struct.param0A_ = false; // not ready anymore
 		*data_struct.param1A_ = true; // aborting
+		*data_struct.param3F_ = true; // finished
 		return;
 	}
 
@@ -432,6 +451,7 @@ void readIMUs(ThrdStruct& data_struct)
 	{
 		unique_lock<mutex> _(*data_struct.mtx_);
 		*data_struct.param0A_ = false;
+		*data_struct.param3F_ = true;
 	}
 }
 

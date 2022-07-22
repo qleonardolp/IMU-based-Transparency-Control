@@ -4,3 +4,6 @@
 [submodule "Presentation"]
 	path = Presentation
 	url = https://git.overleaf.com/60e387170b11689d8cd3acdb
+[submodule "implot"]
+	path = implot
+	url = git@github.com:epezent/implot.git
