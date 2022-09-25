@@ -66,7 +66,7 @@ void qASGD(ThrdStruct &data_struct)
   const float Ts = data_struct.sampletime_;
   const int offst_period_us = int(0.260 * MILLION);
   float mi0 = 0.36;
-  float Beta = 10.0;
+  float Beta = 9.0;
   const Matrix4f H = Matrix4f::Identity();
   const Matrix4f R = Matrix4f::Identity() * 2.5e-5;
 

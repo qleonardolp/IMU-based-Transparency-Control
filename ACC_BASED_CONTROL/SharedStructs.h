@@ -11,8 +11,9 @@
 #include <thread>
 #include <mutex>
 
-#define CAN_ENABLE 1
+#define CAN_ENABLE 0
 #define IMU_DBG_LOG 0
+#define IMU_ATT_LOG
 #define IMUBYPASS 3
 #define READIMUS  4
 

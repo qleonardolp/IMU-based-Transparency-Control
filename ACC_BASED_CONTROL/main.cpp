@@ -209,6 +209,9 @@ int main(int, char**)
 		logging_struct.param0E_ = &ftsensor_isready;
 		logging_struct.param3F_ = finished + 3;
 		*(logging_struct.datavec_) = gains_data;
+#ifdef IMU_ATT_LOG
+		*(logging_struct.datavec_) = imu_data;
+#endif
 		*(logging_struct.datavecA_) = logging_data;
 		*(logging_struct.datavecB_) = states_data;
 		*(logging_struct.datavecF_) = ati_data;
@@ -340,7 +343,7 @@ int main(int, char**)
 			ImGui::Text(" //////////////////////////////////////////\\/////////\\/");
 			ImGui::Text(" // INTERFACE DE CONTROLE EXO-TAU  /       /\\     ////\\");
 			ImGui::Text(" // EESC-USP          [%.1f FPS]  / _____ ___  ___  //|", ImGui::GetIO().Framerate);
-			ImGui::Text(" // RehabLab                     /  | |  | . \\/   \\  /|");
+			ImGui::Text(" // RehabLab | LegRo             /  | |  | . \\/   \\  /|");
 			ImGui::Text(" // *Copyright 2021-2026* \\//// //  | |   \\ \\   |_|  /|");
 			ImGui::Text(" //\\///////////////////////\\// //// \\_'_/\\_`_/__|   ///");
 			ImGui::Text(" ///\\///////////////////////\\ //////////////////\\/////\\");

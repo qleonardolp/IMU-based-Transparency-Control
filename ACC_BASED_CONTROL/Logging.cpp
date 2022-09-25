@@ -80,8 +80,14 @@ void Logging(ThrdStruct& data_struct) {
 		if (logFileHandle != NULL) {
 			float timestamp = float(Timer.micro_now() - begin_timestamp) / MILLION;
 			fprintf(logFileHandle, "%.5f", timestamp);
-			for (size_t i = 0; i < DTVCA_SZ; i++)
+			for (size_t i = 0; i < DTVCA_SZ; i++) {
 				fprintf(logFileHandle, ", %.4f", log_states[i]);
+			}
+#ifdef IMU_ATT_LOG
+			for (size_t i = 24; i < (DTVC_SZ-3); i++) {
+				fprintf(logFileHandle, ", %.4f", log_gains[i]);
+			}
+#endif
 			fprintf(logFileHandle, "\n");
 			fclose(logFileHandle);
 		}
