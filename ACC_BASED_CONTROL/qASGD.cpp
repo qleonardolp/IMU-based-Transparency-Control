@@ -217,6 +217,11 @@ void qASGD(ThrdStruct &data_struct)
     Timer.tak();
   } while (!Timer.end());
 
+  // Joining asgd threads:
+  for (auto& it : asgd_threads) {
+      it.join();
+  }
+
   {   
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0B_ = false;
