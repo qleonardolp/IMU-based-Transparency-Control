@@ -73,24 +73,31 @@ void qASGD(ThrdStruct &data_struct)
   Vector4f qASGD1_qk(1, 0, 0, 0);
   Vector4f qASGD2_qk(1, 0, 0, 0);
   Vector4f qASGD3_qk(1, 0, 0, 0);
+  Vector4f qASGD4_qk(1, 0, 0, 0);
   Quaternionf q12Off(0, 0, 0, 0);
   Quaternionf q23Off(0, 0, 0, 0);
+  Quaternionf q34Off(0, 0, 0, 0);
   Matrix4f qASGD1_Pk = Matrix4f::Identity();
   Matrix4f qASGD2_Pk = Matrix4f::Identity();
   Matrix4f qASGD3_Pk = Matrix4f::Identity();
+  Matrix4f qASGD4_Pk = Matrix4f::Identity();
   FullPivLU<Matrix4f> Covar1;
   FullPivLU<Matrix4f> Covar2;
   FullPivLU<Matrix4f> Covar3;
+  FullPivLU<Matrix4f> Covar4;
   Matrix4f Q1 = Matrix4f::Identity() * 5.476e-6; // Usar Eq. 19...
   Matrix4f Q2 = Q1;
   Matrix4f Q3 = Q1;
+  Matrix4f Q4 = Q1;
 
   Vector3f gyro1(0, 0, 0);
   Vector3f gyro2(0, 0, 0);
   Vector3f gyro3(0, 0, 0);
+  Vector3f gyro4(0, 0, 0);
   Vector3f acc1(0, 0, 0);
   Vector3f acc2(0, 0, 0);
   Vector3f acc3(0, 0, 0);
+  Vector3f acc4(0, 0, 0);
   Vector3f F_obj;
   Vector4f GradF;
   Vector4f z_k;
@@ -100,6 +107,7 @@ void qASGD(ThrdStruct &data_struct)
   Matrix4f Kg1;
   Matrix4f Kg2;
   Matrix4f Kg3;
+  Matrix4f Kg4;
   Matrix4f Qy;
   Matrix<float, 3, 4> Jq;
   Matrix<float, 4, 3> Xi;
@@ -159,12 +167,18 @@ void qASGD(ThrdStruct &data_struct)
 
 
     gyro1 << imus_data[0], imus_data[1], imus_data[2];
-    acc1 << imus_data[3], imus_data[4], imus_data[5];
-    gyro2 << imus_data[6], imus_data[7], imus_data[8];
-    acc2 << imus_data[9], imus_data[10], imus_data[11];
-    gyro3 << imus_data[12], imus_data[13], imus_data[14];
-    acc3 << imus_data[15], imus_data[16], imus_data[17];
+    acc1  << imus_data[3], imus_data[4], imus_data[5];
 
+    gyro2 << imus_data[6], imus_data[7], imus_data[8];
+    acc2  << imus_data[9], imus_data[10], imus_data[11];
+
+    gyro3 << imus_data[12], imus_data[13], imus_data[14];
+    acc3  << imus_data[15], imus_data[16], imus_data[17];
+
+    gyro4 << imus_data[18], imus_data[19], imus_data[20];
+    acc4  << imus_data[21], imus_data[22], imus_data[23];
+
+    // Right Thight
     q0 = qASGD1_qk(0);
     q1 = qASGD1_qk(1);
     q2 = qASGD1_qk(2);
@@ -213,7 +227,7 @@ void qASGD(ThrdStruct &data_struct)
     // Rotate the quaternion by a quaternion with -(yaw):
     removeYaw(&qASGD1_qk);
 
-
+    // Right Shank
     q0 = qASGD2_qk(0);
     q1 = qASGD2_qk(1);
     q2 = qASGD2_qk(2);
@@ -263,7 +277,7 @@ void qASGD(ThrdStruct &data_struct)
     removeYaw(&qASGD2_qk);
 
 
-    // Foot:
+    // Left Thight
     q0 = qASGD3_qk(0);
     q1 = qASGD3_qk(1);
     q2 = qASGD3_qk(2);
@@ -312,9 +326,59 @@ void qASGD(ThrdStruct &data_struct)
     // Rotate the quaternion by a quaternion with -(yaw):
     removeYaw(&qASGD3_qk);
 
-    // Euler angles between IMUs:
-    Vector3f knee_euler = quatDelta2Euler(qASGD2_qk, qASGD1_qk);
-    Vector3f ankle_euler = quatDelta2Euler(qASGD3_qk, qASGD2_qk);
+    // Left Shank
+    q0 = qASGD4_qk(0);
+    q1 = qASGD4_qk(1);
+    q2 = qASGD4_qk(2);
+    q3 = qASGD4_qk(3);
+
+    Zc << 2 * (q1 * q3 - q0 * q2),
+        2 * (q2 * q3 + q0 * q1),
+        (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
+    F_obj = Zc - acc4.normalized(); // Eq.23
+
+    Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
+        2 * q1, 2 * q0, 2 * q3, 2 * q2,
+        2 * q0, -2 * q1, -2 * q2, 2 * q3;
+
+    GradF = Jq.transpose() * F_obj; // Eq.25
+
+    omg_norm = gyro4.norm();
+    mi = mi0 + Beta * Ts * omg_norm; // Eq.29
+
+    z_k = qASGD4_qk - mi * GradF.normalized(); // Eq.24
+    z_k.normalize();
+
+    OmG << 0, -gyro4(0), -gyro4(1), -gyro4(2),
+        gyro4(0), 0, gyro4(2), -gyro4(1),
+        gyro4(1), -gyro4(2), 0, gyro4(0),
+        gyro4(2),  gyro4(1),   -gyro4(0), 0;
+    OmG = 0.5 * OmG;
+
+    Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * Matrix4f::Identity() + 0.5 * Ts * OmG;
+
+    // Process noise covariance update (Eq. 19):
+    Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
+    Q4 = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
+    // Projection:
+    qASGD4_qk = Psi * qASGD4_qk;
+    qASGD4_Pk = Psi * qASGD4_Pk * Psi.transpose() + Q4;
+    // Kalman Gain (H is Identity)
+    Covar4 = FullPivLU<Matrix4f>(qASGD4_Pk + R);
+    if (Covar4.isInvertible())
+        Kg4 = qASGD4_Pk * Covar4.inverse();
+    // Update (H is Identity)
+    qASGD4_qk = qASGD4_qk + Kg4 * (z_k - qASGD4_qk);
+    qASGD4_Pk = (Matrix4f::Identity() - Kg4) * qASGD4_Pk;
+    qASGD4_qk.normalize();
+
+    // Rotate the quaternion by a quaternion with -(yaw):
+    removeYaw(&qASGD4_qk);
+
+
+    // Knees Euler angles:
+    Vector3f right_knee_elr = quatDelta2Euler(qASGD2_qk, qASGD1_qk);
+    Vector3f left_knee_elr = quatDelta2Euler(qASGD4_qk, qASGD3_qk);
 
 
     // Remove arbitrary IMU attitude:
@@ -327,10 +391,10 @@ void qASGD(ThrdStruct &data_struct)
         q12Off.y() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(2);
         q12Off.z() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(3);
 
-        q23Off.w() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(0);
-        q23Off.x() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(1);
-        q23Off.y() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(2);
-        q23Off.z() += incrmnt * qDelta(qASGD3_qk, qASGD2_qk)(3);
+        q34Off.w() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(0);
+        q34Off.x() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(1);
+        q34Off.y() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(2);
+        q34Off.z() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(3);
         // Prioritize static dynamics (accelerometer):
         mi0 = 7.20;
         Beta = 0.1;
@@ -339,16 +403,17 @@ void qASGD(ThrdStruct &data_struct)
                                             && elapsedTime >= offst_period_us) //
     {
         q12Off.normalize();
-        q23Off.normalize();
+        q34Off.normalize();
         mi0 = 0.36;
         Beta = 10.0;
     }
     else
     {   // Attitude without arbitrary IMU orientation:
         Vector4f q12(q12Off.w(), q12Off.x(), q12Off.y(), q12Off.z());
-        Vector4f q23(q23Off.w(), q23Off.x(), q23Off.y(), q23Off.z());
-        knee_euler  = quatDelta2Euler(qDelta(qASGD2_qk,q12), qASGD1_qk);
-        ankle_euler = quatDelta2Euler(qDelta(qASGD3_qk,q23), qASGD2_qk);
+        //Vector4f q23(q23Off.w(), q23Off.x(), q23Off.y(), q23Off.z());
+        Vector4f q34(q34Off.w(), q34Off.x(), q34Off.y(), q34Off.z());
+        right_knee_elr = quatDelta2Euler(qDelta(qASGD2_qk,q12), qASGD1_qk);
+        left_knee_elr = quatDelta2Euler(qDelta(qASGD4_qk,q34), qASGD3_qk);
     }
 
     // Relative Angular Velocity
