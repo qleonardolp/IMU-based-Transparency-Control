@@ -330,7 +330,7 @@ void readIMUs(ThrdStruct& data_struct)
 						imus_data[4] = imu_filters[4].apply(1.0063*accVector[1] - 0.0352);
 						imus_data[5] = imu_filters[5].apply(0.9966*accVector[0] - 0.1196);
 						print_cntr++;
-						if (print_cntr%400 == 0)
+						if (print_cntr%400000 == 0)
 						{
 							cout << " IMU1 AccZ: " << imus_data[3] << endl;
 							print_cntr = 0;
