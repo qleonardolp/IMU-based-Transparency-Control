@@ -12,6 +12,13 @@
 #include <Eigen/LU>
 #include <iostream>
 #include <string>
+#include <vector>
+
+#define NUMBER_OF_IMUS 4
+#define OFFSET_US int(0.260 * MILLION)
+#define R2D       (180 / M_PI)
+#define MI0       0.3600f
+#define BETA      9.7000f
 
 /*  -- Obtain attitude quaternion:
 -- Quaternion-based Attitude estimation using ASGD algorithm
@@ -23,13 +30,21 @@
 -- [3]: "How to integrate Quaternions", Ashwin Narayan (www.ashwinnarayan.com/post/how-to-integrate-quaternions/)
 */
 
+typedef struct asgd_struct{
+    float sampletime_;
+    int     exectime_;
+    std::mutex* mtx_;
+    float* imudata[6];
+    Eigen::Vector4f* quaternion;
+} AsgdStruct;
+
 void removeYaw(Eigen::Vector4f* quat);
 Eigen::Vector4f qDelta(const Eigen::Vector4f quat_r, const Eigen::Vector4f quat_m);
 Eigen::Vector3f quatDelta2Euler(const Eigen::Vector4f quat_r, const Eigen::Vector4f quat_m);
 Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, const Eigen::Vector3f* omg_r, const Eigen::Vector3f* omg_m);
 Eigen::Vector3f RelVector(const Eigen::Vector4f rel_quat, const Eigen::Vector3f vec_r, const Eigen::Vector3f vec_m);
 Eigen::Vector3f RelAngAcc(const Eigen::Vector4f rel_quat, const Eigen::Vector3f rel_ang_vel, const Eigen::Vector3f rel_linear_acc);
-
+void qASGDKalman(AsgdStruct &bind_struct);
 extern void rollBuffer(float buffer[10], const size_t length);
 
 
@@ -49,70 +64,19 @@ void qASGD(ThrdStruct &data_struct)
       *data_struct.param3F_ = false;  // not finished
   }
 
-  mutex    imu_mtx[10];
-  Vector3f imuGyroscope[10];
-  Vector3f imuAccelerometer[10];
-
   // Declarations
-  float q0 = 0;
-  float q1 = 0;
-  float q2 = 0;
-  float q3 = 0;
+
   float imus_data[DTVC_SZ];
   for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
-  float rad2deg = 180 / (M_PI);
-  float euler_k[3] = {0,0,0};
-  float omega_k[3] = {0,0,0};
-  const float Ts = data_struct.sampletime_;
-  const int offst_period_us = int(0.260 * MILLION);
-  float mi0 = 0.36;
-  float Beta = 9.0;
-  const Matrix4f H = Matrix4f::Identity();
-  const Matrix4f R = Matrix4f::Identity() * 2.5e-5;
+  
+  float data_block[NUMBER_OF_IMUS*6];
 
-  Vector4f qASGD1_qk(1, 0, 0, 0);
-  Vector4f qASGD2_qk(1, 0, 0, 0);
-  Vector4f qASGD3_qk(1, 0, 0, 0);
-  Vector4f qASGD4_qk(1, 0, 0, 0);
-  Quaternionf q12Off(0, 0, 0, 0);
-  Quaternionf q23Off(0, 0, 0, 0);
-  Quaternionf q34Off(0, 0, 0, 0);
-  Matrix4f qASGD1_Pk = Matrix4f::Identity();
-  Matrix4f qASGD2_Pk = Matrix4f::Identity();
-  Matrix4f qASGD3_Pk = Matrix4f::Identity();
-  Matrix4f qASGD4_Pk = Matrix4f::Identity();
-  FullPivLU<Matrix4f> Covar1;
-  FullPivLU<Matrix4f> Covar2;
-  FullPivLU<Matrix4f> Covar3;
-  FullPivLU<Matrix4f> Covar4;
-  Matrix4f Q1 = Matrix4f::Identity() * 5.476e-6; // Usar Eq. 19...
-  Matrix4f Q2 = Q1;
-  Matrix4f Q3 = Q1;
-  Matrix4f Q4 = Q1;
-
-  Vector3f gyro1(0, 0, 0);
-  Vector3f gyro2(0, 0, 0);
-  Vector3f gyro3(0, 0, 0);
-  Vector3f gyro4(0, 0, 0);
-  Vector3f acc1(0, 0, 0);
-  Vector3f acc2(0, 0, 0);
-  Vector3f acc3(0, 0, 0);
-  Vector3f acc4(0, 0, 0);
-  Vector3f F_obj;
-  Vector4f GradF;
-  Vector4f z_k;
-  Vector3f Zc;
-  Matrix4f OmG;
-  Matrix4f Psi;
-  Matrix4f Kg1;
-  Matrix4f Kg2;
-  Matrix4f Kg3;
-  Matrix4f Kg4;
-  Matrix4f Qy;
-  Matrix<float, 3, 4> Jq;
-  Matrix<float, 4, 3> Xi;
-  float omg_norm = gyro1.norm();
-  float mi(0);
+  Vector3f right_knee_elr;
+  Vector3f  left_knee_elr;
+  Quaternionf q12Off(1, 0, 0, 0);
+  Quaternionf q23Off(1, 0, 0, 0);
+  Quaternionf q34Off(1, 0, 0, 0);
+  std::vector<Eigen::Vector4f> qASGD;
 
   bool isready_imu(false);
   bool aborting_imu(false);
@@ -136,12 +100,28 @@ void qASGD(ThrdStruct &data_struct)
       return;
   }
 
-  // TODO: cada subthread sera declarada e associada a uma instancia da classe 'asgdKalmanFilter'
-
   {   // qASGD avisa que esta pronto!
     unique_lock<mutex> _(*data_struct.mtx_);
     *data_struct.param0B_ = true;
     cout << "-> qASGD Running!\n";
+  }
+
+  // cada subthread eh declarada e associada ah uma instancia da funct 'qASGDKalman'
+  std::vector<std::thread> asgd_threads;
+  std::mutex imus_mutex[NUMBER_OF_IMUS];
+  std::vector<Eigen::Vector4f> attQuat;
+  AsgdStruct asgdThreadsStructs[NUMBER_OF_IMUS];
+
+  for (int i = 0; i < NUMBER_OF_IMUS; i++)
+  {
+      attQuat.push_back(Eigen::Vector4f(1,0,0,0));
+      asgdThreadsStructs[i].quaternion = &attQuat[i];
+      asgdThreadsStructs[i].sampletime_ = data_struct.sampletime_;
+      asgdThreadsStructs[i].exectime_ = data_struct.exectime_;
+      asgdThreadsStructs[i].mtx_ = &imus_mutex[i];
+      *(asgdThreadsStructs[i].imudata) = (data_block + i*6);
+
+      asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -151,297 +131,84 @@ void qASGD(ThrdStruct &data_struct)
   do
   {
     Timer.tik();
-    { // sessao critica (externa):
+
+    { // sessao critica (acessando dados da thread readIMUs):
       unique_lock<mutex> _(*data_struct.mtx_);
       memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
-    } // fim da sessao critica (ext)
+    } // fim da sessao critica
 
-    for (size_t i = 0; i < 3; i++)
-    {
-        unique_lock<mutex> _(imu_mtx[i]); // sessao critica (interna):
-        imuGyroscope[i]     << imus_data[6*i + 0], imus_data[6*i + 1], imus_data[6*i + 2];
-        imuAccelerometer[i] << imus_data[6*i + 3], imus_data[6*i + 4], imus_data[6*i + 5];
+
+    for (int i = 0; i < NUMBER_OF_IMUS; i++) {
+        { // sessao critica
+            // distribuindo os dados para cada thread de qASGDKalman:
+            unique_lock<mutex> _(imus_mutex[i]);
+            for (int k = 0; k < 6; k++) {
+                data_block[i * 6 + k] = imus_data[i * 6 + k];
+            }
+            // Lendo quaternion de cada thread:
+            qASGD[i] = attQuat[i];
+        }
     }
 
-    // TODO: cada subthread chama 'asgdKalmanFilter.update()' aqui....
-
-
-    gyro1 << imus_data[0], imus_data[1], imus_data[2];
-    acc1  << imus_data[3], imus_data[4], imus_data[5];
-
-    gyro2 << imus_data[6], imus_data[7], imus_data[8];
-    acc2  << imus_data[9], imus_data[10], imus_data[11];
-
-    gyro3 << imus_data[12], imus_data[13], imus_data[14];
-    acc3  << imus_data[15], imus_data[16], imus_data[17];
-
-    gyro4 << imus_data[18], imus_data[19], imus_data[20];
-    acc4  << imus_data[21], imus_data[22], imus_data[23];
-    // ------------------------------------------------//
-    // Right Thight
-    q0 = qASGD1_qk(0);
-    q1 = qASGD1_qk(1);
-    q2 = qASGD1_qk(2);
-    q3 = qASGD1_qk(3);
-
-    Zc << 2 * (q1 * q3 - q0 * q2),
-      2 * (q2 * q3 + q0 * q1),
-      (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
-    F_obj = Zc - acc1.normalized(); // Eq.23
-
-    Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
-      2 * q1, 2 * q0, 2 * q3, 2 * q2,
-      2 * q0, -2 * q1, -2 * q2, 2 * q3;
-
-    GradF = Jq.transpose() * F_obj; // Eq.25
-
-    omg_norm = gyro1.norm();
-    mi = mi0 + Beta * Ts * omg_norm; // Eq.29
-
-    z_k = qASGD1_qk - mi * GradF.normalized(); // Eq.24
-    z_k.normalize();
-
-    OmG << 0, -gyro1(0), -gyro1(1), -gyro1(2),
-      gyro1(0), 0, gyro1(2), -gyro1(1),
-      gyro1(1), -gyro1(2), 0, gyro1(0),
-      gyro1(2), gyro1(1), -gyro1(0), 0;
-    OmG = 0.5 * OmG;
-
-    Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * Matrix4f::Identity() + 0.5 * Ts * OmG;
-
-    // Process noise covariance update (Eq. 19):
-    Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
-    Q1 = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
-    // Projection:
-    qASGD1_qk = Psi * qASGD1_qk;
-    qASGD1_Pk = Psi * qASGD1_Pk * Psi.transpose() + Q1;
-    // Kalman Gain (H is Identity)
-    Covar1 = FullPivLU<Matrix4f>(qASGD1_Pk + R);
-    if (Covar1.isInvertible())
-      Kg1 = qASGD1_Pk * Covar1.inverse();
-    // Update (H is Identity)
-    qASGD1_qk = qASGD1_qk + Kg1 * (z_k - qASGD1_qk);
-    qASGD1_Pk = (Matrix4f::Identity() - Kg1) * qASGD1_Pk;
-    qASGD1_qk.normalize();
-
-    // Rotate the quaternion by a quaternion with -(yaw):
-    removeYaw(&qASGD1_qk);
-    // ------------------------------------------------//
-    // Right Shank
-    q0 = qASGD2_qk(0);
-    q1 = qASGD2_qk(1);
-    q2 = qASGD2_qk(2);
-    q3 = qASGD2_qk(3);
-
-    Zc << 2 * (q1 * q3 - q0 * q2),
-      2 * (q2 * q3 + q0 * q1),
-      (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
-    F_obj = Zc - acc2.normalized(); // Eq.23
-
-    Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
-      2 * q1, 2 * q0, 2 * q3, 2 * q2,
-      2 * q0, -2 * q1, -2 * q2, 2 * q3;
-
-    GradF = Jq.transpose() * F_obj; // Eq.25
-
-    omg_norm = gyro2.norm();
-    mi = mi0 + Beta * Ts * omg_norm; // Eq.29
-
-    z_k = qASGD2_qk - mi * GradF.normalized(); // Eq.24
-    z_k.normalize();
-
-    OmG << 0, -gyro2(0), -gyro2(1), -gyro2(2),
-      gyro2(0), 0, gyro2(2), -gyro2(1),
-      gyro2(1), -gyro2(2), 0, gyro1(0),
-      gyro2(2), gyro2(1), -gyro2(0), 0;
-    OmG = 0.5 * OmG;
-
-    Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * Matrix4f::Identity() + 0.5 * Ts * OmG;
-
-    // Process noise covariance update (Eq. 19):
-    Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
-    Q2 = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
-    // Projection:
-    qASGD2_qk = Psi * qASGD2_qk;
-    qASGD2_Pk = Psi * qASGD2_Pk * Psi.transpose() + Q2;
-    // Kalman Gain (H is Identity)
-    Covar2 = FullPivLU<Matrix4f>(qASGD2_Pk + R);
-    if (Covar2.isInvertible())
-      Kg2 = qASGD2_Pk * Covar2.inverse();
-    // Update (H is Identity)
-    qASGD2_qk = qASGD2_qk + Kg2 * (z_k - qASGD2_qk);
-    qASGD2_Pk = (Matrix4f::Identity() - Kg2) * qASGD2_Pk;
-    qASGD2_qk.normalize();
-
-    // Rotate the quaternion by a quaternion with -(yaw):
-    removeYaw(&qASGD2_qk);
-    // ------------------------------------------------//
-    // Left Thight
-    q0 = qASGD3_qk(0);
-    q1 = qASGD3_qk(1);
-    q2 = qASGD3_qk(2);
-    q3 = qASGD3_qk(3);
-
-    Zc << 2 * (q1 * q3 - q0 * q2),
-        2 * (q2 * q3 + q0 * q1),
-        (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
-    F_obj = Zc - acc3.normalized(); // Eq.23
-
-    Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
-        2 * q1, 2 * q0, 2 * q3, 2 * q2,
-        2 * q0, -2 * q1, -2 * q2, 2 * q3;
-
-    GradF = Jq.transpose() * F_obj; // Eq.25
-
-    omg_norm = gyro3.norm();
-    mi = mi0 + Beta * Ts * omg_norm; // Eq.29
-
-    z_k = qASGD3_qk - mi * GradF.normalized(); // Eq.24
-    z_k.normalize();
-
-    OmG << 0, -gyro3(0), -gyro3(1), -gyro3(2),
-        gyro3(0), 0, gyro3(2), -gyro3(1),
-        gyro3(1), -gyro3(2), 0, gyro3(0),
-        gyro3(2), gyro3(1), -gyro3(0), 0;
-    OmG = 0.5 * OmG;
-
-    Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * Matrix4f::Identity() + 0.5 * Ts * OmG;
-
-    // Process noise covariance update (Eq. 19):
-    Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
-    Q3 = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
-    // Projection:
-    qASGD3_qk = Psi * qASGD3_qk;
-    qASGD3_Pk = Psi * qASGD3_Pk * Psi.transpose() + Q3;
-    // Kalman Gain (H is Identity)
-    Covar3 = FullPivLU<Matrix4f>(qASGD3_Pk + R);
-    if (Covar3.isInvertible())
-        Kg3 = qASGD3_Pk * Covar3.inverse();
-    // Update (H is Identity)
-    qASGD3_qk = qASGD3_qk + Kg3 * (z_k - qASGD3_qk);
-    qASGD3_Pk = (Matrix4f::Identity() - Kg3) * qASGD3_Pk;
-    qASGD3_qk.normalize();
-
-    // Rotate the quaternion by a quaternion with -(yaw):
-    removeYaw(&qASGD3_qk);
-    // ------------------------------------------------//
-    // Left Shank
-    q0 = qASGD4_qk(0);
-    q1 = qASGD4_qk(1);
-    q2 = qASGD4_qk(2);
-    q3 = qASGD4_qk(3);
-
-    Zc << 2 * (q1 * q3 - q0 * q2),
-        2 * (q2 * q3 + q0 * q1),
-        (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
-    F_obj = Zc - acc4.normalized(); // Eq.23
-
-    Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
-        2 * q1, 2 * q0, 2 * q3, 2 * q2,
-        2 * q0, -2 * q1, -2 * q2, 2 * q3;
-
-    GradF = Jq.transpose() * F_obj; // Eq.25
-
-    omg_norm = gyro4.norm();
-    mi = mi0 + Beta * Ts * omg_norm; // Eq.29
-
-    z_k = qASGD4_qk - mi * GradF.normalized(); // Eq.24
-    z_k.normalize();
-
-    OmG << 0, -gyro4(0), -gyro4(1), -gyro4(2),
-        gyro4(0), 0, gyro4(2), -gyro4(1),
-        gyro4(1), -gyro4(2), 0, gyro4(0),
-        gyro4(2),  gyro4(1),   -gyro4(0), 0;
-    OmG = 0.5 * OmG;
-
-    Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * Matrix4f::Identity() + 0.5 * Ts * OmG;
-
-    // Process noise covariance update (Eq. 19):
-    Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
-    Q4 = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
-    // Projection:
-    qASGD4_qk = Psi * qASGD4_qk;
-    qASGD4_Pk = Psi * qASGD4_Pk * Psi.transpose() + Q4;
-    // Kalman Gain (H is Identity)
-    Covar4 = FullPivLU<Matrix4f>(qASGD4_Pk + R);
-    if (Covar4.isInvertible())
-        Kg4 = qASGD4_Pk * Covar4.inverse();
-    // Update (H is Identity)
-    qASGD4_qk = qASGD4_qk + Kg4 * (z_k - qASGD4_qk);
-    qASGD4_Pk = (Matrix4f::Identity() - Kg4) * qASGD4_Pk;
-    qASGD4_qk.normalize();
-
-    // Rotate the quaternion by a quaternion with -(yaw):
-    removeYaw(&qASGD4_qk);
-
-
     // Knees Euler angles:
-    Vector3f right_knee_elr = quatDelta2Euler(qASGD2_qk, qASGD1_qk);
-    Vector3f left_knee_elr = quatDelta2Euler(qASGD4_qk, qASGD3_qk);
+    right_knee_elr = quatDelta2Euler(qASGD[1], qASGD[0]);
+    left_knee_elr = quatDelta2Euler(qASGD[3], qASGD[2]);
 
 
     // Remove arbitrary IMU attitude:
     auto elapsedTime = Timer.micro_now() - t_begin;
-    if (elapsedTime < offst_period_us) //
+    // Time average:
+    if (elapsedTime < OFFSET_US) //
     {
-        float incrmnt = Ts*MILLION / offst_period_us;
-        q12Off.w() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(0);
-        q12Off.x() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(1);
-        q12Off.y() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(2);
-        q12Off.z() += incrmnt * qDelta(qASGD2_qk, qASGD1_qk)(3);
+        float incrmnt = (data_struct.sampletime_ * MILLION) / OFFSET_US;
+        q12Off.w() += incrmnt * qDelta(qASGD[1], qASGD[0])(0);
+        q12Off.x() += incrmnt * qDelta(qASGD[1], qASGD[0])(1);
+        q12Off.y() += incrmnt * qDelta(qASGD[1], qASGD[0])(2);
+        q12Off.z() += incrmnt * qDelta(qASGD[1], qASGD[0])(3);
 
-        q34Off.w() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(0);
-        q34Off.x() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(1);
-        q34Off.y() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(2);
-        q34Off.z() += incrmnt * qDelta(qASGD4_qk, qASGD3_qk)(3);
-        // Prioritize static dynamics (accelerometer):
-        mi0 = 7.20;
-        Beta = 0.1;
+        q34Off.w() += incrmnt * qDelta(qASGD[3], qASGD[2])(0);
+        q34Off.x() += incrmnt * qDelta(qASGD[3], qASGD[2])(1);
+        q34Off.y() += incrmnt * qDelta(qASGD[3], qASGD[2])(2);
+        q34Off.z() += incrmnt * qDelta(qASGD[3], qASGD[2])(3);
+
     }
-    if (elapsedTime < (offst_period_us + static_cast<long long>(7*Ts*MILLION)) && elapsedTime >= offst_period_us) {
+    if (elapsedTime < (OFFSET_US + static_cast<long long>(7 * data_struct.sampletime_ * MILLION)) && elapsedTime >= OFFSET_US) {
         q12Off.normalize();
         q34Off.normalize();
-        mi0 = 0.36;
-        Beta = 10.0;
+
     } else {   // Attitude without arbitrary IMU orientation:
         Vector4f q12(q12Off.w(), q12Off.x(), q12Off.y(), q12Off.z());
-        //Vector4f q23(q23Off.w(), q23Off.x(), q23Off.y(), q23Off.z());
         Vector4f q34(q34Off.w(), q34Off.x(), q34Off.y(), q34Off.z());
-        right_knee_elr = quatDelta2Euler(qDelta(qASGD2_qk,q12), qASGD1_qk);
-        left_knee_elr = quatDelta2Euler(qDelta(qASGD4_qk,q34), qASGD3_qk);
+        right_knee_elr = quatDelta2Euler(qDelta(qASGD[1], q12), qASGD[0]);
+        left_knee_elr = quatDelta2Euler(qDelta(qASGD[3], q34), qASGD[2]);
     }
 
     // Relative Angular Velocity
-    Vector3f right_knee_vel = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
-    Vector3f  left_knee_vel = RelVector(qDelta(qASGD3_qk, qASGD4_qk), gyro3, gyro4);
+    //Vector3f right_knee_vel = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
+    //Vector3f  left_knee_vel = RelVector(qDelta(qASGD3_qk, qASGD4_qk), gyro3, gyro4);
 
-
-    // Finite Difference Acc approximation:
-    //omega_k[0] = right_knee_vel(0);
-    //float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
-    //rollBuffer(omega_k, 3);
 
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       switch (data_struct.param39_)
       {
       case IMUBYPASS:
-        *(*data_struct.datavecB_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);    // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = 0;       // hum_rgtknee_acc
         break;
       default:
-        *(*data_struct.datavecA_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecA_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = 0;                   // hum_rgtknee_acc
-        *(*data_struct.datavecA_ + 3) = left_knee_elr(0);    // hum_lftknee_pos 
-        *(*data_struct.datavecA_ + 4) = left_knee_vel(0);    // hum_lftknee_vel
+        *(*data_struct.datavecA_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 1) = (0);                     // hum_rgtknee_vel
+        *(*data_struct.datavecA_ + 2) = (0);                     // hum_rgtknee_acc
+        *(*data_struct.datavecA_ + 3) = R2D*left_knee_elr(0);    // hum_lftknee_pos 
+        *(*data_struct.datavecA_ + 4) = (0);                     // hum_lftknee_vel
 
-        *(*data_struct.datavecB_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);   // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = 0;                   // hum_rgtknee_acc
-        *(*data_struct.datavecB_ + 3) = left_knee_elr(0);    // hum_lftknee_pos 
-        *(*data_struct.datavecB_ + 4) = left_knee_vel(0);    // hum_lftknee_vel
+        *(*data_struct.datavecB_ + 3) = (0);    // hum_lftknee_pos 
+        *(*data_struct.datavecB_ + 4) = (0);    // hum_lftknee_vel
 
         break;
       }
@@ -551,6 +318,104 @@ Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f
 Eigen::Vector3f RelVector(const Eigen::Vector4f rel_quat, const Eigen::Vector3f vec_r, const Eigen::Vector3f vec_m)
 {
   return  (vec_m - Eigen::Quaternionf(rel_quat).toRotationMatrix() * vec_r);
+}
+
+void qASGDKalman(AsgdStruct& bind_struct)
+{
+    using namespace std;
+    using namespace Eigen;
+    // Declarations
+    float q0 = 1;
+    float q1 = 0;
+    float q2 = 0;
+    float q3 = 0;
+    Vector4f qk(q0, q1, q2, q3);
+    const Matrix4f H = Matrix4f::Identity();
+    const Matrix4f R = Matrix4f::Identity() * 2.5e-5;
+
+    FullPivLU<Matrix4f> Ck; // Covariance Matrix
+    Matrix4f Pk = Matrix4f::Identity();
+    Matrix4f Qk = Matrix4f::Identity() * 5.476e-6; // Usar Eq. 19...
+    Matrix4f KG; // Kalman Gain
+    Vector3f gyro(0, 0, 0);
+    Vector3f acc(0, 0, 0);
+    Vector3f F_obj;
+    Vector4f GradF;
+    Vector4f z_k;
+    Vector3f Zc;
+    Matrix4f OmG;
+    Matrix4f Psi;
+    Matrix<float, 3, 4> Jq;
+    Matrix<float, 4, 3> Xi;
+    float omg_norm = gyro.norm();
+    float mi(0);
+
+    float Ts = bind_struct.exectime_;
+
+    looptimer Timer(Ts, bind_struct.exectime_);
+    auto t_begin = Timer.micro_now();
+    // inicializa looptimer
+    Timer.start();
+    do
+    {
+        Timer.tik();
+        { // sessao critica:
+            unique_lock<mutex> _(*bind_struct.mtx_);
+            gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
+            acc  << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];
+        } // fim da sessao critica (ext)
+
+        // ASGD iteration:
+        Zc << 2 * (q1 * q3 - q0 * q2),
+            2 * (q2 * q3 + q0 * q1),
+            (q0 * q0 - q1 * q1 - q2 * q2 - q3 * q3);
+        F_obj = Zc - acc.normalized(); // Eq.23
+
+        Jq << -2 * q2, 2 * q3, -2 * q0, 2 * q1,
+            2 * q1, 2 * q0, 2 * q3, 2 * q2,
+            2 * q0, -2 * q1, -2 * q2, 2 * q3;
+
+        GradF = Jq.transpose() * F_obj; // Eq.25
+
+        omg_norm = gyro.norm();
+        mi = MI0 + BETA * Ts * omg_norm; // Eq.29
+
+        z_k = qk - mi * GradF.normalized(); // Eq.24
+        z_k.normalize();
+
+        OmG << 0, -gyro(0), -gyro(1), -gyro(2),
+            gyro(0), 0, gyro(2), -gyro(1),
+            gyro(1), -gyro(2), 0, gyro(0),
+            gyro(2),  gyro(1), -gyro(0), 0;
+        OmG = 0.5 * OmG;
+
+        Psi = (1 - ((omg_norm * Ts) * (omg_norm * Ts)) / 8) * H + 0.5 * Ts * OmG; // Using H as 'I_44'
+
+        // Process noise covariance update (Eq. 19):
+        Xi << q0, q3, -q2, -q3, q0, q1, q2, -q1, q0, -q1, -q2, -q3;
+        Qk = 0.5 * Ts * Xi * (Matrix3f::Identity() * 5.476e-6) * Xi.transpose();
+        // Projection:
+        qk = Psi * qk;
+        Pk = Psi * Pk * Psi.transpose() + Qk;
+        // Kalman Gain (H is Identity)
+        Ck = FullPivLU<Matrix4f>(Pk + R);
+        if (Ck.isInvertible())
+            KG = Pk * Ck.inverse();
+        // Update (H is Identity)
+        qk = qk + KG * (z_k - qk);
+        Pk = (Matrix4f::Identity() - KG) * Pk;
+        qk.normalize();
+
+        // Rotate the quaternion by a quaternion with -(yaw):
+        removeYaw(&qk);
+
+        {// Write at the output quaternion:
+            unique_lock<mutex> _(*bind_struct.mtx_);
+            *bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
+        }
+
+        Timer.tak();
+    } while (!Timer.end());
 }
 
 //|///////////////////////////\_____///\////_____ ___  ___ \//|
