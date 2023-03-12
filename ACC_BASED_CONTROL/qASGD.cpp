@@ -177,7 +177,7 @@ void qASGD(ThrdStruct &data_struct)
 
     gyro4 << imus_data[18], imus_data[19], imus_data[20];
     acc4  << imus_data[21], imus_data[22], imus_data[23];
-
+    // ------------------------------------------------//
     // Right Thight
     q0 = qASGD1_qk(0);
     q1 = qASGD1_qk(1);
@@ -226,7 +226,7 @@ void qASGD(ThrdStruct &data_struct)
 
     // Rotate the quaternion by a quaternion with -(yaw):
     removeYaw(&qASGD1_qk);
-
+    // ------------------------------------------------//
     // Right Shank
     q0 = qASGD2_qk(0);
     q1 = qASGD2_qk(1);
@@ -275,8 +275,7 @@ void qASGD(ThrdStruct &data_struct)
 
     // Rotate the quaternion by a quaternion with -(yaw):
     removeYaw(&qASGD2_qk);
-
-
+    // ------------------------------------------------//
     // Left Thight
     q0 = qASGD3_qk(0);
     q1 = qASGD3_qk(1);
@@ -325,7 +324,7 @@ void qASGD(ThrdStruct &data_struct)
 
     // Rotate the quaternion by a quaternion with -(yaw):
     removeYaw(&qASGD3_qk);
-
+    // ------------------------------------------------//
     // Left Shank
     q0 = qASGD4_qk(0);
     q1 = qASGD4_qk(1);
@@ -399,16 +398,12 @@ void qASGD(ThrdStruct &data_struct)
         mi0 = 7.20;
         Beta = 0.1;
     }
-    if (elapsedTime < (offst_period_us + static_cast<long long>(7*Ts*MILLION)) 
-                                            && elapsedTime >= offst_period_us) //
-    {
+    if (elapsedTime < (offst_period_us + static_cast<long long>(7*Ts*MILLION)) && elapsedTime >= offst_period_us) {
         q12Off.normalize();
         q34Off.normalize();
         mi0 = 0.36;
         Beta = 10.0;
-    }
-    else
-    {   // Attitude without arbitrary IMU orientation:
+    } else {   // Attitude without arbitrary IMU orientation:
         Vector4f q12(q12Off.w(), q12Off.x(), q12Off.y(), q12Off.z());
         //Vector4f q23(q23Off.w(), q23Off.x(), q23Off.y(), q23Off.z());
         Vector4f q34(q34Off.w(), q34Off.x(), q34Off.y(), q34Off.z());
@@ -417,61 +412,37 @@ void qASGD(ThrdStruct &data_struct)
     }
 
     // Relative Angular Velocity
-    Vector3f knee_omega  = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
-    Vector3f ankle_omega = RelVector(qDelta(qASGD2_qk, qASGD3_qk), gyro2, gyro3);
+    Vector3f right_knee_vel = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
+    Vector3f  left_knee_vel = RelVector(qDelta(qASGD3_qk, qASGD4_qk), gyro3, gyro4);
 
-    // Relative Acc (Linear) in IMU1 frame:
-    Vector3f left_shank2thigh_acc = RelVector(qDelta(qASGD1_qk, qASGD2_qk), acc1, acc2);
-    Vector3f left_foot2shank_acc = RelVector(qDelta(qASGD2_qk, qASGD3_qk), acc2, acc3);
-
-    // IMU2 Relative Acc (Angular) in IMU2 frame:
-    Vector3f left_shank2thigh_alpha = RelAngAcc( qDelta(qASGD2_qk, qASGD1_qk),\
-                                                 knee_omega, left_shank2thigh_acc);
-
-    Vector3f s2tL_alpha = Quaternionf(qASGD1_qk).toRotationMatrix() * left_shank2thigh_alpha;
-
-    /*
-    // por enquanto so para o joelho direito:
-    hum_rgtknee_pos = vector[0]; v
-    hum_rgtknee_vel = vector[1]; v
-    hum_rgtknee_acc = vector[2]; v
-    rbt_rgtknee_pos = vector[3]; x
-    rbt_rgtknee_vel = vector[4]; x
-    rbt_rgtknee_acc = vector[5]; x
-    sea_rgtshank    = vector[6]; x
-    inter_rgtshank  = vector[7]; x
-    mtr_rgtknee_tau = vector[8]; x
-    mtr_rgtknee_omg = vector[9]; x
-    */
 
     // Finite Difference Acc approximation:
-    omega_k[0] = knee_omega(0);
-    float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
-    rollBuffer(omega_k, 3);
-    //omega_k[2] = omega_k[1]; 
-    //omega_k[1] = omega_k[0]; 
+    //omega_k[0] = right_knee_vel(0);
+    //float acc_omega = (3*omega_k[0] - 4*omega_k[1] + omega_k[2])/(2*Ts);
+    //rollBuffer(omega_k, 3);
 
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
       switch (data_struct.param39_)
       {
       case IMUBYPASS:
-        *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 2) = 0;       // hum_rgtknee_acc
         break;
       default:
-        *(*data_struct.datavecA_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecA_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = acc_omega;       // hum_rgtknee_acc
-        *(*data_struct.datavecA_ + 3) = -ankle_euler(0); // esta "negativo" ->TODO
-        *(*data_struct.datavecA_ + 4) = -ankle_omega(0);
+        *(*data_struct.datavecA_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecA_ + 2) = 0;                   // hum_rgtknee_acc
+        *(*data_struct.datavecA_ + 3) = left_knee_elr(0);    // hum_lftknee_pos 
+        *(*data_struct.datavecA_ + 4) = left_knee_vel(0);    // hum_lftknee_vel
 
-        *(*data_struct.datavecB_ + 0) = knee_euler(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = knee_omega(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecB_ + 2) = acc_omega;       // hum_rgtknee_acc
-        *(*data_struct.datavecB_ + 3) = -ankle_euler(0); // hum_rgtankle_pos
-        *(*data_struct.datavecB_ + 4) = -ankle_omega(0); // hum_rgtankle_vel
+        *(*data_struct.datavecB_ + 0) = right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 1) = right_knee_vel(0);   // hum_rgtknee_vel
+        *(*data_struct.datavecB_ + 2) = 0;                   // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 3) = left_knee_elr(0);    // hum_lftknee_pos 
+        *(*data_struct.datavecB_ + 4) = left_knee_vel(0);    // hum_lftknee_vel
+
         break;
       }
     } // fim da sessao critica
