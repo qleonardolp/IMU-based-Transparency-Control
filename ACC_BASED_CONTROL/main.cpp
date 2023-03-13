@@ -500,7 +500,7 @@ int main(int, char**)
 				
 				unique_lock<mutex> _(comm_mtx);
 				float right_knee_pos  = states_data[0];
-				float right_ankle_pos = states_data[3];
+				float right_ankle_pos = states_data[1];
 				dataKneePos.AddPoint(t, right_knee_pos * 180.0f / 3.14159f);
 				dataAnklePos.AddPoint(t, right_ankle_pos * 180.0f / 3.14159f);
 

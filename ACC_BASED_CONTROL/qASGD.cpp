@@ -122,6 +122,8 @@ void qASGD(ThrdStruct &data_struct)
       *(asgdThreadsStructs[i].imudata) = (data_block + i*6);
 
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
+
+      qASGD.push_back(Eigen::Vector4f(1,0,0,0));
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -366,8 +368,8 @@ void qASGDKalman(AsgdStruct& bind_struct)
         Timer.tik();
         { // sessao critica:
             unique_lock<mutex> _(*bind_struct.mtx_);
-            gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
-            acc  << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];
+            gyro << *(*bind_struct.imudata + 0), *(*bind_struct.imudata + 1), *(*bind_struct.imudata + 2);
+            acc  << *(*bind_struct.imudata + 3), *(*bind_struct.imudata + 4), * (*bind_struct.imudata + 5);
         } // fim da sessao critica (ext)
 
         // ASGD iteration:

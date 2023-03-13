@@ -329,12 +329,6 @@ void readIMUs(ThrdStruct& data_struct)
 						imus_data[3] = imu_filters[3].apply(-0.9961*(-accVector[2]) - 5.2843);
 						imus_data[4] = imu_filters[4].apply(1.0063*accVector[1] - 0.0352);
 						imus_data[5] = imu_filters[5].apply(0.9966*accVector[0] - 0.1196);
-						print_cntr++;
-						if (print_cntr%400000 == 0)
-						{
-							cout << " IMU1 AccZ: " << imus_data[3] << endl;
-							print_cntr = 0;
-						}
 					}
 					if (imu_names[i].compare("00B410D2") == 0) {
 						imus_data[6] =  imu_filters[6].apply(-gyroVector[2] - 0.0105);
@@ -346,22 +340,21 @@ void readIMUs(ThrdStruct& data_struct)
 						//cout << imu_names[i] << endl;
 					}
 					if (imu_names[i].compare("00B41244") == 0) {
-						imus_data[12] = imu_filters[12].apply(gyroVector[1] - 0.0079);
-						imus_data[13] = imu_filters[13].apply(-gyroVector[0] - 0.0017);
-						imus_data[14] = imu_filters[14].apply(gyroVector[2] + 0.0105);
-						imus_data[15] = imu_filters[15].apply(accVector[1] + 0.025);
-						imus_data[16] = imu_filters[16].apply(0.997*(-accVector[0]));
-						imus_data[17] = imu_filters[17].apply(accVector[2] - 0.065);
-						//cout << imu_names[i] << endl;
+						imus_data[12] = imu_filters[12].apply(-gyroVector[2] - 0.0105);
+						imus_data[13] = imu_filters[13].apply(gyroVector[1] - 0.0079);
+						imus_data[14] = imu_filters[14].apply(gyroVector[0] + 0.0017);
+						imus_data[15] = imu_filters[15].apply(-accVector[2] + 0.065);
+						imus_data[16] = imu_filters[16].apply(accVector[1] + 0.025);
+						imus_data[17] = imu_filters[17].apply(0.997 *accVector[0]);
 					}
 					if (imu_names[i].compare("00B4108C") == 0) {
-						imus_data[18] = imu_filters[18].apply(gyroVector[2] + 0.0070);
-						imus_data[19] = imu_filters[19].apply(-gyroVector[1] + 0.0030);
-						imus_data[20] = imu_filters[20].apply(gyroVector[0] + 0.0035);
-						imus_data[21] = imu_filters[21].apply(accVector[2] - 0.060);
-						imus_data[22] = imu_filters[22].apply(-accVector[1] + 0.020);
-						imus_data[23] = imu_filters[23].apply(accVector[0] - 0.040);
-						//cout << imu_names[i] << endl;
+						// Orientacao Perna DIR: [-3 2 1]
+						imus_data[18] = imu_filters[18].apply(-gyroVector[2] - 0.0070);
+						imus_data[19] = imu_filters[19].apply( gyroVector[1] - 0.0030);
+						imus_data[20] = imu_filters[20].apply( gyroVector[0] + 0.0035);
+						imus_data[21] = imu_filters[21].apply(-accVector[2] + 0.060);
+						imus_data[22] = imu_filters[22].apply( accVector[1] - 0.020);
+						imus_data[23] = imu_filters[23].apply( accVector[0] - 0.040);
 					}
 
 #ifdef IMU_ATT_LOG
