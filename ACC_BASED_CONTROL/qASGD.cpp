@@ -36,6 +36,7 @@ typedef struct asgd_struct{
     std::mutex* mtx_;
     float* imudata[6];
     Eigen::Vector4f* quaternion;
+    int id;
 } AsgdStruct;
 
 void removeYaw(Eigen::Vector4f* quat);
@@ -44,7 +45,7 @@ Eigen::Vector3f quatDelta2Euler(const Eigen::Vector4f quat_r, const Eigen::Vecto
 Eigen::Vector3f RelOmegaNED(const Eigen::Vector4f* quat_r, const Eigen::Vector4f* quat_m, const Eigen::Vector3f* omg_r, const Eigen::Vector3f* omg_m);
 Eigen::Vector3f RelVector(const Eigen::Vector4f rel_quat, const Eigen::Vector3f vec_r, const Eigen::Vector3f vec_m);
 Eigen::Vector3f RelAngAcc(const Eigen::Vector4f rel_quat, const Eigen::Vector3f rel_ang_vel, const Eigen::Vector3f rel_linear_acc);
-void qASGDKalman(AsgdStruct &bind_struct);
+void qASGDKalman(const AsgdStruct &bind_struct);
 extern void rollBuffer(float buffer[10], const size_t length);
 
 
@@ -66,17 +67,17 @@ void qASGD(ThrdStruct &data_struct)
 
   // Declarations
 
-  float imus_data[DTVC_SZ];
-  for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
+  float imus_data[DTVC_SZ] = {0};
+  //for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
   
-  float data_block[NUMBER_OF_IMUS*6];
+  float data_block[NUMBER_OF_IMUS][6];
 
   Vector3f right_knee_elr;
   Vector3f  left_knee_elr;
   Quaternionf q12Off(1, 0, 0, 0);
   Quaternionf q23Off(1, 0, 0, 0);
   Quaternionf q34Off(1, 0, 0, 0);
-  std::vector<Eigen::Vector4f> qASGD;
+  vector<Vector4f> qASGD;
 
   bool isready_imu(false);
   bool aborting_imu(false);
@@ -107,21 +108,23 @@ void qASGD(ThrdStruct &data_struct)
   }
 
   // cada subthread eh declarada e associada ah uma instancia da funct 'qASGDKalman'
-  std::vector<std::thread> asgd_threads;
-  std::mutex imus_mutex[NUMBER_OF_IMUS];
-  std::vector<Eigen::Vector4f> attQuat;
   AsgdStruct asgdThreadsStructs[NUMBER_OF_IMUS];
+  std::mutex imus_mutex[NUMBER_OF_IMUS];
+  std::vector<std::thread> asgd_threads;
+  std::vector<Vector4f> attQuat;
 
   for (int i = 0; i < NUMBER_OF_IMUS; i++)
   {
       attQuat.push_back(Eigen::Vector4f(1,0,0,0));
-      asgdThreadsStructs[i].quaternion = &attQuat[i];
       asgdThreadsStructs[i].sampletime_ = data_struct.sampletime_;
       asgdThreadsStructs[i].exectime_ = data_struct.exectime_;
+      asgdThreadsStructs[i].quaternion = &attQuat[i];
       asgdThreadsStructs[i].mtx_ = &imus_mutex[i];
-      *(asgdThreadsStructs[i].imudata) = (data_block + i*6);
+      *(asgdThreadsStructs[i].imudata) = data_block[i];
+      asgdThreadsStructs[i].id = i+1;
 
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
+      this_thread::sleep_for(chrono::microseconds(100));
 
       qASGD.push_back(Eigen::Vector4f(1,0,0,0));
   }
@@ -145,7 +148,7 @@ void qASGD(ThrdStruct &data_struct)
             // distribuindo os dados para cada thread de qASGDKalman:
             unique_lock<mutex> _(imus_mutex[i]);
             for (int k = 0; k < 6; k++) {
-                data_block[i * 6 + k] = imus_data[i * 6 + k];
+                data_block[i][k] = imus_data[i * 6 + k];
             }
             // Lendo quaternion de cada thread:
             qASGD[i] = attQuat[i];
@@ -221,6 +224,7 @@ void qASGD(ThrdStruct &data_struct)
 
   // Joining asgd threads:
   for (auto& it : asgd_threads) {
+      cout << "qASGD subthread " << it.get_id() << " jointed";
       it.join();
   }
 
@@ -327,7 +331,7 @@ Eigen::Vector3f RelVector(const Eigen::Vector4f rel_quat, const Eigen::Vector3f 
   return  (vec_m - Eigen::Quaternionf(rel_quat).toRotationMatrix() * vec_r);
 }
 
-void qASGDKalman(AsgdStruct& bind_struct)
+void qASGDKalman(const AsgdStruct& bind_struct)
 {
     using namespace std;
     using namespace Eigen;
@@ -362,6 +366,7 @@ void qASGDKalman(AsgdStruct& bind_struct)
     looptimer Timer(Ts, bind_struct.exectime_);
     auto t_begin = Timer.micro_now();
     // inicializa looptimer
+    cout << "-> qASGD[" << bind_struct.id << "] Running!\n";
     Timer.start();
     do
     {
