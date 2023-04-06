@@ -1,16 +1,21 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2012 for Windows Desktop
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33516.290
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ACC_BASED_CONTROL", "ACC_BASED_CONTROL\ACC_BASED_CONTROL.vcxproj", "{FE4B3718-D429-4BBD-AFEC-969F89C78281}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
+		R1|Win32 = R1|Win32
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.Debug|Win32.ActiveCfg = Debug|Win32
 		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.Debug|Win32.Build.0 = Debug|Win32
+		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.R1|Win32.ActiveCfg = R1|Win32
+		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.R1|Win32.Build.0 = R1|Win32
 		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.Release|Win32.ActiveCfg = Release|Win32
 		{FE4B3718-D429-4BBD-AFEC-969F89C78281}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection

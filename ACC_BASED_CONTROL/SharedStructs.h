@@ -11,11 +11,18 @@
 #include <thread>
 #include <mutex>
 
+constexpr int WIND_WIDTH = 1024;
+constexpr int WIND_HEIGHT = 576;
+
 #define CAN_ENABLE 0
 #define IMU_DBG_LOG 0
 //#define IMU_ATT_LOG
 #define IMUBYPASS 3
 #define READIMUS  4
+
+constexpr int NUMBER_OF_IMUS = 4;
+constexpr int IMU_DATA_SZ = 6;
+//#define QASGD_THREAD_DEBUG
 
 #define DTVC_SZ 36
 #define DTVCA_SZ 10

@@ -118,17 +118,11 @@ int main(int, char**)
 #endif
 
 	mutex comm_mtx;
-	float imu_data[DTVC_SZ];
-	float gains_data[DTVC_SZ];
-	float logging_data[DTVCA_SZ];
-	float states_data[DTVCB_SZ];
-	float ati_data[DTVCF_SZ];
-	//initialize data vectors (safety):
-	for (int i = 0; i < DTVC_SZ; i++) {
-		imu_data[i] = gains_data[i] = 0;
-		if (i < 10) logging_data[i] = states_data[i] = 0;
-		if (i < 6) ati_data[i] = 0;
-	}
+	float imu_data[DTVC_SZ] = { 0 };
+	float gains_data[DTVC_SZ] = { 0 };
+	float logging_data[DTVCA_SZ] = { 0 };
+	float states_data[DTVCB_SZ] = { 0 };
+	float ati_data[DTVCF_SZ] = { 0 };
 
 	static short imu_isready(false);
 	static short asgd_isready(false);
@@ -277,7 +271,7 @@ int main(int, char**)
 #endif
 
 	// Create window with graphics context
-	GLFWwindow* window = glfwCreateWindow(1820, 1080, "Project Hylonome | D.ImGui[GLFW/OpenGL3]+ImPlot", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WIND_WIDTH, WIND_HEIGHT, "Project Hylonome | D.ImGui[GLFW/OpenGL3]+ImPlot", NULL, NULL);
 	if (window == NULL) return 1;
 	glfwSetWindowPos(window, 0, 38);
 	glfwMakeContextCurrent(window);
