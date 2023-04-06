@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#define NUMBER_OF_IMUS 4
 #define OFFSET_US int(0.260 * MILLION)
 #define R2D       (180 / M_PI)
 #define MI0       0.3600f
@@ -33,9 +32,9 @@
 typedef struct asgd_struct{
     float sampletime_;
     int     exectime_;
-    std::mutex* mtx_;
-    float* imudata[6];
-    Eigen::Vector4f* quaternion;
+    std::mutex *mtx_;
+    float *imudata[6];
+    Eigen::Vector4f *quaternion;
     int id;
 } AsgdStruct;
 
@@ -68,9 +67,8 @@ void qASGD(ThrdStruct &data_struct)
   // Declarations
 
   float imus_data[DTVC_SZ] = {0};
-  //for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
   
-  float data_block[NUMBER_OF_IMUS][6];
+  float data_block[NUMBER_OF_IMUS][IMU_DATA_SZ] = {0};
 
   Vector3f right_knee_elr;
   Vector3f  left_knee_elr;
@@ -111,16 +109,19 @@ void qASGD(ThrdStruct &data_struct)
   AsgdStruct asgdThreadsStructs[NUMBER_OF_IMUS];
   std::mutex imus_mutex[NUMBER_OF_IMUS];
   std::vector<std::thread> asgd_threads;
-  std::vector<Vector4f> attQuat;
+  Vector4f attQuat[NUMBER_OF_IMUS];
 
   for (int i = 0; i < NUMBER_OF_IMUS; i++)
   {
-      attQuat.push_back(Eigen::Vector4f(1,0,0,0));
       asgdThreadsStructs[i].sampletime_ = data_struct.sampletime_;
       asgdThreadsStructs[i].exectime_ = data_struct.exectime_;
       asgdThreadsStructs[i].quaternion = &attQuat[i];
       asgdThreadsStructs[i].mtx_ = &imus_mutex[i];
-      *(asgdThreadsStructs[i].imudata) = data_block[i];
+      for (size_t k = 0; k < IMU_DATA_SZ; k++)
+      {
+          asgdThreadsStructs[i].imudata[k] = &data_block[i][k];
+      }
+
       asgdThreadsStructs[i].id = i+1;
 
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
@@ -147,7 +148,7 @@ void qASGD(ThrdStruct &data_struct)
         { // sessao critica
             // distribuindo os dados para cada thread de qASGDKalman:
             unique_lock<mutex> _(imus_mutex[i]);
-            for (int k = 0; k < 6; k++) {
+            for (int k = 0; k < IMU_DATA_SZ; k++) {
                 data_block[i][k] = imus_data[i * 6 + k];
             }
             // Lendo quaternion de cada thread:
@@ -361,20 +362,23 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     float omg_norm = gyro.norm();
     float mi(0);
 
-    float Ts = bind_struct.exectime_;
+    float Ts = bind_struct.sampletime_;
 
     looptimer Timer(Ts, bind_struct.exectime_);
     auto t_begin = Timer.micro_now();
     // inicializa looptimer
-    cout << "-> qASGD[" << bind_struct.id << "] Running!\n";
+    cout << "\n-> qASGD[" << bind_struct.id << "] Running!\n";
     Timer.start();
     do
     {
         Timer.tik();
         { // sessao critica:
             unique_lock<mutex> _(*bind_struct.mtx_);
-            gyro << *(*bind_struct.imudata + 0), *(*bind_struct.imudata + 1), *(*bind_struct.imudata + 2);
-            acc  << *(*bind_struct.imudata + 3), *(*bind_struct.imudata + 4), * (*bind_struct.imudata + 5);
+            //float gyro_x = *bind_struct.imudata[2];
+            //gyro << *(*bind_struct.imudata + 0), *(*bind_struct.imudata + 1), *(*bind_struct.imudata + 2);
+            //acc  << *(*bind_struct.imudata + 3), *(*bind_struct.imudata + 4), * (*bind_struct.imudata + 5);
+            gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
+            acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];                      
         } // fim da sessao critica (ext)
 
         // ASGD iteration:
@@ -423,7 +427,8 @@ void qASGDKalman(const AsgdStruct& bind_struct)
 
         {// Write at the output quaternion:
             unique_lock<mutex> _(*bind_struct.mtx_);
-            *bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
+            //*bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
+            *bind_struct.quaternion << qk(0), qk(1), qk(2), float(bind_struct.id);
         }
 
         Timer.tak();

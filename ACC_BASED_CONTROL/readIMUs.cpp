@@ -70,7 +70,31 @@ void readIMUs(ThrdStruct& data_struct)
 	|  12  |            50 Hz        |
 	|__18__|____________40 Hz________| */
 
-	const int desiredUpdateRate = 75; //
+	int desiredUpdateRate;
+	switch (NUMBER_OF_IMUS)
+	{
+	case 1:
+		desiredUpdateRate = 150;
+		break;
+	case 2:
+		desiredUpdateRate = 120;
+		break;
+	case 4:
+		desiredUpdateRate = 100;
+		break;
+	case 6:
+		desiredUpdateRate =  75;
+		break;
+	case 12:
+		desiredUpdateRate =  50;
+		break;
+	case 18:
+		desiredUpdateRate =  40;
+		break;
+	default:
+		desiredUpdateRate =  75;
+		break;
+	}
 	const int desiredRadioChannel = 25;
 	const float sampleTime = 1 / float(desiredUpdateRate);
 
@@ -80,8 +104,42 @@ void readIMUs(ThrdStruct& data_struct)
 	XsControl* control = XsControl::construct();
 	if (control == 0)
 	{
-		cout << "Failed to construct XsControl instance." << endl;
+		std::cout << "Failed to construct XsControl instance." << std::endl;
 	}
+
+#ifdef QASGD_THREAD_DEBUG
+
+	float imus_data[DTVC_SZ] = { 0 };
+
+	{   // readIMUs nao espera as outras threads:
+		unique_lock<mutex> _(*data_struct.mtx_);
+		*data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
+		std::cout << "-> 'Reading' IMUs!\n";
+	}
+
+	std::cout << "Update Rate: " << desiredUpdateRate << std::endl;
+
+	looptimer xsensTimer(sampleTime, data_struct.exectime_);
+	// inicializar looptimer:
+	xsensTimer.start();
+	do
+	{
+		xsensTimer.tik();
+
+		imus_data[1] = 0.1;
+		imus_data[7] = 0.1;
+		imus_data[9] = 0.5;
+		imus_data[13] = 0.1;
+		imus_data[19] = 0.1;
+		imus_data[23] = 9.80;
+		{
+			std::unique_lock<mutex> _(*data_struct.mtx_);
+			std::memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));
+		}
+
+		xsensTimer.tak();
+	} while (!xsensTimer.end());
+#else
 
 	try
 	{
@@ -256,8 +314,8 @@ void readIMUs(ThrdStruct& data_struct)
 		vector<XsEuler> eulerData(mtwCallbacks.size());
 		uint32_t print_cntr = 0;
 
-		float imus_data[DTVC_SZ];
-		for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
+		float imus_data[DTVC_SZ] = { 0 };
+		//for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
 
 		// Filtros Passa Baixa para os dados das IMUs
 		LowPassFilter2pFloat imu_filters[DTVC_SZ];
@@ -465,8 +523,8 @@ void readIMUs(ThrdStruct& data_struct)
 		*data_struct.param3F_ = true; // finished
 		return;
 	}
-
-	cout << "Closing XsControl..." << endl;
+#endif
+	std::cout << "Closing XsControl..." << endl;
 	control->close();
 
 	for (vector<MtwCallback*>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i) {
