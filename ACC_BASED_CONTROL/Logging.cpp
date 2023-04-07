@@ -7,12 +7,13 @@
 ///\///////////////////////\ //////////////////\/////\
 
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <vector>
 
 void Logging(ThrdStruct& data_struct) {
 	using namespace std;
@@ -23,7 +24,9 @@ void Logging(ThrdStruct& data_struct) {
 	// setup stuff...
 	char filename[] = "./data/log_thread.txt";
 	FILE* logFileHandle = fopen(filename, "w");
-	if (logFileHandle != NULL) fclose(logFileHandle);
+	if (logFileHandle != NULL) {
+		fclose(logFileHandle);
+	}
 
 	float rad2deg = 180 / (M_PI);
 	float log_states[DTVCA_SZ];
@@ -61,6 +64,13 @@ void Logging(ThrdStruct& data_struct) {
 		*data_struct.param3F_ = false;
 	}
 
+	size_t n_lines = (data_struct.exectime_ / data_struct.sampletime_); // samples
+	vector<string> string_vector(n_lines, " ");
+	char temp_string[256];
+	float timestamp(0);
+	size_t  counter(0);
+
+
 	looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
 	auto begin_timestamp = Timer.micro_now();
 	// inicializa looptimer
@@ -76,23 +86,32 @@ void Logging(ThrdStruct& data_struct) {
 			memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
 		}   // fim da sessao critica
 
-		logFileHandle = fopen(filename, "a");
-		if (logFileHandle != NULL) {
-			float timestamp = float(Timer.micro_now() - begin_timestamp) / MILLION;
-			fprintf(logFileHandle, "%.5f", timestamp);
-			for (size_t i = 0; i < DTVCA_SZ; i++) {
-				fprintf(logFileHandle, ", %.4f", log_states[i]);
-			}
-#ifdef IMU_ATT_LOG
-			for (size_t i = 24; i < (DTVC_SZ-3); i++) {
-				fprintf(logFileHandle, ", %.4f", log_gains[i]);
-			}
-#endif
-			fprintf(logFileHandle, "\n");
-			fclose(logFileHandle);
+		timestamp = float(Timer.micro_now() - begin_timestamp) / MILLION;
+
+		int char_p = sprintf(temp_string, "%.4f", timestamp);
+		for (size_t i = 0; i < DTVCA_SZ; i++) {
+			int pos = sprintf(&temp_string[char_p-1], ", %.4f", log_states[i]);
+			char_p += pos;
+		}
+		if (counter < n_lines) {
+			string_vector[counter] = temp_string;
+			counter++;
 		}
 		Timer.tak();
 	} while (!Timer.end());
+
+
+	// Saves on file:
+	logFileHandle = fopen(filename, "a");
+	if (logFileHandle != NULL) {
+		for (size_t i = 0; i < n_lines; i++) {
+			if (string_vector[i].size() > 1) {
+				const char *str = string_vector[i].c_str();
+				fprintf(logFileHandle, "%s\n", str);
+			}
+		}
+		fclose(logFileHandle);
+	}
 
 	{
 		unique_lock<mutex> _(*data_struct.mtx_);

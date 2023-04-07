@@ -19,6 +19,7 @@
 #include <iomanip>
 #include <conio.h>
 #include <string>
+#include <random>
 
 /*! \brief Stream insertion operator overload for XsPortInfo */
 std::ostream& operator<<(std::ostream& out, XsPortInfo const& p)
@@ -92,7 +93,7 @@ void readIMUs(ThrdStruct& data_struct)
 		desiredUpdateRate =  40;
 		break;
 	default:
-		desiredUpdateRate =  75;
+		desiredUpdateRate =  120;
 		break;
 	}
 	const int desiredRadioChannel = 25;
@@ -110,6 +111,8 @@ void readIMUs(ThrdStruct& data_struct)
 #ifdef QASGD_THREAD_DEBUG
 
 	float imus_data[DTVC_SZ] = { 0 };
+	std::default_random_engine generator;
+	std::normal_distribution<float> dist(9.81, 0.5);
 
 	{   // readIMUs nao espera as outras threads:
 		unique_lock<mutex> _(*data_struct.mtx_);
@@ -131,7 +134,7 @@ void readIMUs(ThrdStruct& data_struct)
 		imus_data[9] = 0.5;
 		imus_data[13] = 0.1;
 		imus_data[19] = 0.1;
-		imus_data[23] = 9.80;
+		imus_data[23] = dist(generator);
 		{
 			std::unique_lock<mutex> _(*data_struct.mtx_);
 			std::memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));

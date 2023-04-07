@@ -22,7 +22,7 @@ constexpr int WIND_HEIGHT = 576;
 
 constexpr int NUMBER_OF_IMUS = 4;
 constexpr int IMU_DATA_SZ = 6;
-//#define QASGD_THREAD_DEBUG
+#define QASGD_THREAD_DEBUG
 
 #define DTVC_SZ 36
 #define DTVCA_SZ 10
