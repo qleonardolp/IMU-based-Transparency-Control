@@ -81,7 +81,7 @@ void readIMUs(ThrdStruct& data_struct)
 		desiredUpdateRate = 120;
 		break;
 	case 4:
-		desiredUpdateRate = 100;
+		desiredUpdateRate = 75; // 100;
 		break;
 	case 6:
 		desiredUpdateRate =  75;
@@ -93,7 +93,7 @@ void readIMUs(ThrdStruct& data_struct)
 		desiredUpdateRate =  40;
 		break;
 	default:
-		desiredUpdateRate =  120;
+		desiredUpdateRate =  75;
 		break;
 	}
 	const int desiredRadioChannel = 25;
@@ -128,7 +128,7 @@ void readIMUs(ThrdStruct& data_struct)
 	do
 	{
 		xsensTimer.tik();
-
+		/*
 		imus_data[1] = 0.1;
 		imus_data[7] = 0.1;
 		imus_data[9] = 0.5;
@@ -138,6 +138,17 @@ void readIMUs(ThrdStruct& data_struct)
 		{
 			std::unique_lock<mutex> _(*data_struct.mtx_);
 			std::memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));
+		}
+		*/
+
+		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+		{
+			std::unique_lock<mutex> _(*data_struct.mtx_vector_[i]);
+			for (int k = 0; k < IMU_DATA_SZ; k++) {
+				size_t idx = i*IMU_DATA_SZ + k;
+				imus_data[idx] = 10*(i+1)+(k+1);
+				*data_struct.datavec_[idx] = imus_data[idx];
+			}
 		}
 
 		xsensTimer.tak();
