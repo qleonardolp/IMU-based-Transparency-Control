@@ -31,7 +31,8 @@
 typedef struct asgd_struct{
     float sampletime_;
     int     exectime_;
-    std::mutex *mtx_;
+    std::mutex* mtx_xsens_;
+    std::mutex* mtx_kalman_;
     float *imudata[6];
     Eigen::Vector4f *quaternion;
     int id;
@@ -106,7 +107,7 @@ void qASGD(ThrdStruct &data_struct)
 
   // cada subthread eh declarada e associada ah uma instancia da funct 'qASGDKalman'
   AsgdStruct asgdThreadsStructs[NUMBER_OF_IMUS];
-  std::mutex imus_mutex[NUMBER_OF_IMUS];
+  std::mutex kalman_mutex[NUMBER_OF_IMUS];
   std::vector<std::thread> asgd_threads;
   Vector4f attQuat[NUMBER_OF_IMUS];
 
@@ -115,10 +116,13 @@ void qASGD(ThrdStruct &data_struct)
       asgdThreadsStructs[i].sampletime_ = data_struct.sampletime_;
       asgdThreadsStructs[i].exectime_ = data_struct.exectime_;
       asgdThreadsStructs[i].quaternion = &attQuat[i];
-      asgdThreadsStructs[i].mtx_ = &imus_mutex[i];
+
+      asgdThreadsStructs[i].mtx_xsens_  = data_struct.mtx_vector_[i]; // outside
+      asgdThreadsStructs[i].mtx_kalman_ = &kalman_mutex[i];            // inside
       for (size_t k = 0; k < IMU_DATA_SZ; k++)
       {
-          asgdThreadsStructs[i].imudata[k] = &data_block[i][k];
+          size_t idx = i * IMU_DATA_SZ + k;
+          asgdThreadsStructs[i].imudata[k] = data_struct.datavec_[idx];
       }
 
       asgdThreadsStructs[i].id = i+1;
@@ -137,22 +141,10 @@ void qASGD(ThrdStruct &data_struct)
   {
     Timer.tik();
 
-    { // sessao critica (acessando dados da thread readIMUs):
-      unique_lock<mutex> _(*data_struct.mtx_);
-      memcpy(imus_data, *data_struct.datavec_, sizeof(imus_data));
-    } // fim da sessao critica
-
-
-    for (int i = 0; i < NUMBER_OF_IMUS; i++) {
-        { // sessao critica
-            // distribuindo os dados para cada thread de qASGDKalman:
-            unique_lock<mutex> _(imus_mutex[i]);
-            for (int k = 0; k < IMU_DATA_SZ; k++) {
-                data_block[i][k] = imus_data[i * 6 + k];
-            }
-            // Lendo quaternion de cada thread:
-            qASGD[i] = attQuat[i];
-        }
+    for (size_t i = 0; i < NUMBER_OF_IMUS; i++) {
+        // Lendo quaternion de cada thread:
+        unique_lock<mutex> _(kalman_mutex[i]);
+        qASGD[i] = attQuat[i];
     }
 
     // Knees Euler angles:
@@ -197,7 +189,7 @@ void qASGD(ThrdStruct &data_struct)
       unique_lock<mutex> _(*data_struct.mtx_);
       switch (data_struct.param39_)
       {
-      case IMUBYPASS:
+      case OPMODE::IMU_BYPASS_CONTROL:
         *(*data_struct.datavecB_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
         *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);    // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = 0;       // hum_rgtknee_acc
@@ -214,7 +206,6 @@ void qASGD(ThrdStruct &data_struct)
         *(*data_struct.datavecB_ + 2) = 0;                   // hum_rgtknee_acc
         *(*data_struct.datavecB_ + 3) = (0);    // hum_lftknee_pos 
         *(*data_struct.datavecB_ + 4) = (0);    // hum_lftknee_vel
-
         break;
       }
     } // fim da sessao critica
@@ -224,7 +215,8 @@ void qASGD(ThrdStruct &data_struct)
 
   // Joining asgd threads:
   for (auto& it : asgd_threads) {
-      cout << "qASGD subthread " << it.get_id() << " jointed";
+      cout << "qASGD subthread " << it.get_id() << " jointed" << endl;
+      this_thread::sleep_for(chrono::milliseconds(80));
       it.join();
   }
 
@@ -372,10 +364,7 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     {
         Timer.tik();
         { // sessao critica:
-            unique_lock<mutex> _(*bind_struct.mtx_);
-            //float gyro_x = *bind_struct.imudata[2];
-            //gyro << *(*bind_struct.imudata + 0), *(*bind_struct.imudata + 1), *(*bind_struct.imudata + 2);
-            //acc  << *(*bind_struct.imudata + 3), *(*bind_struct.imudata + 4), * (*bind_struct.imudata + 5);
+            unique_lock<mutex> _(*bind_struct.mtx_xsens_);
             gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
             acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];                      
         } // fim da sessao critica (ext)
@@ -425,9 +414,8 @@ void qASGDKalman(const AsgdStruct& bind_struct)
         removeYaw(&qk);
 
         {// Write at the output quaternion:
-            unique_lock<mutex> _(*bind_struct.mtx_);
-            //*bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
-            *bind_struct.quaternion << qk(0), qk(1), qk(2), float(bind_struct.id);
+            unique_lock<mutex> _(*bind_struct.mtx_kalman_);
+            *bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
         }
 
         Timer.tak();

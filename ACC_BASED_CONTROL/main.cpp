@@ -118,6 +118,7 @@ int main(int, char**)
 #endif
 
 	mutex comm_mtx;
+	mutex imus_mtxs[NUMBER_OF_IMUS];
 	float imu_data[DTVC_SZ] = { 0 };
 	float gains_data[DTVC_SZ] = { 0 };
 	float logging_data[DTVCA_SZ] = { 0 };
@@ -153,7 +154,6 @@ int main(int, char**)
 		imu_struct.param0A_ = &imu_isready;
 		imu_struct.param1A_ = &imu_aborting;
 		imu_struct.param3F_ = finished + 0;
-		*(imu_struct.datavec_) = imu_data;
 		*(imu_struct.datavecB_) = states_data;
 		imu_struct.mtx_ = &comm_mtx;
 
@@ -165,10 +165,20 @@ int main(int, char**)
 		asgd_struct.param0A_ = &imu_isready;
 		asgd_struct.param1A_ = &imu_aborting;
 		asgd_struct.param3F_ = finished + 1;
-		*(asgd_struct.datavec_) = imu_data;     // from IMUs
 		*(asgd_struct.datavecA_) = logging_data;// to logging
 		*(asgd_struct.datavecB_) = states_data; // to control
 		asgd_struct.mtx_ = &comm_mtx;
+
+		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+		{
+			imu_struct.mtx_vector_[i] = &imus_mtxs[i];
+			asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
+		}
+
+		for (size_t i = 0; i < DTVC_SZ; i++)
+		{
+			imu_struct.datavec_[i] = asgd_struct.datavec_[i] = &imu_data[i];
+		}
 
 		// Control Struct
 		control_struct.sampletime_ = CTRL_SMPLTM;
@@ -204,7 +214,8 @@ int main(int, char**)
 		logging_struct.param3F_ = finished + 3;
 		*(logging_struct.datavec_) = gains_data;
 #ifdef IMU_ATT_LOG
-		*(logging_struct.datavec_) = imu_data;
+		// TODO: use another vector, imu_data is only for readIMUs and qASGD			
+		*(logging_struct.datavec_) = imu_data; 
 #endif
 		*(logging_struct.datavecA_) = logging_data;
 		*(logging_struct.datavecB_) = states_data;
