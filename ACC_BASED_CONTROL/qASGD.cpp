@@ -15,7 +15,6 @@
 #include <vector>
 
 #define OFFSET_US int(0.260 * MILLION)
-#define R2D       (180 / M_PI)
 #define MI0       0.3600f
 #define BETA      9.7000f
 

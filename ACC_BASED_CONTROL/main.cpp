@@ -391,19 +391,20 @@ int main(int, char**)
 #endif
 			}
 
+			// Pass the operation mode to the threads:
 			imu_struct.param39_ = option;
 			asgd_struct.param39_ = option;
 			control_struct.param39_ = option;
 			logging_struct.param39_ = option;
+
 			// Fill structs exectime:
-			{
-				imu_struct.exectime_ = execution_time;
-				asgd_struct.exectime_ = execution_time;
-				gscan_struct.exectime_ = execution_time;
-				control_struct.exectime_ = execution_time;
-				logging_struct.exectime_ = execution_time;
-				ftsensor_struct.exectime_ = execution_time;
-			}
+			imu_struct.exectime_ = execution_time;
+			asgd_struct.exectime_ = execution_time;
+			gscan_struct.exectime_ = execution_time;
+			control_struct.exectime_ = execution_time;
+			logging_struct.exectime_ = execution_time;
+			ftsensor_struct.exectime_ = execution_time;
+
 			//ImGui::Text("Tempo de execução (s):");
 			//ImGui::SameLine();
 			if (ImGui::InputInt("segundos", &execution_time, 1, 20)) {
@@ -612,7 +613,7 @@ int main(int, char**)
 }
 
 void opmode01(short* opt) {
-	*opt = 1;
+	*opt = OPMODE::FULL_SENSORS_CONTROL;
 	// tudo roda:
 	imu_start = asgd_start = true;
 	gscan_start = logging_start = true;
@@ -620,7 +621,7 @@ void opmode01(short* opt) {
 }
 
 void opmode02(short* opt) {
-	*opt = 2;
+	*opt = OPMODE::IMUS_ONLY_CONTROL;
 	asgd_start = imu_start = true;
 	gscan_start = true;
 	logging_start = true;
@@ -629,7 +630,7 @@ void opmode02(short* opt) {
 }
 
 void opmode03(short* opt) {
-	*opt = IMUBYPASS;
+	*opt = OPMODE::IMU_BYPASS_CONTROL;
 	asgd_start = imu_start = true;
 	gscan_start = true;
 	logging_start = true;
@@ -638,7 +639,7 @@ void opmode03(short* opt) {
 }
 
 void opmode04(short* opt) {
-	*opt = READIMUS;
+	*opt = OPMODE::IMUS_READ;
 	asgd_start = imu_start = true;
 	gscan_start = false;
 	logging_start = true;
@@ -647,7 +648,7 @@ void opmode04(short* opt) {
 }
 
 void opmode05(short* opt) {
-	*opt = 5;
+	*opt = OPMODE::FT_READ;
 	asgd_start = imu_start = false;
 	gscan_start = false;
 	logging_start = true;
@@ -656,7 +657,7 @@ void opmode05(short* opt) {
 }
 
 void opmode06(short* opt) {
-	*opt = 6;
+	*opt = OPMODE::PARAMS_READ;
 	asgd_start = imu_start = false;
 	gscan_start = true;
 	logging_start = true;
@@ -665,7 +666,7 @@ void opmode06(short* opt) {
 }
 
 void opmode07(short* opt) {
-	*opt = 7;
+	*opt = OPMODE::RESET_CAN;
 	asgd_start = imu_start = false;
 	gscan_start = false;
 	logging_start = false;
@@ -674,7 +675,7 @@ void opmode07(short* opt) {
 }
 
 void opmode08(short* opt) {
-	*opt = 8;
+	*opt = OPMODE::SEA_ONLY_CONTROL;
 	asgd_start = imu_start = false;
 	gscan_start = true;
 	logging_start = true;
