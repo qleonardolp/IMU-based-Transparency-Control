@@ -28,10 +28,9 @@ void Logging(ThrdStruct& data_struct) {
 		fclose(logFileHandle);
 	}
 
-	float rad2deg = 180 / (M_PI);
-	float log_states[DTVCA_SZ];
-	float log_gains[DTVC_SZ];
-	float log_ftsensor[DTVCF_SZ];
+	float log_states[DTVCA_SZ] = { 0 };
+	float log_gains[DTVC_SZ] = { 0 };
+	float log_ftsensor[DTVCF_SZ] = { 0 };
 
 	bool isready_imu(false);
 	bool aborting_imu(false);
@@ -79,12 +78,26 @@ void Logging(ThrdStruct& data_struct) {
 	{
 		Timer.tik();
 
-		{   // sessao critica:
+		{
 			unique_lock<mutex> _(*data_struct.mtx_);
-			memcpy(log_gains, *data_struct.datavec_, sizeof(log_gains));
-			memcpy(log_states, *data_struct.datavecA_, sizeof(log_states));
-			memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
-		}   // fim da sessao critica
+			switch (data_struct.param39_)
+			{
+			case OPMODE::IMUS_READ:
+				memcpy(log_states, *data_struct.datavecA_, sizeof(log_states));
+				break;
+			case OPMODE::PARAMS_READ:
+				memcpy(log_gains, *data_struct.datavec_, sizeof(log_gains));
+				break;
+			case OPMODE::FT_READ:
+				memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
+				break;
+			default:
+				memcpy(log_gains, *data_struct.datavec_, sizeof(log_gains));
+				memcpy(log_states, *data_struct.datavecA_, sizeof(log_states));
+				memcpy(log_ftsensor, *data_struct.datavecF_, sizeof(log_ftsensor));
+				break;
+			}
+		}
 
 		timestamp = float(Timer.micro_now() - begin_timestamp) / MILLION;
 
@@ -101,7 +114,7 @@ void Logging(ThrdStruct& data_struct) {
 	} while (!Timer.end());
 
 
-	// Saves on file:
+	// Saves in the file:
 	logFileHandle = fopen(filename, "a");
 	if (logFileHandle != NULL) {
 		for (size_t i = 0; i < n_lines; i++) {

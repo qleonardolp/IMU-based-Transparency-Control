@@ -23,6 +23,7 @@ constexpr int WIND_HEIGHT = 576;
 constexpr int NUMBER_OF_IMUS = 4;
 constexpr int IMU_DATA_SZ = 6;
 #define QASGD_THREAD_DEBUG
+#define R2D (180 / M_PI)
 
 #define DTVC_SZ 36
 #define DTVCA_SZ 10
@@ -196,6 +197,18 @@ typedef struct states{
         mtr_rgtknee_omg = vector[9];
     }
 } States;
+
+enum OPMODE {
+    NO_MODE,                // 0
+    FULL_SENSORS_CONTROL,   // 1
+    IMUS_ONLY_CONTROL,      // 2
+    IMU_BYPASS_CONTROL,     // 3
+    IMUS_READ,              // 4
+    FT_READ,                // 5
+    PARAMS_READ,            // 6
+    RESET_CAN,              // 7
+    SEA_ONLY_CONTROL        // 8
+};
 
 #endif // SHAREDSTRUCT_H
 
