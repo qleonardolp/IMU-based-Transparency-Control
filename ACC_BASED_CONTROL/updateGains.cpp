@@ -46,11 +46,12 @@ void updateGains(ThrdStruct &data_struct){
       *data_struct.param3F_ = false;
   }
 
+  int sampleT_us = data_struct.sampletime_ * MILLION;
   // inicializa looptimer
   Timer.start();
   do
   {
-    Timer.tik();
+    auto begin_timestamp = chrono::steady_clock::now();
 
     pFile = fopen("gains.param.txt", "rt");
     if (pFile != NULL && file_isvalid) {
@@ -74,7 +75,8 @@ void updateGains(ThrdStruct &data_struct){
       *data_struct.param0F_ = true;
       memcpy(*data_struct.datavec_, gains, DTVC_SZ*sizeof(float));
     }   // fim da sessao critica
-    Timer.tak();
+
+    this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
   } while (!Timer.end());
 
   {   

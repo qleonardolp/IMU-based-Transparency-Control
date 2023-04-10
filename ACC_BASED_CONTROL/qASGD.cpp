@@ -134,12 +134,13 @@ void qASGD(ThrdStruct &data_struct)
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+  int sampleT_us = data_struct.sampletime_ * MILLION;
   auto t_begin = Timer.micro_now();
   // inicializa looptimer
   Timer.start();
   do
   {
-    Timer.tik();
+    auto begin_timestamp = chrono::steady_clock::now();
 
     for (size_t i = 0; i < NUMBER_OF_IMUS; i++) {
         // Lendo quaternion de cada thread:
@@ -210,7 +211,7 @@ void qASGD(ThrdStruct &data_struct)
       }
     } // fim da sessao critica
 
-    Timer.tak();
+    this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
   } while (!Timer.end());
 
   // Joining asgd threads:
@@ -354,6 +355,7 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     float mi(0);
 
     float Ts = bind_struct.sampletime_;
+    int sampleT_us = Ts * MILLION;
 
     looptimer Timer(Ts, bind_struct.exectime_);
     auto t_begin = Timer.micro_now();
@@ -362,7 +364,9 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     Timer.start();
     do
     {
-        Timer.tik();
+        //Timer.tik();
+        auto begin_timestamp = chrono::steady_clock::now();
+
         { // sessao critica:
             unique_lock<mutex> _(*bind_struct.mtx_xsens_);
             gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
@@ -418,7 +422,9 @@ void qASGDKalman(const AsgdStruct& bind_struct)
             *bind_struct.quaternion << qk(0), qk(1), qk(2), qk(3);
         }
 
-        Timer.tak();
+        //Timer.tak();
+        this_thread::sleep_until( begin_timestamp + chrono::microseconds(sampleT_us) );
+
     } while (!Timer.end());
 }
 

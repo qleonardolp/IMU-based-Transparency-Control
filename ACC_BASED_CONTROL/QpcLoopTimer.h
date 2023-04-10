@@ -7,6 +7,7 @@
 #define QPCLOOPTIMER_H
 
 #include <time.h>
+#include <chrono>
 
 #ifdef _WIN32
 #include <windows.h>
