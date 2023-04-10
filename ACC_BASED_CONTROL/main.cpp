@@ -23,7 +23,7 @@
 
 #include "implot.h"
 
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#include "SharedStructs.h"
 #if CAN_ENABLE
 #include "XsensEpos.h"
 #endif
@@ -119,6 +119,7 @@ int main(int, char**)
 
 	mutex comm_mtx;
 	mutex imus_mtxs[NUMBER_OF_IMUS];
+	condition_variable cvs[NUMBER_OF_IMUS];
 	float imu_data[DTVC_SZ] = { 0 };
 	float gains_data[DTVC_SZ] = { 0 };
 	float logging_data[DTVCA_SZ] = { 0 };
@@ -171,8 +172,8 @@ int main(int, char**)
 
 		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
 		{
-			imu_struct.mtx_vector_[i] = &imus_mtxs[i];
-			asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
+			imu_struct.mtx_vector_[i] = asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
+			imu_struct.cv_vector_[i]  = asgd_struct.cv_vector_[i]  = &cvs[i];
 		}
 
 		for (size_t i = 0; i < DTVC_SZ; i++)

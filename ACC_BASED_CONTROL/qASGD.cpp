@@ -31,9 +31,10 @@
 typedef struct asgd_struct{
     float sampletime_;
     int     exectime_;
+    float *imudata[6];
     std::mutex* mtx_xsens_;
     std::mutex* mtx_kalman_;
-    float *imudata[6];
+    std::condition_variable* cv;
     Eigen::Vector4f *quaternion;
     int id;
 } AsgdStruct;
@@ -119,6 +120,7 @@ void qASGD(ThrdStruct &data_struct)
 
       asgdThreadsStructs[i].mtx_xsens_  = data_struct.mtx_vector_[i]; // outside
       asgdThreadsStructs[i].mtx_kalman_ = &kalman_mutex[i];            // inside
+      asgdThreadsStructs[i].cv = data_struct.cv_vector_[i];
       for (size_t k = 0; k < IMU_DATA_SZ; k++)
       {
           size_t idx = i * IMU_DATA_SZ + k;
@@ -368,9 +370,10 @@ void qASGDKalman(const AsgdStruct& bind_struct)
         auto begin_timestamp = chrono::steady_clock::now();
 
         { // sessao critica:
-            unique_lock<mutex> _(*bind_struct.mtx_xsens_);
+            unique_lock<mutex> lock(*bind_struct.mtx_xsens_);
             gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
-            acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];                      
+            acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];  
+            //bind_struct.cv->wait(lock);
         } // fim da sessao critica (ext)
 
         // ASGD iteration:

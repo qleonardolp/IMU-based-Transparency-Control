@@ -151,6 +151,7 @@ void readIMUs(ThrdStruct& data_struct)
 				imus_data[idx] = 10*(i+1)+(k+1);
 				*data_struct.datavec_[idx] = imus_data[idx];
 			}
+			data_struct.cv_vector_[i]->notify_one();
 		}
 
 		this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
