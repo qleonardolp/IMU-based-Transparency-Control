@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 
 constexpr int WIND_WIDTH = 1024;
 constexpr int WIND_HEIGHT = 576;
@@ -36,6 +37,7 @@ typedef struct shared_struct {
     float      *data_;
     std::mutex  *mtx_;
     std::mutex* mtx_vector_[NUMBER_OF_IMUS];
+    std::condition_variable* cv_vector_[NUMBER_OF_IMUS];
     float *datavec_[DTVC_SZ];
     float *datavecA_[DTVCA_SZ];
     float *datavecB_[DTVCB_SZ];
