@@ -15,7 +15,6 @@
 #include <processthreadsapi.h>
 #include <iostream>
 #include <string>
-#include <chrono>
 //#include <math.h>
 
 
@@ -83,11 +82,13 @@ void readFTSensor(ThrdStruct &data_struct){
     }
 
     looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    int sampleT_us = data_struct.sampletime_ * MILLION;
+
     // inicializa looptimer
     Timer.start();
     do
     {
-      Timer.tik();
+        auto begin_timestamp = chrono::steady_clock::now();
 #if CAN_ENABLE
       sensorAxia->peek();
 
@@ -121,7 +122,7 @@ void readFTSensor(ThrdStruct &data_struct){
         memcpy(*data_struct.datavecF_, sensor_data, DTVCF_SZ*sizeof(float)); // para log
       }   // fim da sessao critica
 
-      Timer.tak();
+      this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
     } while (!Timer.end());
 
     {   

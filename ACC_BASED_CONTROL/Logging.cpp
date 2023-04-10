@@ -22,7 +22,7 @@ void Logging(ThrdStruct& data_struct) {
 #endif
 
 	// setup stuff...
-	char filename[] = "./data/log_thread.txt";
+	char filename[] = "./data/log_thread.csv";
 	FILE* logFileHandle = fopen(filename, "w");
 	if (logFileHandle != NULL) {
 		fclose(logFileHandle);
@@ -71,12 +71,13 @@ void Logging(ThrdStruct& data_struct) {
 
 
 	looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
-	auto begin_timestamp = Timer.micro_now();
+	int sampleT_us = data_struct.sampletime_ * MILLION;
+	auto begin_t = Timer.micro_now();
 	// inicializa looptimer
 	Timer.start();
 	do
 	{
-		Timer.tik();
+		auto begin_timestamp = chrono::steady_clock::now();
 
 		{
 			unique_lock<mutex> _(*data_struct.mtx_);
@@ -99,7 +100,7 @@ void Logging(ThrdStruct& data_struct) {
 			}
 		}
 
-		timestamp = float(Timer.micro_now() - begin_timestamp) / MILLION;
+		timestamp = float(Timer.micro_now() - begin_t) / MILLION;
 
 		int char_p = sprintf(temp_string, "%.4f", timestamp);
 		for (size_t i = 0; i < DTVCA_SZ; i++) {
@@ -110,7 +111,8 @@ void Logging(ThrdStruct& data_struct) {
 			string_vector[counter] = temp_string;
 			counter++;
 		}
-		Timer.tak();
+
+		this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
 	} while (!Timer.end());
 
 

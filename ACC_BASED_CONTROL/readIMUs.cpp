@@ -123,11 +123,13 @@ void readIMUs(ThrdStruct& data_struct)
 	std::cout << "Update Rate: " << desiredUpdateRate << std::endl;
 
 	looptimer xsensTimer(sampleTime, data_struct.exectime_);
+	int sampleT_us = data_struct.sampletime_ * MILLION;
+
 	// inicializar looptimer:
 	xsensTimer.start();
 	do
 	{
-		xsensTimer.tik();
+		auto begin_timestamp = chrono::steady_clock::now();
 		/*
 		imus_data[1] = 0.1;
 		imus_data[7] = 0.1;
@@ -151,7 +153,7 @@ void readIMUs(ThrdStruct& data_struct)
 			}
 		}
 
-		xsensTimer.tak();
+		this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
 	} while (!xsensTimer.end());
 #else
 

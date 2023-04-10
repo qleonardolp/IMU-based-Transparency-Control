@@ -194,11 +194,13 @@ void Controle(ThrdStruct &data_struct){
     }
 
     looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
+    int sampleT_us = data_struct.sampletime_ * MILLION;
+
     // inicializa looptimer
     Timer.start();
     do
     {
-        Timer.tik();
+        auto begin_timestamp = chrono::steady_clock::now();
 #if CAN_ENABLE
         epos.sync();
 #endif
@@ -278,7 +280,7 @@ void Controle(ThrdStruct &data_struct){
             // fim da sessao critica
         }
         
-        Timer.tak();
+        this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
     } while (!Timer.end());
     
     {   // Fim da execução
