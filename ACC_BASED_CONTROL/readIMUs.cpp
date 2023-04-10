@@ -15,6 +15,8 @@
 #include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <iostream>
 #include <iomanip>
 #include <conio.h>
@@ -43,9 +45,43 @@ int findClosestUpdateRate(const XsIntArray& supportedUpdateRates, const int desi
 void readIMUs(ThrdStruct& data_struct)
 {
 	using namespace std;
-#if PRIORITY
-	SetThreadPriority(GetCurrentThread(), data_struct.param00_);
-#endif
+	
+	vector<string> imus_names;
+	imus_names.push_back("00B412DF");
+	imus_names.push_back("00B410D2");
+	imus_names.push_back("00B41244");
+	imus_names.push_back("00B4108C");
+	imus_names.push_back("00B412CC");
+	imus_names.push_back("00B410EE");
+
+	vector<Eigen::Matrix3f> Rotate;
+	Eigen::Matrix3f R;
+
+	R << 0, -1, 0, 
+		 0, 0, -1, 
+		 1, 0,  0;
+	Rotate.push_back(R.transpose()); // pe dir
+
+	R << 0, 0, 1,
+		 0,-1, 0,
+		 1, 0, 0;
+	Rotate.push_back(R.transpose()); // canela dir
+
+	// R idem
+	Rotate.push_back(R.transpose()); // coxa dir
+
+	R << 0, -1, 0,
+		 0, 0, -1,
+		 1, 0,  0;
+	Rotate.push_back(R.transpose()); // pe esq
+
+	R << 0, 0, 1,
+		 0,-1, 0,
+		 1, 0, 0;
+	Rotate.push_back(R.transpose()); // canela esq
+
+	// R idem
+	Rotate.push_back(R.transpose()); // coxa esq
 
 #if IMU_DBG_LOG
 	char filename[] = "./data/im_debug_log.txt";
@@ -303,27 +339,55 @@ void readIMUs(ThrdStruct& data_struct)
 		}
 
 		cout << "Attaching callback handlers to MTWs..." << endl;
-		vector<string> imu_names(mtwDevices.size());
+
+		XsDevicePtrArray mtwDevicesOrdered(mtwDevices.size());
 		mtwCallbacks.resize(mtwDevices.size());
+
 		for (int i = 0; i < (int)mtwDevices.size(); ++i)
 		{
-			mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
-			mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
-			imu_names[i] = mtwDevices[i]->deviceId().toString().toStdString();
-			if (imu_names[i].compare("00B412DF") == 0)
-				cout << "IMU Coxa Direita: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00B410D2") == 0)
-				cout << "IMU Canela Direita: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00B41244") == 0)
-				cout << "IMU Pe Direito: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00B4108C") == 0)
-				cout << "IMU Canela ExoTau: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00342322") == 0)
-				cout << "IMU 01: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00342323") == 0)
-				cout << "IMU 02: " << imu_names[i] << "\n";
-			if (imu_names[i].compare("00342324") == 0)
-				cout << "IMU 03: " << imu_names[i] << "\n";
+			int idx_unordered;
+			// loop through mtwDevices to find the index according to the desired imus_names[i] (ordered)
+			for (int j = 0; j < (int)mtwDevices.size(); ++j) 
+			{
+				string check_name = mtwDevices[j]->deviceId().toString().toStdString();
+				if (check_name.compare(imus_names[i]) == 0)
+				{
+					idx_unordered = j;
+					break;
+				}
+			}
+
+			mtwDevicesOrdered[i] = mtwDevices[idx_unordered];
+			mtwCallbacks[i] = new MtwCallback(i, mtwDevicesOrdered[i]);
+			mtwDevicesOrdered[i]->addCallbackHandler(mtwCallbacks[i]);
+
+			string display_name = mtwDevicesOrdered[i]->deviceId().toString().toStdString();
+			string imu_placement;
+
+			switch (i)
+			{
+			case 0:
+				imu_placement = "IMU1 Pe Direito: ";
+				break;
+			case 1:
+				imu_placement = "IMU2 Canela Direita: ";
+				break;
+			case 2:
+				imu_placement = "IMU3 Coxa Direita: ";
+				break;
+			case 3:
+				imu_placement = "IMU4 Pe Esquerdo: ";
+				break;
+			case 4:
+				imu_placement = "IMU5 Canela Esquerda: ";
+				break;
+			case 5:
+				imu_placement = "IMU6 Coxa Esquerda: ";
+				break;
+			default:
+				break;
+			}
+			cout << imu_placement << display_name << "\n";
 		}
 
 		vector<XsVector> accData(mtwCallbacks.size());
@@ -332,14 +396,12 @@ void readIMUs(ThrdStruct& data_struct)
 		uint32_t print_cntr = 0;
 
 		float imus_data[DTVC_SZ] = { 0 };
-		//for (int i = 0; i < DTVC_SZ; i++) imus_data[i] = 0;
 
-		// Filtros Passa Baixa para os dados das IMUs
+		// Low Pass Filters:
 		LowPassFilter2pFloat imu_filters[DTVC_SZ];
 		for (int i = 0; i < DTVC_SZ; i++)
 		{
-			float thread_frequency = desiredUpdateRate;
-			imu_filters[i].set_cutoff_frequency(thread_frequency, LPF_CUTOFF);
+			imu_filters[i].set_cutoff_frequency(float(desiredUpdateRate), LPF_CUTOFF);
 			imu_filters[i].reset();
 		}
 
@@ -350,11 +412,13 @@ void readIMUs(ThrdStruct& data_struct)
 		}
 
 		looptimer xsensTimer(sampleTime, data_struct.exectime_);
+		int sampleT_us = data_struct.sampletime_ * MILLION;
+
 		// inicializar looptimer:
 		xsensTimer.start();
 		do
 		{
-			xsensTimer.tik();
+			auto begin_timestamp = chrono::steady_clock::now();
 			// IMU connection check for safety
 			// Avoid wirelessMasterCallback here, I dont know if their mutex is the same of
 			// mtwCallbacks!!!
@@ -368,7 +432,9 @@ void readIMUs(ThrdStruct& data_struct)
 
 			for (size_t i = 0; i < (int)mtwCallbacks.size(); ++i)
 			{
-				if (mtwCallbacks[i] == NULL) continue;
+				if (mtwCallbacks[i] == NULL) 
+					continue;
+
 				bool newDataAvailable = false;
 				if (mtwCallbacks[i]->dataAvailable())
 				{
@@ -392,98 +458,30 @@ void readIMUs(ThrdStruct& data_struct)
 				if (newDataAvailable) {
 					// Orientacao Perna DIR: [-3 2 1]
 					// Orientacao Perna ESQ: [3 -2 1]
-					// Orientacao P� DIR:    [2 -1 3]
+					// Orientacao Pes:		 [2 -1 3]
 					// Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
 					// due to the 'assert' inside these operators on xsvector.h !!!
+					// Old IMUs package names: 00342322 | 00342323 | 00342324
+
 					vector<XsReal> gyroVector = gyroData[i].toVector();
 					vector<XsReal> accVector = accData[i].toVector();
-					if (imu_names[i].compare("00B412DF") == 0) {
-						imus_data[0] = imu_filters[0].apply(-gyroVector[2] - 0.0241);
-						imus_data[1] = imu_filters[1].apply(gyroVector[1] - 0.0209);
-						imus_data[2] = imu_filters[2].apply(gyroVector[0]- 0.0065);
-						imus_data[3] = imu_filters[3].apply(-0.9961*(-accVector[2]) - 5.2843);
-						imus_data[4] = imu_filters[4].apply(1.0063*accVector[1] - 0.0352);
-						imus_data[5] = imu_filters[5].apply(0.9966*accVector[0] - 0.1196);
-					}
-					if (imu_names[i].compare("00B410D2") == 0) {
-						imus_data[6] =  imu_filters[6].apply(-gyroVector[2] - 0.0105);
-						imus_data[7] =  imu_filters[7].apply(gyroVector[1] - 0.0087);
-						imus_data[8] =  imu_filters[8].apply(gyroVector[0] + 0.0070);
-						imus_data[9] =  imu_filters[9].apply(-accVector[2] + 0.115);
-						imus_data[10] = imu_filters[10].apply(accVector[1] - 0.060);
-						imus_data[11] = imu_filters[11].apply(accVector[0] - 0.140);
-						//cout << imu_names[i] << endl;
-					}
-					if (imu_names[i].compare("00B41244") == 0) {
-						imus_data[12] = imu_filters[12].apply(-gyroVector[2] - 0.0105);
-						imus_data[13] = imu_filters[13].apply(gyroVector[1] - 0.0079);
-						imus_data[14] = imu_filters[14].apply(gyroVector[0] + 0.0017);
-						imus_data[15] = imu_filters[15].apply(-accVector[2] + 0.065);
-						imus_data[16] = imu_filters[16].apply(accVector[1] + 0.025);
-						imus_data[17] = imu_filters[17].apply(0.997 *accVector[0]);
-					}
-					if (imu_names[i].compare("00B4108C") == 0) {
-						// Orientacao Perna DIR: [-3 2 1]
-						imus_data[18] = imu_filters[18].apply(-gyroVector[2] - 0.0070);
-						imus_data[19] = imu_filters[19].apply( gyroVector[1] - 0.0030);
-						imus_data[20] = imu_filters[20].apply( gyroVector[0] + 0.0035);
-						imus_data[21] = imu_filters[21].apply(-accVector[2] + 0.060);
-						imus_data[22] = imu_filters[22].apply( accVector[1] - 0.020);
-						imus_data[23] = imu_filters[23].apply( accVector[0] - 0.040);
+
+					Eigen::Vector3f gyroRotated = Rotate[i] * Eigen::Vector3f(gyroVector[0], gyroVector[1], gyroVector[2]);
+					Eigen::Vector3f accRotated = Rotate[i] * Eigen::Vector3f(accVector[0], accVector[1], accVector[2]);
+					
+					std::unique_lock<mutex> _(*data_struct.mtx_vector_[i]);
+					for (size_t k = 0; k < (IMU_DATA_SZ - 3); k++)
+					{
+						size_t idx = i * IMU_DATA_SZ + k;
+						*data_struct.datavec_[idx] = imu_filters[idx].apply(gyroRotated(k));
 					}
 
-#ifdef IMU_ATT_LOG
-					if (imu_names[i].compare("00B412DF") == 0) {
-						imus_data[24] = eulerData[i].roll();
-						imus_data[25] = eulerData[i].pitch();
-						imus_data[26] = eulerData[i].yaw();
+					for (size_t k = 3; k < IMU_DATA_SZ; k++)
+					{
+						size_t idx = i * IMU_DATA_SZ + k;
+						*data_struct.datavec_[idx] = imu_filters[idx].apply(accRotated(k-3));
 					}
-					if (imu_names[i].compare("00B410D2") == 0) {
-						imus_data[27] = eulerData[i].roll();
-						imus_data[28] = eulerData[i].pitch();
-						imus_data[29] = eulerData[i].yaw();
-					}
-					if (imu_names[i].compare("00B41244") == 0) {
-						imus_data[30] = eulerData[i].roll();
-						imus_data[31] = eulerData[i].pitch();
-						imus_data[32] = eulerData[i].yaw();
-					}
-					if (imu_names[i].compare("00B4108C") == 0) {
-						imus_data[33] = eulerData[i].roll();
-						imus_data[34] = eulerData[i].pitch();
-						imus_data[35] = eulerData[i].yaw();
-					}
-#endif
-
-
-					if (imu_names[i].compare("00342322") == 0) {
-						imus_data[0] = imu_filters[0].apply(-gyroVector[2]);
-						imus_data[1] = imu_filters[1].apply(gyroVector[1]);
-						imus_data[2] = imu_filters[2].apply(gyroVector[0]);
-						imus_data[3] = imu_filters[3].apply(-accVector[2]);
-						imus_data[4] = imu_filters[4].apply(accVector[1]);
-						imus_data[5] = imu_filters[5].apply(accVector[0]);
-						//cout << imu_names[i] << endl;
-					}
-					if (imu_names[i].compare("00342323") == 0) {
-						imus_data[6] = imu_filters[6].apply(-gyroVector[2]);
-						imus_data[7] = imu_filters[7].apply(gyroVector[1]);
-						imus_data[8] = imu_filters[8].apply(gyroVector[0]);
-						imus_data[9] = imu_filters[9].apply(-accVector[2]);
-						imus_data[10] = imu_filters[10].apply(accVector[1]);
-						imus_data[11] = imu_filters[11].apply(accVector[0]);
-						//cout << imu_names[i] << endl;
-					}
-					if (imu_names[i].compare("00342324") == 0) {
-						// Orientacao P� DIR: [2 -1 3]
-						imus_data[12] = imu_filters[12].apply(gyroVector[1]);
-						imus_data[13] = imu_filters[13].apply(-gyroVector[0]);
-						imus_data[14] = imu_filters[14].apply(gyroVector[2]);
-						imus_data[15] = imu_filters[15].apply(accVector[1]);
-						imus_data[16] = imu_filters[16].apply(-accVector[0]);
-						imus_data[17] = imu_filters[17].apply(accVector[2]);
-						//cout << imu_names[i] << endl;
-					}
+					data_struct.cv_vector_[i]->notify_one();
 #if IMU_DBG_LOG
 					logFileHandle = fopen(filename, "a");
 					if (logFileHandle != NULL) {
@@ -496,15 +494,21 @@ void readIMUs(ThrdStruct& data_struct)
 					}
 #endif // IMU_DBG_LOG
 
-					unique_lock<mutex> _(*data_struct.mtx_);
-					memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));
-					if (data_struct.param39_ == IMUBYPASS) {
+					/*
+					for (int k = 0; k < IMU_DATA_SZ; k++) {
+						size_t idx = i * IMU_DATA_SZ + k;
+						*data_struct.datavec_[idx] = imus_data[idx];
+					}
+					data_struct.cv_vector_[i]->notify_one();
+					*/
+					if (data_struct.param39_ == OPMODE::IMU_BYPASS_CONTROL) {
+						unique_lock<mutex> _(*data_struct.mtx_);
 						*(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
 					}
 				}
 			}
 
-			xsensTimer.tak();
+			this_thread::sleep_until(begin_timestamp + chrono::microseconds(sampleT_us));
 		} while (!xsensTimer.end());
 
 		if (!wirelessMasterDevice->gotoConfig())
