@@ -23,7 +23,9 @@ constexpr int WIND_HEIGHT = 576;
 
 constexpr int NUMBER_OF_IMUS = 6;
 constexpr int IMU_DATA_SZ = 6;
-#define QASGD_THREAD_DEBUG
+//#define QASGD_THREAD_DEBUG
+
+// Radians to Degrees
 #define R2D (180 / M_PI)
 
 #define DTVC_SZ 36

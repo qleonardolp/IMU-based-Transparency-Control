@@ -503,7 +503,7 @@ int main(int, char**)
 
 			static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
 
-			if (ImPlot::BeginPlot("Joint Positions", ImVec2(-1, 150))) {
+			if (ImPlot::BeginPlot("Joint Positions", ImVec2(-1, 200))) {
 				
 				unique_lock<mutex> _(comm_mtx);
 				float right_knee_pos  = states_data[0];
@@ -516,7 +516,7 @@ int main(int, char**)
 
 				ImPlot::SetupAxes(NULL, NULL, flags, flags);
 				ImPlot::SetupAxisLimits(ImAxis_X1, 0, history, ImGuiCond_Always);
-				ImPlot::SetupAxisLimits(ImAxis_Y1, -100, 100, ImGuiCond_Always);
+				ImPlot::SetupAxisLimits(ImAxis_Y1, -180, 180, ImGuiCond_Always);
 				ImPlot::PlotLine("Knee", &dataKneePos.Data[0].x, &dataKneePos.Data[0].y, dataKneePos.Data.size(), 0, 2 * sizeof(float));
 				ImPlot::PlotLine("Ankle", &dataAnklePos.Data[0].x, &dataAnklePos.Data[0].y, dataAnklePos.Data.size(), 0, 2 * sizeof(float));
 				ImPlot::EndPlot();

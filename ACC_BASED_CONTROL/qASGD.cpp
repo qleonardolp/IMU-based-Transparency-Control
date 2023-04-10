@@ -15,8 +15,8 @@
 #include <vector>
 
 #define OFFSET_US int(0.260 * MILLION)
-#define MI0       0.3600f
-#define BETA      9.7000f
+#define MI0       1.5000f
+#define BETA      10.7000f
 
 /*  -- Obtain attitude quaternion:
 -- Quaternion-based Attitude estimation using ASGD algorithm
@@ -187,6 +187,7 @@ void qASGD(ThrdStruct &data_struct)
     //Vector3f right_knee_vel = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
     //Vector3f  left_knee_vel = RelVector(qDelta(qASGD3_qk, qASGD4_qk), gyro3, gyro4);
 
+    Vector3f EulerIMU = Quaternionf(qASGD[1]).toRotationMatrix().eulerAngles(0,1,2);
 
     { // sessao critica
       unique_lock<mutex> _(*data_struct.mtx_);
@@ -204,7 +205,7 @@ void qASGD(ThrdStruct &data_struct)
         *(*data_struct.datavecA_ + 3) = R2D*left_knee_elr(0);    // hum_lftknee_pos 
         *(*data_struct.datavecA_ + 4) = (0);                     // hum_lftknee_vel
 
-        *(*data_struct.datavecB_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 0) = R2D* EulerIMU(0);   // hum_rgtknee_pos
         *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);   // hum_rgtknee_vel
         *(*data_struct.datavecB_ + 2) = 0;                   // hum_rgtknee_acc
         *(*data_struct.datavecB_ + 3) = (0);    // hum_lftknee_pos 
@@ -376,6 +377,10 @@ void qASGDKalman(const AsgdStruct& bind_struct)
             //bind_struct.cv->wait(lock);
         } // fim da sessao critica (ext)
 
+        q0 = qk(0);
+        q1 = qk(1);
+        q2 = qk(2);
+        q3 = qk(3);
         // ASGD iteration:
         Zc << 2 * (q1 * q3 - q0 * q2),
             2 * (q2 * q3 + q0 * q1),
