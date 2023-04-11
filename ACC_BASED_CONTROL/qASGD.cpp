@@ -71,11 +71,24 @@ void qASGD(ThrdStruct &data_struct)
   
   float data_block[NUMBER_OF_IMUS][IMU_DATA_SZ] = {0};
 
-  Vector3f right_knee_elr;
-  Vector3f  left_knee_elr;
-  Quaternionf q12Off(1, 0, 0, 0);
-  Quaternionf q23Off(1, 0, 0, 0);
-  Quaternionf q34Off(1, 0, 0, 0);
+  // Human joints euler angles:
+  Vector3f right_ankle_euler;
+  Vector3f right_knee_euler;
+  Vector3f left_ankle_euler;
+  Vector3f left_knee_euler;
+
+  // Offset quaternions: remove arbitrary attitude on initialization
+  vector<Vector4f> qOffsets; // q12Off, q23Off, q45Off, q56Off
+  qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
+  qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
+  qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
+  qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
+
+  Vector4f q12Off(1, 0, 0, 0);
+  Vector4f q23Off(1, 0, 0, 0);
+  Vector4f q45Off(1, 0, 0, 0);
+  Vector4f q56Off(1, 0, 0, 0);
+
   vector<Vector4f> qASGD;
 
   bool isready_imu(false);
@@ -150,9 +163,12 @@ void qASGD(ThrdStruct &data_struct)
         qASGD[i] = attQuat[i];
     }
 
-    // Knees Euler angles:
-    right_knee_elr = quatDelta2Euler(qASGD[1], qASGD[0]);
-    left_knee_elr = quatDelta2Euler(qASGD[3], qASGD[2]);
+    // Compute joints euler angles:
+    right_ankle_euler = quatDelta2Euler(qASGD[0], qASGD[1]); // IMU1 - IMU2
+    right_knee_euler  = quatDelta2Euler(qASGD[1], qASGD[2]); // IMU2 - IMU3
+    left_ankle_euler  = quatDelta2Euler(qASGD[3], qASGD[4]); // IMU4 - IMU5
+    left_knee_euler   = quatDelta2Euler(qASGD[4], qASGD[5]); // IMU5 - IMU6
+
 
 
     // Remove arbitrary IMU attitude:
@@ -161,26 +177,25 @@ void qASGD(ThrdStruct &data_struct)
     if (elapsedTime < OFFSET_US) //
     {
         float incrmnt = (data_struct.sampletime_ * MILLION) / OFFSET_US;
-        q12Off.w() += incrmnt * qDelta(qASGD[1], qASGD[0])(0);
-        q12Off.x() += incrmnt * qDelta(qASGD[1], qASGD[0])(1);
-        q12Off.y() += incrmnt * qDelta(qASGD[1], qASGD[0])(2);
-        q12Off.z() += incrmnt * qDelta(qASGD[1], qASGD[0])(3);
 
-        q34Off.w() += incrmnt * qDelta(qASGD[3], qASGD[2])(0);
-        q34Off.x() += incrmnt * qDelta(qASGD[3], qASGD[2])(1);
-        q34Off.y() += incrmnt * qDelta(qASGD[3], qASGD[2])(2);
-        q34Off.z() += incrmnt * qDelta(qASGD[3], qASGD[2])(3);
+        qOffsets[0] += incrmnt * qDelta(qASGD[0], qASGD[1]);
+        qOffsets[1] += incrmnt * qDelta(qASGD[1], qASGD[2]);
+        qOffsets[2] += incrmnt * qDelta(qASGD[3], qASGD[4]);
+        qOffsets[3] += incrmnt * qDelta(qASGD[4], qASGD[5]);
 
     }
-    if (elapsedTime < (OFFSET_US + static_cast<long long>(7 * data_struct.sampletime_ * MILLION)) && elapsedTime >= OFFSET_US) {
-        q12Off.normalize();
-        q34Off.normalize();
+    if (elapsedTime < (OFFSET_US + static_cast<long long>(7 * data_struct.sampletime_ * MILLION)) && elapsedTime >= OFFSET_US) 
+    {
+        for (size_t i = 0; i < qOffsets.size(); i++)
+        {
+            qOffsets[i].normalize();
+        }
 
-    } else {   // Attitude without arbitrary IMU orientation:
-        Vector4f q12(q12Off.w(), q12Off.x(), q12Off.y(), q12Off.z());
-        Vector4f q34(q34Off.w(), q34Off.x(), q34Off.y(), q34Off.z());
-        right_knee_elr = quatDelta2Euler(qDelta(qASGD[1], q12), qASGD[0]);
-        left_knee_elr = quatDelta2Euler(qDelta(qASGD[3], q34), qASGD[2]);
+    } else {   // Compensate arbitrary IMU attitude:
+        right_ankle_euler = quatDelta2Euler(qASGD[0], qDelta(qOffsets[0], qASGD[1]));
+        right_knee_euler  = quatDelta2Euler(qASGD[1], qDelta(qOffsets[1], qASGD[2]));
+        left_ankle_euler  = quatDelta2Euler(qASGD[3], qDelta(qOffsets[2], qASGD[4]));
+        left_knee_euler   = quatDelta2Euler(qASGD[4], qDelta(qOffsets[3], qASGD[5]));
     }
 
     // Relative Angular Velocity
@@ -194,21 +209,21 @@ void qASGD(ThrdStruct &data_struct)
       switch (data_struct.param39_)
       {
       case OPMODE::IMU_BYPASS_CONTROL:
-        *(*data_struct.datavecB_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);    // hum_rgtknee_vel
-        *(*data_struct.datavecB_ + 2) = 0;       // hum_rgtknee_acc
+        *(*data_struct.datavecB_ + 0) = R2D * right_ankle_euler(0);   // hum_rgtankle_pos
+        *(*data_struct.datavecB_ + 1) = R2D * right_knee_euler(0);    // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 2) = 0;
         break;
       default:
-        *(*data_struct.datavecA_ + 0) = R2D*right_knee_elr(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecA_ + 1) = (0);                     // hum_rgtknee_vel
-        *(*data_struct.datavecA_ + 2) = (0);                     // hum_rgtknee_acc
-        *(*data_struct.datavecA_ + 3) = R2D*left_knee_elr(0);    // hum_lftknee_pos 
-        *(*data_struct.datavecA_ + 4) = (0);                     // hum_lftknee_vel
+        *(*data_struct.datavecA_ + 0) = R2D * right_ankle_euler(0);   // hum_rgtankle_pos
+        *(*data_struct.datavecA_ + 1) = R2D * right_knee_euler(0);    // hum_rgtknee_pos
+        *(*data_struct.datavecA_ + 2) = R2D * left_ankle_euler(0);    // hum_lftankle_pos
+        *(*data_struct.datavecA_ + 3) = R2D * left_knee_euler(0);     // hum_lftknee_pos
+        *(*data_struct.datavecA_ + 4) = (0);
 
-        *(*data_struct.datavecB_ + 0) = R2D* EulerIMU(0);   // hum_rgtknee_pos
-        *(*data_struct.datavecB_ + 1) = R2D*left_knee_elr(0);   // hum_rgtknee_vel
-        *(*data_struct.datavecB_ + 2) = 0;                   // hum_rgtknee_acc
-        *(*data_struct.datavecB_ + 3) = (0);    // hum_lftknee_pos 
+        *(*data_struct.datavecB_ + 0) = R2D* right_ankle_euler(0);   // hum_rgtankle_pos
+        *(*data_struct.datavecB_ + 1) = R2D* right_knee_euler(0);    // hum_rgtknee_pos
+        *(*data_struct.datavecB_ + 2) = R2D * left_ankle_euler(0);   // hum_lftankle_pos
+        *(*data_struct.datavecB_ + 3) = R2D * left_knee_euler(0);    // hum_lftknee_pos
         *(*data_struct.datavecB_ + 4) = (0);    // hum_lftknee_vel
         break;
       }
