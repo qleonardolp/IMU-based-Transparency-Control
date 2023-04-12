@@ -15,8 +15,6 @@
 #include <vector>
 
 #define OFFSET_US int(0.260 * MILLION)
-#define MI0       1.5000f
-#define BETA      10.7000f
 
 /*  -- Obtain attitude quaternion:
 -- Quaternion-based Attitude estimation using ASGD algorithm
@@ -32,8 +30,11 @@ typedef struct asgd_struct{
     float sampletime_;
     int     exectime_;
     float *imudata[6];
+    float* mi0;
+    float* beta;
     std::mutex* mtx_xsens_;
     std::mutex* mtx_kalman_;
+    std::mutex* mtx_param_;
     std::condition_variable* cv;
     Eigen::Vector4f *quaternion;
     int id;
@@ -67,15 +68,13 @@ void qASGD(ThrdStruct &data_struct)
 
   // Declarations
 
-  float imus_data[DTVC_SZ] = {0};
-  
-  float data_block[NUMBER_OF_IMUS][IMU_DATA_SZ] = {0};
-
   // Human joints euler angles:
   Vector3f right_ankle_euler;
   Vector3f right_knee_euler;
   Vector3f left_ankle_euler;
   Vector3f left_knee_euler;
+
+  vector<Vector4f> qASGD;
 
   // Offset quaternions: remove arbitrary attitude on initialization
   vector<Vector4f> qOffsets; // q12Off, q23Off, q45Off, q56Off
@@ -84,19 +83,13 @@ void qASGD(ThrdStruct &data_struct)
   qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
   qOffsets.push_back(Eigen::Vector4f(1, 0, 0, 0));
 
-  Vector4f q12Off(1, 0, 0, 0);
-  Vector4f q23Off(1, 0, 0, 0);
-  Vector4f q45Off(1, 0, 0, 0);
-  Vector4f q56Off(1, 0, 0, 0);
-
-  vector<Vector4f> qASGD;
 
   bool isready_imu(false);
   bool aborting_imu(false);
   bool asgd_abort(false);
   do{ 
     {   // qASGD confere IMU:
-      unique_lock<mutex> _(*data_struct.mtx_);
+      unique_lock<mutex> lock(*data_struct.mtx_);
       isready_imu = *data_struct.param0A_;
       aborting_imu = *data_struct.param1A_;
       if (aborting_imu)
@@ -108,7 +101,7 @@ void qASGD(ThrdStruct &data_struct)
   } while (!isready_imu);
 
   if (asgd_abort) {
-      unique_lock<mutex> _(*data_struct.mtx_);
+      unique_lock<mutex> lock(*data_struct.mtx_);
       *data_struct.param3F_ = true; // finished
       return;
   }
@@ -133,6 +126,7 @@ void qASGD(ThrdStruct &data_struct)
 
       asgdThreadsStructs[i].mtx_xsens_  = data_struct.mtx_vector_[i]; // outside
       asgdThreadsStructs[i].mtx_kalman_ = &kalman_mutex[i];            // inside
+      asgdThreadsStructs[i].mtx_param_  = data_struct.mtx_vector_[i + NUMBER_OF_IMUS]; // param mutexes
       asgdThreadsStructs[i].cv = data_struct.cv_vector_[i];
       for (size_t k = 0; k < IMU_DATA_SZ; k++)
       {
@@ -140,6 +134,8 @@ void qASGD(ThrdStruct &data_struct)
           asgdThreadsStructs[i].imudata[k] = data_struct.datavec_[idx];
       }
 
+      asgdThreadsStructs[i].mi0  = data_struct.datavecF_[0];
+      asgdThreadsStructs[i].beta = data_struct.datavecF_[1];
       asgdThreadsStructs[i].id = i+1;
 
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
@@ -159,7 +155,7 @@ void qASGD(ThrdStruct &data_struct)
 
     for (size_t i = 0; i < NUMBER_OF_IMUS; i++) {
         // Lendo quaternion de cada thread:
-        unique_lock<mutex> _(kalman_mutex[i]);
+        unique_lock<mutex> lock(kalman_mutex[i]);
         qASGD[i] = attQuat[i];
     }
 
@@ -205,7 +201,7 @@ void qASGD(ThrdStruct &data_struct)
     Vector3f EulerIMU = Quaternionf(qASGD[1]).toRotationMatrix().eulerAngles(0,1,2);
 
     { // sessao critica
-      unique_lock<mutex> _(*data_struct.mtx_);
+      unique_lock<mutex> lock(*data_struct.mtx_);
       switch (data_struct.param39_)
       {
       case OPMODE::IMU_BYPASS_CONTROL:
@@ -370,7 +366,10 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     Matrix<float, 3, 4> Jq;
     Matrix<float, 4, 3> Xi;
     float omg_norm = gyro.norm();
+    float miZero(ASGD_MI0);
+    float Beta(ASGD_BETA);
     float mi(0);
+
 
     float Ts = bind_struct.sampletime_;
     int sampleT_us = Ts * MILLION;
@@ -390,6 +389,9 @@ void qASGDKalman(const AsgdStruct& bind_struct)
             gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
             acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];  
             //bind_struct.cv->wait(lock);
+            unique_lock<mutex> lock_params(*bind_struct.mtx_param_);
+            miZero = *bind_struct.mi0;
+            Beta = *bind_struct.beta;
         } // fim da sessao critica (ext)
 
         q0 = qk(0);
@@ -409,7 +411,7 @@ void qASGDKalman(const AsgdStruct& bind_struct)
         GradF = Jq.transpose() * F_obj; // Eq.25
 
         omg_norm = gyro.norm();
-        mi = MI0 + BETA * Ts * omg_norm; // Eq.29
+        mi = miZero + Beta * Ts * omg_norm; // Eq.29
 
         z_k = qk - mi * GradF.normalized(); // Eq.24
         z_k.normalize();

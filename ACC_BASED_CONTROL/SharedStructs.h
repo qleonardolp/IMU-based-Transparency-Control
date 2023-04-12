@@ -27,6 +27,8 @@ constexpr int IMU_DATA_SZ = 6;
 
 // Radians to Degrees
 #define R2D (180 / M_PI)
+#define ASGD_MI0       0.4180f
+#define ASGD_BETA      9.3510f
 
 #define DTVC_SZ 36
 #define DTVCA_SZ 10
@@ -38,8 +40,8 @@ typedef struct shared_struct {
     int     exectime_;
     float      *data_;
     std::mutex  *mtx_;
-    std::mutex* mtx_vector_[NUMBER_OF_IMUS];
-    std::condition_variable* cv_vector_[NUMBER_OF_IMUS];
+    std::mutex* mtx_vector_[NUMBER_OF_IMUS*2];
+    std::condition_variable* cv_vector_[NUMBER_OF_IMUS*2];
     float *datavec_[DTVC_SZ];
     float *datavecA_[DTVCA_SZ];
     float *datavecB_[DTVCB_SZ];
@@ -212,7 +214,8 @@ enum OPMODE {
     FT_READ,                // 5
     PARAMS_READ,            // 6
     RESET_CAN,              // 7
-    SEA_ONLY_CONTROL        // 8
+    SEA_ONLY_CONTROL,       // 8
+    IMUS_READ_NOLOG         // 9
 };
 
 #endif // SHAREDSTRUCT_H
