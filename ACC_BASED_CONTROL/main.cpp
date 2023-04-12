@@ -41,6 +41,7 @@ void opmode05(short* opt);
 void opmode06(short* opt);
 void opmode07(short* opt);
 void opmode08(short* opt);
+void opmode09(short* opt);
 void readIMUs(ThrdStruct& data_struct);
 void readFTSensor(ThrdStruct& data_struct);
 void qASGD(ThrdStruct& data_struct);
@@ -53,10 +54,11 @@ void updateGains(ThrdStruct& data_struct);
 #define EXEC_TIME   25
 
 // Threads Sample Time:
-#define IMU_SMPLTM  0.01333 // "@75 Hz", actually is defined by Xsens 'desiredUpdateRate'
+//#define IMU_SMPLTM  0.01333 // "@75 Hz", actually is defined by Xsens 'desiredUpdateRate'
+#define IMU_SMPLTM  0.020 //
 #define ASGD_SMPLTM IMU_SMPLTM //
 #define CTRL_SMPLTM 0.0010 //  @1000 Hz
-#define LOG_SMPLTM  0.0050 //  @200  Hz 
+#define LOG_SMPLTM  IMU_SMPLTM //  "@200 Hz" 
 #define GSCN_SMPLTM 4.0000 //  @ leitura de ganhos do arquivo a cada 4s 
 #define FT_SMPLTM   0.0010 //  @1000 Hz, pode chegar a 7kHz ... 
 // Threads Priority:
@@ -119,12 +121,16 @@ int main(int, char**)
 
 	mutex comm_mtx;
 	mutex imus_mtxs[NUMBER_OF_IMUS];
+	mutex asgd_param_mtx[NUMBER_OF_IMUS];
 	condition_variable cvs[NUMBER_OF_IMUS];
 	float imu_data[DTVC_SZ] = { 0 };
 	float gains_data[DTVC_SZ] = { 0 };
 	float logging_data[DTVCA_SZ] = { 0 };
 	float states_data[DTVCB_SZ] = { 0 };
 	float ati_data[DTVCF_SZ] = { 0 };
+
+	float asgd_mi0 = ASGD_MI0;
+	float asgd_beta = ASGD_BETA;
 
 	static short imu_isready(false);
 	static short asgd_isready(false);
@@ -170,10 +176,15 @@ int main(int, char**)
 		*(asgd_struct.datavecB_) = states_data; // to control
 		asgd_struct.mtx_ = &comm_mtx;
 
+		asgd_struct.datavecF_[0] = &asgd_mi0;
+		asgd_struct.datavecF_[1] = &asgd_beta;
+
 		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
 		{
 			imu_struct.mtx_vector_[i] = asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
 			imu_struct.cv_vector_[i]  = asgd_struct.cv_vector_[i]  = &cvs[i];
+			// param mutexes
+			asgd_struct.mtx_vector_[i + NUMBER_OF_IMUS] = &asgd_param_mtx[i];
 		}
 
 		for (size_t i = 0; i < DTVC_SZ; i++)
@@ -384,6 +395,9 @@ int main(int, char**)
 				opmode04(&option);
 
 			ImGui::SameLine();
+			
+			if (ImGui::Button("Leitura IMUs (Sem Log)"))
+				opmode09(&option);
 
 			if (ImGui::Button("Leitura F/T"))
 				opmode05(&option);
@@ -448,6 +462,7 @@ int main(int, char**)
 
 			// Plots can display overlay texts
 			// (in this example, we will display an average value)
+			/*
 			{
 				float average = 0.0f;
 				for (int n = 0; n < IM_ARRAYSIZE(values); n++)
@@ -459,7 +474,7 @@ int main(int, char**)
 				ImGui::PlotLines("Lines", values, IM_ARRAYSIZE(values), values_offset, overlay, -1.0f, 1.0f, ImVec2(0, 80.0f));
 			}
 			ImGui::Checkbox("Animate", &animate);
-
+			*/
 			ImGui::End();
 		}
 
@@ -489,38 +504,55 @@ int main(int, char**)
 			show_imu_window = true;
 			ImGui::Begin("Joint Angle Estimator", &show_imu_window);
 			ImGui::BulletText("This example assumes 60 FPS. Higher FPS requires larger buffer size.");
-			static RollingBuffer   dataKneePos, dataAnklePos;
+			static RollingBuffer   dataRightKnee, dataRightAnkle, dataLeftKnee, dataLeftAnkle;
 			ImVec2 mouse = ImGui::GetMousePos();
 			static float t = 0;
 			t += ImGui::GetIO().DeltaTime;
-			//dataKneePos.AddPoint(t, mouse.x * 0.0005f);
-			//dataAnklePos.AddPoint(t, mouse.y * 0.0005f);
+			//dataRightKnee.AddPoint(t, mouse.x * 0.0005f);
+			//dataRightAnkle.AddPoint(t, mouse.y * 0.0005f);
 
 			static float history = 10.0f;
 			ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
-			dataKneePos.Span = history;
-			dataAnklePos.Span = history;
+			dataRightKnee.Span = history;
+			dataRightAnkle.Span = history;
+			dataLeftKnee.Span = history;
+			dataLeftAnkle.Span = history;
 
 			static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
 
 			if (ImPlot::BeginPlot("Joint Positions", ImVec2(-1, 200))) {
 				
-				unique_lock<mutex> _(comm_mtx);
-				float right_knee_pos  = states_data[0];
-				float right_ankle_pos = states_data[1];
-				dataKneePos.AddPoint(t, right_knee_pos);
-				dataAnklePos.AddPoint(t, right_ankle_pos);
+				unique_lock<mutex> lock(comm_mtx);
+				dataRightAnkle.AddPoint(t, states_data[0]);
+				dataRightKnee.AddPoint(t, states_data[1]);
+				dataLeftAnkle.AddPoint(t, states_data[2]);
+				dataLeftKnee.AddPoint(t, states_data[3]);
 
 				// IMU Abort close this window:
-				//show_imu_window = !(*imu_struct.param1A_);
+				show_imu_window = !(*imu_struct.param1A_);
 
 				ImPlot::SetupAxes(NULL, NULL, flags, flags);
 				ImPlot::SetupAxisLimits(ImAxis_X1, 0, history, ImGuiCond_Always);
 				ImPlot::SetupAxisLimits(ImAxis_Y1, -180, 180, ImGuiCond_Always);
-				ImPlot::PlotLine("Knee", &dataKneePos.Data[0].x, &dataKneePos.Data[0].y, dataKneePos.Data.size(), 0, 2 * sizeof(float));
-				ImPlot::PlotLine("Ankle", &dataAnklePos.Data[0].x, &dataAnklePos.Data[0].y, dataAnklePos.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Right Knee", &dataRightKnee.Data[0].x, &dataRightKnee.Data[0].y, dataRightKnee.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Right Ankle", &dataRightAnkle.Data[0].x, &dataRightAnkle.Data[0].y, dataRightAnkle.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Left Knee", &dataLeftKnee.Data[0].x, &dataLeftKnee.Data[0].y, dataLeftKnee.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Left Ankle", &dataLeftAnkle.Data[0].x, &dataLeftAnkle.Data[0].y, dataLeftAnkle.Data.size(), 0, 2 * sizeof(float));
 				ImPlot::EndPlot();
 			}
+
+			static float asgd_mi0_update = ASGD_MI0;
+			static float asgd_beta_update = ASGD_BETA;
+			ImGui::SliderFloat("ASGD Mi0", &asgd_mi0_update, 0.1f, 5.0f, "%.3f");
+			ImGui::SliderFloat("ASGD Beta", &asgd_beta_update, 5.0f, 15.0f, "%.3f");
+
+			for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+			{
+				unique_lock<mutex> lock(asgd_param_mtx[i]);
+				*asgd_struct.datavecF_[0] = asgd_mi0_update;
+				*asgd_struct.datavecF_[1] = asgd_beta_update;
+			}
+
 			ImGui::End();
 		}
 
@@ -692,6 +724,15 @@ void opmode08(short* opt) {
 	gscan_start = true;
 	logging_start = true;
 	control_start = true;
+	ftsensor_start = false;
+}
+
+void opmode09(short* opt) {
+	*opt = OPMODE::IMUS_READ_NOLOG;
+	asgd_start = imu_start = true;
+	gscan_start = false;
+	logging_start = false;
+	control_start = false;
 	ftsensor_start = false;
 }
 

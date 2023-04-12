@@ -60,28 +60,28 @@ void readIMUs(ThrdStruct& data_struct)
 	R << 0, -1, 0, 
 		 0, 0, -1, 
 		 1, 0,  0;
-	Rotate.push_back(R.transpose()); // pe dir
+	Rotate.push_back(R); // pe dir
 
 	R << 0, 0, 1,
 		 0,-1, 0,
 		 1, 0, 0;
-	Rotate.push_back(R.transpose()); // canela dir
+	Rotate.push_back(R); // canela dir
 
 	// R idem
-	Rotate.push_back(R.transpose()); // coxa dir
+	Rotate.push_back(R); // coxa dir
 
 	R << 0, -1, 0,
 		 0, 0, -1,
 		 1, 0,  0;
-	Rotate.push_back(R.transpose()); // pe esq
+	Rotate.push_back(R); // pe esq
 
 	R << 0, 0, 1,
 		 0,-1, 0,
 		 1, 0, 0;
-	Rotate.push_back(R.transpose()); // canela esq
+	Rotate.push_back(R); // canela esq
 
 	// R idem
-	Rotate.push_back(R.transpose()); // coxa esq
+	Rotate.push_back(R); // coxa esq
 
 #if IMU_DBG_LOG
 	char filename[] = "./data/im_debug_log.txt";
@@ -117,10 +117,10 @@ void readIMUs(ThrdStruct& data_struct)
 		desiredUpdateRate = 120;
 		break;
 	case 4:
-		desiredUpdateRate = 75; // 100;
+		desiredUpdateRate = 75; // 100; // using 75 due to low performance!
 		break;
 	case 6:
-		desiredUpdateRate =  75;
+		desiredUpdateRate =  50; // 75; // using 50 due to low performance!
 		break;
 	case 12:
 		desiredUpdateRate =  50;
@@ -129,7 +129,7 @@ void readIMUs(ThrdStruct& data_struct)
 		desiredUpdateRate =  40;
 		break;
 	default:
-		desiredUpdateRate =  75;
+		desiredUpdateRate =  50;
 		break;
 	}
 	const int desiredRadioChannel = 25;
