@@ -6,13 +6,8 @@
 //\///////////////////////\// //// \_'_/\_`_/__|   ///
 ///\///////////////////////\ //////////////////\/////\
 
-#include "mastercallback.h" // Inclui Xsens device API header
-#include "mtwcallback.h"
-// Copyright (c) 2003-2016 Xsens Technologies B.V.
-// or subsidiaries worldwide. All rights reserved.
-
 #include "QpcLoopTimer.h" // ja inclui <windows.h>
-#include "SharedStructs.h" // ja inclui <stdio.h> / <thread> / <mutex> / <vector>
+#include "SharedStructs.h" // inclui <stdio.h> / <thread> / <mutex> / <condition_variable> / mastercallback.h / mtwcallback.h
 #include "LowPassFilter2p.h"
 #include <processthreadsapi.h>
 #include <Eigen/Core>
@@ -22,6 +17,10 @@
 #include <conio.h>
 #include <string>
 #include <random>
+
+
+// Copyright (c) 2003-2016 Xsens Technologies B.V.
+// or subsidiaries worldwide. All rights reserved.
 
 /*! \brief Stream insertion operator overload for XsPortInfo */
 std::ostream& operator<<(std::ostream& out, XsPortInfo const& p)
@@ -361,6 +360,11 @@ void readIMUs(ThrdStruct& data_struct)
 			mtwCallbacks[i] = new MtwCallback(i, mtwDevicesOrdered[i]);
 			mtwDevicesOrdered[i]->addCallbackHandler(mtwCallbacks[i]);
 
+			{
+				unique_lock<mutex> lock(*data_struct.mtx_);
+				data_struct.xs_callbacks[i] = mtwCallbacks[i]; // aqui funciona a passagem de endereco
+			}
+
 			string display_name = mtwDevicesOrdered[i]->deviceId().toString().toStdString();
 			string imu_placement;
 
@@ -388,6 +392,11 @@ void readIMUs(ThrdStruct& data_struct)
 				break;
 			}
 			cout << imu_placement << display_name << "\n";
+		}
+
+		{
+			unique_lock<mutex> lock(*data_struct.mtx_);
+			*data_struct.param3A_ = true;
 		}
 
 		vector<XsVector> accData(mtwCallbacks.size());

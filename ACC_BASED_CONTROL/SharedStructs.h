@@ -7,6 +7,8 @@
 #define SHAREDSTRUCT_H
 // File for structs definitions:
 
+#include "mastercallback.h" // Inclui Xsens device API header
+#include "mtwcallback.h"
 #include <stdio.h>
 #include <thread>
 #include <mutex>
@@ -38,10 +40,11 @@ constexpr int IMU_DATA_SZ = 6;
 typedef struct shared_struct {
     float sampletime_;
     int     exectime_;
-    float      *data_;
-    std::mutex  *mtx_;
+    float*      data_;
+    std::mutex*  mtx_;
     std::mutex* mtx_vector_[NUMBER_OF_IMUS*2];
     std::condition_variable* cv_vector_[NUMBER_OF_IMUS*2];
+    MtwCallback* xs_callbacks[NUMBER_OF_IMUS];
     float *datavec_[DTVC_SZ];
     float *datavecA_[DTVCA_SZ];
     float *datavecB_[DTVCB_SZ];
@@ -59,12 +62,12 @@ typedef struct shared_struct {
     short  param07_;
     short  param08_;
     short  param09_;
-    short *param0A_; // imu_isready      (flag)
-    short *param0B_; // asgd_isready     (flag)
-    short *param0C_; // control_isready  (flag)
-    short *param0D_; // logging_isready  (flag)
-    short *param0E_; // ftsensor_isready (flag)
-    short *param0F_; // gscan_isready    (flag)
+    short* param0A_; // imu_isready      (flag)
+    short* param0B_; // asgd_isready     (flag)
+    short* param0C_; // control_isready  (flag)
+    short* param0D_; // logging_isready  (flag)
+    short* param0E_; // ftsensor_isready (flag)
+    short* param0F_; // gscan_isready    (flag)
 
     // parameters, 2� block:
     short  param10_;
@@ -77,12 +80,12 @@ typedef struct shared_struct {
     short  param17_;
     short  param18_;
     short  param19_;
-    short *param1A_; // imu_aborting      (flag)
-    short *param1B_; // asgd_aborting     (flag)
-    short *param1C_; // control_aborting  (flag)
-    short *param1D_; // logging_aborting  (flag)
-    short *param1E_; // ftsensor_aborting (flag)
-    short *param1F_; // gscan_aborting    (flag)
+    short* param1A_; // imu_aborting      (flag)
+    short* param1B_; // asgd_aborting     (flag)
+    short* param1C_; // control_aborting  (flag)
+    short* param1D_; // logging_aborting  (flag)
+    short* param1E_; // ftsensor_aborting (flag)
+    short* param1F_; // gscan_aborting    (flag)
 
     // parameters, 3� block:
     short  param20_;
@@ -95,12 +98,12 @@ typedef struct shared_struct {
     short  param27_;
     short  param28_;
     short  param29_;
-    short *param2A_; // imu_holding      (flag)
-    short *param2B_; // asgd_holding     (flag)
-    short *param2C_; // control_holding  (flag)
-    short *param2D_; // logging_holding  (flag)
-    short *param2E_; // ftsensor_holding (flag)
-    short *param2F_; // gscan_holding    (flag) 
+    short* param2A_; // imu_holding      (flag)
+    short* param2B_; // asgd_holding     (flag)
+    short* param2C_; // control_holding  (flag)
+    short* param2D_; // logging_holding  (flag)
+    short* param2E_; // ftsensor_holding (flag)
+    short* param2F_; // gscan_holding    (flag) 
 
     // parameters, 4� block:
     short  param30_;
@@ -113,7 +116,7 @@ typedef struct shared_struct {
     short  param37_;
     short  param38_;
     short  param39_;
-    short *param3A_;
+    short* param3A_; // IMU mtwCallbacks(ptr) signal
     short* param3B_;
     short* param3C_;
     short* param3D_;

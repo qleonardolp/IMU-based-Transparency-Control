@@ -123,6 +123,7 @@ int main(int, char**)
 	mutex imus_mtxs[NUMBER_OF_IMUS];
 	mutex asgd_param_mtx[NUMBER_OF_IMUS];
 	condition_variable cvs[NUMBER_OF_IMUS];
+	MtwCallback* MtwCallbacks[NUMBER_OF_IMUS]{NULL};
 	float imu_data[DTVC_SZ] = { 0 };
 	float gains_data[DTVC_SZ] = { 0 };
 	float logging_data[DTVCA_SZ] = { 0 };
@@ -131,6 +132,8 @@ int main(int, char**)
 
 	float asgd_mi0 = ASGD_MI0;
 	float asgd_beta = ASGD_BETA;
+
+	static short mtw_callbacks_ready(false);
 
 	static short imu_isready(false);
 	static short asgd_isready(false);
@@ -160,6 +163,7 @@ int main(int, char**)
 		imu_struct.param00_ = IMU_PRIORITY;
 		imu_struct.param0A_ = &imu_isready;
 		imu_struct.param1A_ = &imu_aborting;
+		imu_struct.param3A_ = &mtw_callbacks_ready;
 		imu_struct.param3F_ = finished + 0;
 		*(imu_struct.datavecB_) = states_data;
 		imu_struct.mtx_ = &comm_mtx;
@@ -171,6 +175,7 @@ int main(int, char**)
 		asgd_struct.param1B_ = &asgd_aborting;
 		asgd_struct.param0A_ = &imu_isready;
 		asgd_struct.param1A_ = &imu_aborting;
+		asgd_struct.param3A_ = &mtw_callbacks_ready;
 		asgd_struct.param3F_ = finished + 1;
 		*(asgd_struct.datavecA_) = logging_data;// to logging
 		*(asgd_struct.datavecB_) = states_data; // to control
@@ -183,6 +188,7 @@ int main(int, char**)
 		{
 			imu_struct.mtx_vector_[i] = asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
 			imu_struct.cv_vector_[i]  = asgd_struct.cv_vector_[i]  = &cvs[i];
+			imu_struct.xs_callbacks[i] = asgd_struct.xs_callbacks[i] = MtwCallbacks[i];
 			// param mutexes
 			asgd_struct.mtx_vector_[i + NUMBER_OF_IMUS] = &asgd_param_mtx[i];
 		}
@@ -577,6 +583,18 @@ int main(int, char**)
 			thr_qasgd = thread(qASGD, asgd_struct);
 			asgd_start = false;
 		}
+
+		{   /// updating xs_callbacks pointers after readIMUs thread instantiate MtwCallbacks[i] 
+			unique_lock<mutex> lock(comm_mtx);
+			if (*imu_struct.param3A_) // readIMUs assigned mtwCallbacks ptrs
+			{
+				for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+				{
+					asgd_struct.xs_callbacks[i] = imu_struct.xs_callbacks[i]; // aqui nao funcionou a passagem de endereco (continuou NULL)
+				}
+			}
+		}
+
 		if (logging_start) {
 			thr_logging = thread(Logging, logging_struct);
 			logging_start = false;
@@ -596,7 +614,7 @@ int main(int, char**)
 
 		// Join Threads:
 		{
-			unique_lock<mutex> _(comm_mtx);
+			unique_lock<mutex> lock(comm_mtx);
 			if (*imu_struct.param3F_) {
 				thr_imus.join();
 				*imu_struct.param3F_ = 0; // restart
