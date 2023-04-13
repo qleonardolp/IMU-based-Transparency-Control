@@ -149,9 +149,17 @@ void readIMUs(ThrdStruct& data_struct)
 	std::default_random_engine generator;
 	std::normal_distribution<float> dist(9.81, 0.5);
 
+	XsDevicePtrArray mtwDevices;
+	mtwDevices.resize(NUMBER_OF_IMUS);
+
 	{   // readIMUs nao espera as outras threads:
 		unique_lock<mutex> _(*data_struct.mtx_);
+
+		for (size_t i = 0; i < NUMBER_OF_IMUS; i++) {
+			*data_struct.mtw_devices[i] = mtwDevices[i];
+		}
 		*data_struct.param0A_ = true; // readIMUs avisa que esta pronto!
+		*data_struct.param3A_ = true;
 		std::cout << "-> 'Reading' IMUs!\n";
 	}
 
@@ -165,19 +173,6 @@ void readIMUs(ThrdStruct& data_struct)
 	do
 	{
 		auto begin_timestamp = chrono::steady_clock::now();
-		/*
-		imus_data[1] = 0.1;
-		imus_data[7] = 0.1;
-		imus_data[9] = 0.5;
-		imus_data[13] = 0.1;
-		imus_data[19] = 0.1;
-		imus_data[23] = dist(generator);
-		{
-			std::unique_lock<mutex> _(*data_struct.mtx_);
-			std::memcpy(*data_struct.datavec_, imus_data, (DTVC_SZ * sizeof(float)));
-		}
-		*/
-
 		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
 		{
 			std::unique_lock<mutex> _(*data_struct.mtx_vector_[i]);
@@ -234,8 +229,6 @@ void readIMUs(ThrdStruct& data_struct)
 			error << "Failed to goto config mode: " << *wirelessMasterDevice;
 			throw runtime_error(error.str());
 		}
-
-		//detectedDevices.clear();
 
 		wirelessMasterDevice->addCallbackHandler(&wirelessMasterCallback);
 
@@ -337,8 +330,6 @@ void readIMUs(ThrdStruct& data_struct)
 			}
 		}
 
-		cout << "Attaching callback handlers to MTWs..." << endl;
-
 		XsDevicePtrArray mtwDevicesOrdered(mtwDevices.size());
 		mtwCallbacks.resize(mtwDevices.size());
 
@@ -357,12 +348,13 @@ void readIMUs(ThrdStruct& data_struct)
 			}
 
 			mtwDevicesOrdered[i] = mtwDevices[idx_unordered];
-			mtwCallbacks[i] = new MtwCallback(i, mtwDevicesOrdered[i]);
-			mtwDevicesOrdered[i]->addCallbackHandler(mtwCallbacks[i]);
+			//mtwCallbacks[i] = new MtwCallback(i, mtwDevicesOrdered[i]);
+			//mtwDevicesOrdered[i]->addCallbackHandler(mtwCallbacks[i]);
 
+			mtw_devices_global[i] = mtwDevices[idx_unordered];
 			{
 				unique_lock<mutex> lock(*data_struct.mtx_);
-				data_struct.xs_callbacks[i] = mtwCallbacks[i]; // aqui funciona a passagem de endereco
+				data_struct.mtw_devices[i] = mtwDevicesOrdered[i];
 			}
 
 			string display_name = mtwDevicesOrdered[i]->deviceId().toString().toStdString();
@@ -396,6 +388,7 @@ void readIMUs(ThrdStruct& data_struct)
 
 		{
 			unique_lock<mutex> lock(*data_struct.mtx_);
+			//data_struct.mtw_devices->assign(mtwDevicesOrdered.size(), &mtwDevicesOrdered[0]);
 			*data_struct.param3A_ = true;
 		}
 
@@ -429,9 +422,7 @@ void readIMUs(ThrdStruct& data_struct)
 		{
 			auto begin_timestamp = chrono::steady_clock::now();
 			// IMU connection check for safety
-			// Avoid wirelessMasterCallback here, I dont know if their mutex is the same of
-			// mtwCallbacks!!!
-			//int imus_connected = wirelessMasterCallback.getWirelessMTWs().size();
+			// Avoid wirelessMasterCallback here, I dont know if their mutex is the same of mtwCallbacks!!!
 			if ((int)mtwCallbacks.size() < 2)
 			{
 				unique_lock<mutex> _(*data_struct.mtx_);
@@ -445,24 +436,18 @@ void readIMUs(ThrdStruct& data_struct)
 					continue;
 
 				bool newDataAvailable = false;
+				/*
 				if (mtwCallbacks[i]->dataAvailable())
 				{
 					newDataAvailable = true;
-
-					//XsDataPacket const* packet = mtwCallbacks[i]->getOldestPacket();
 					XsDataPacket packet = mtwCallbacks[i]->fetchOldestPacket();
 					if (packet.containsCalibratedGyroscopeData())
 						gyroData[i] = packet.calibratedGyroscopeData();
 
 					if (packet.containsCalibratedAcceleration())
 						accData[i] = packet.calibratedAcceleration();
-#ifdef IMU_ATT_LOG
-					if (packet.containsOrientation())
-						eulerData[i] = packet.orientationEuler();
-#endif
-
-					//mtwCallbacks[i]->deleteOldestPacket();
 				}
+				*/
 
 				if (newDataAvailable) {
 					// Orientacao Perna DIR: [-3 2 1]
@@ -491,25 +476,7 @@ void readIMUs(ThrdStruct& data_struct)
 						*data_struct.datavec_[idx] = imu_filters[idx].apply(accRotated(k-3));
 					}
 					data_struct.cv_vector_[i]->notify_one();
-#if IMU_DBG_LOG
-					logFileHandle = fopen(filename, "a");
-					if (logFileHandle != NULL) {
-						float timestamp = float(xsensTimer.micro_now()) / MILLION;
-						fprintf(logFileHandle, "%.5f", timestamp);
-						for (size_t i = 0; i < 18; i++)
-							fprintf(logFileHandle, ", %.4f", imus_data[i]);
-						fprintf(logFileHandle, "\n");
-						fclose(logFileHandle);
-					}
-#endif // IMU_DBG_LOG
 
-					/*
-					for (int k = 0; k < IMU_DATA_SZ; k++) {
-						size_t idx = i * IMU_DATA_SZ + k;
-						*data_struct.datavec_[idx] = imus_data[idx];
-					}
-					data_struct.cv_vector_[i]->notify_one();
-					*/
 					if (data_struct.param39_ == OPMODE::IMU_BYPASS_CONTROL) {
 						unique_lock<mutex> _(*data_struct.mtx_);
 						*(*data_struct.datavecB_ + 1) = imus_data[12]; // hum_rgtknee_vel
