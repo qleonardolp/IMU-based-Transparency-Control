@@ -37,6 +37,7 @@ typedef struct asgd_struct{
     std::mutex* mtx_param_;
     std::condition_variable* cv;
     Eigen::Vector4f *quaternion;
+    MtwCallback* mtw_callback;
     int id;
 } AsgdStruct;
 
@@ -85,6 +86,7 @@ void qASGD(ThrdStruct &data_struct)
 
 
   bool isready_imu(false);
+  bool isready_callbacks(false);
   bool aborting_imu(false);
   bool asgd_abort(false);
   do{ 
@@ -92,24 +94,19 @@ void qASGD(ThrdStruct &data_struct)
       unique_lock<mutex> lock(*data_struct.mtx_);
       isready_imu = *data_struct.param0A_;
       aborting_imu = *data_struct.param1A_;
+      isready_callbacks = *data_struct.param3A_;
       if (aborting_imu)
       {
           asgd_abort = *data_struct.param1B_ = true;
           break;
       }
     } 
-  } while (!isready_imu);
+  } while ( !(isready_imu && isready_callbacks) );
 
   if (asgd_abort) {
       unique_lock<mutex> lock(*data_struct.mtx_);
       *data_struct.param3F_ = true; // finished
       return;
-  }
-
-  {   // qASGD avisa que esta pronto!
-    unique_lock<mutex> _(*data_struct.mtx_);
-    *data_struct.param0B_ = true;
-    cout << "-> qASGD Running!\n";
   }
 
   // cada subthread eh declarada e associada ah uma instancia da funct 'qASGDKalman'
@@ -138,10 +135,18 @@ void qASGD(ThrdStruct &data_struct)
       asgdThreadsStructs[i].beta = data_struct.datavecF_[1];
       asgdThreadsStructs[i].id = i+1;
 
+      asgdThreadsStructs[i].mtw_callback = data_struct.xs_callbacks[i];
+
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
       this_thread::sleep_for(chrono::microseconds(100));
 
       qASGD.push_back(Eigen::Vector4f(1,0,0,0));
+  }
+
+  {   // qASGD avisa que esta pronto!
+      unique_lock<mutex> _(*data_struct.mtx_);
+      *data_struct.param0B_ = true;
+      cout << "-> qASGD Running!\n";
   }
 
   looptimer Timer(data_struct.sampletime_, data_struct.exectime_);
@@ -193,12 +198,6 @@ void qASGD(ThrdStruct &data_struct)
         left_ankle_euler  = quatDelta2Euler(qASGD[3], qDelta(qOffsets[2], qASGD[4]));
         left_knee_euler   = quatDelta2Euler(qASGD[4], qDelta(qOffsets[3], qASGD[5]));
     }
-
-    // Relative Angular Velocity
-    //Vector3f right_knee_vel = RelVector(qDelta(qASGD1_qk, qASGD2_qk), gyro1, gyro2);
-    //Vector3f  left_knee_vel = RelVector(qDelta(qASGD3_qk, qASGD4_qk), gyro3, gyro4);
-
-    Vector3f EulerIMU = Quaternionf(qASGD[1]).toRotationMatrix().eulerAngles(0,1,2);
 
     { // sessao critica
       unique_lock<mutex> lock(*data_struct.mtx_);
@@ -393,6 +392,8 @@ void qASGDKalman(const AsgdStruct& bind_struct)
             miZero = *bind_struct.mi0;
             Beta = *bind_struct.beta;
         } // fim da sessao critica (ext)
+
+        XsDataPacket packet = bind_struct.mtw_callback->fetchOldestPacket();
 
         q0 = qk(0);
         q1 = qk(1);
