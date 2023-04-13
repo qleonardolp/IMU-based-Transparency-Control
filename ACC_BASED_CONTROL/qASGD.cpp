@@ -36,8 +36,10 @@ typedef struct asgd_struct{
     std::mutex* mtx_kalman_;
     std::mutex* mtx_param_;
     std::condition_variable* cv;
+    Eigen::Matrix3f Rot;
     Eigen::Vector4f *quaternion;
     MtwCallback* mtw_callback;
+    XsDevice* mtw_device;
     int id;
 } AsgdStruct;
 
@@ -56,9 +58,34 @@ void qASGD(ThrdStruct &data_struct)
   using namespace std;
   using namespace Eigen;
 
-#if PRIORITY
-  SetThreadPriority(GetCurrentThread(), data_struct.param00_);
-#endif
+  vector<Matrix3f> Rotate;
+  Matrix3f R;
+
+  R << 0, -1, 0,
+      0, 0, -1,
+      1, 0, 0;
+  Rotate.push_back(R); // pe dir
+
+  R << 0, 0, 1,
+      0, -1, 0,
+      1, 0, 0;
+  Rotate.push_back(R); // canela dir
+
+  // R idem
+  Rotate.push_back(R); // coxa dir
+
+  R << 0, -1, 0,
+      0, 0, -1,
+      1, 0, 0;
+  Rotate.push_back(R); // pe esq
+
+  R << 0, 0, 1,
+      0, -1, 0,
+      1, 0, 0;
+  Rotate.push_back(R); // canela esq
+
+  // R idem
+  Rotate.push_back(R); // coxa esq
 
   {
       unique_lock<mutex> _(*data_struct.mtx_);
@@ -135,7 +162,9 @@ void qASGD(ThrdStruct &data_struct)
       asgdThreadsStructs[i].beta = data_struct.datavecF_[1];
       asgdThreadsStructs[i].id = i+1;
 
-      asgdThreadsStructs[i].mtw_callback = data_struct.xs_callbacks[i];
+      //asgdThreadsStructs[i].mtw_device = data_struct.mtw_devices[i];
+      asgdThreadsStructs[i].mtw_device = mtw_devices_global[i];
+      asgdThreadsStructs[i].Rot = Rotate[i];
 
       asgd_threads.push_back(std::thread(qASGDKalman, asgdThreadsStructs[i]));
       this_thread::sleep_for(chrono::microseconds(100));
@@ -370,6 +399,15 @@ void qASGDKalman(const AsgdStruct& bind_struct)
     float mi(0);
 
 
+    MtwCallback* mtwcallback;
+    {
+        unique_lock<mutex> lock(*bind_struct.mtx_xsens_);
+        mtwcallback = new MtwCallback(bind_struct.id, bind_struct.mtw_device);
+        bind_struct.mtw_device->addCallbackHandler(mtwcallback);
+    }
+
+    Matrix3f Rotate = bind_struct.Rot;
+
     float Ts = bind_struct.sampletime_;
     int sampleT_us = Ts * MILLION;
 
@@ -384,16 +422,34 @@ void qASGDKalman(const AsgdStruct& bind_struct)
         auto begin_timestamp = chrono::steady_clock::now();
 
         { // sessao critica:
-            unique_lock<mutex> lock(*bind_struct.mtx_xsens_);
-            gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
-            acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];  
-            //bind_struct.cv->wait(lock);
+            //unique_lock<mutex> lock(*bind_struct.mtx_xsens_);
+            //gyro << *bind_struct.imudata[0], *bind_struct.imudata[1], *bind_struct.imudata[2];
+            //acc << *bind_struct.imudata[3], *bind_struct.imudata[4], *bind_struct.imudata[5];  
+            
+            ////bind_struct.cv->wait(lock);
+
             unique_lock<mutex> lock_params(*bind_struct.mtx_param_);
             miZero = *bind_struct.mi0;
             Beta = *bind_struct.beta;
+
         } // fim da sessao critica (ext)
 
-        XsDataPacket packet = bind_struct.mtw_callback->fetchOldestPacket();
+        if (mtwcallback->dataAvailable())
+        {
+            XsDataPacket packet = mtwcallback->fetchOldestPacket();
+            XsVector accData;
+            XsVector gyroData;
+
+            if (packet.containsCalibratedGyroscopeData())
+                gyroData = packet.calibratedGyroscopeData();
+
+            if (packet.containsCalibratedAcceleration())
+                accData = packet.calibratedAcceleration();
+
+            gyro = Rotate * Vector3f(gyroData.toVector()[0], gyroData.toVector()[1], gyroData.toVector()[2]);
+            acc  = Rotate * Vector3f(accData.toVector()[0],   accData.toVector()[1],  accData.toVector()[2]);
+        }
+
 
         q0 = qk(0);
         q1 = qk(1);

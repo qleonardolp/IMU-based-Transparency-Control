@@ -123,7 +123,8 @@ int main(int, char**)
 	mutex imus_mtxs[NUMBER_OF_IMUS];
 	mutex asgd_param_mtx[NUMBER_OF_IMUS];
 	condition_variable cvs[NUMBER_OF_IMUS];
-	MtwCallback* MtwCallbacks[NUMBER_OF_IMUS]{NULL};
+	XsDevice* mtwDevices[NUMBER_OF_IMUS];
+
 	float imu_data[DTVC_SZ] = { 0 };
 	float gains_data[DTVC_SZ] = { 0 };
 	float logging_data[DTVCA_SZ] = { 0 };
@@ -188,7 +189,7 @@ int main(int, char**)
 		{
 			imu_struct.mtx_vector_[i] = asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
 			imu_struct.cv_vector_[i]  = asgd_struct.cv_vector_[i]  = &cvs[i];
-			imu_struct.xs_callbacks[i] = asgd_struct.xs_callbacks[i] = MtwCallbacks[i];
+			imu_struct.mtw_devices[i] = asgd_struct.mtw_devices[i] = mtwDevices[i];
 			// param mutexes
 			asgd_struct.mtx_vector_[i + NUMBER_OF_IMUS] = &asgd_param_mtx[i];
 		}
@@ -465,22 +466,6 @@ int main(int, char**)
 				phase += 0.05f * values_offset;
 				refresh_time += 1.0f / 60.0f;
 			}
-
-			// Plots can display overlay texts
-			// (in this example, we will display an average value)
-			/*
-			{
-				float average = 0.0f;
-				for (int n = 0; n < IM_ARRAYSIZE(values); n++)
-					average += values[n] * values[n];
-				average /= (float)IM_ARRAYSIZE(values);
-				average = sqrtf(average);
-				char overlay[32];
-				sprintf(overlay, "rms %f", average);
-				ImGui::PlotLines("Lines", values, IM_ARRAYSIZE(values), values_offset, overlay, -1.0f, 1.0f, ImVec2(0, 80.0f));
-			}
-			ImGui::Checkbox("Animate", &animate);
-			*/
 			ImGui::End();
 		}
 
@@ -511,11 +496,8 @@ int main(int, char**)
 			ImGui::Begin("Joint Angle Estimator", &show_imu_window);
 			ImGui::BulletText("This example assumes 60 FPS. Higher FPS requires larger buffer size.");
 			static RollingBuffer   dataRightKnee, dataRightAnkle, dataLeftKnee, dataLeftAnkle;
-			ImVec2 mouse = ImGui::GetMousePos();
 			static float t = 0;
 			t += ImGui::GetIO().DeltaTime;
-			//dataRightKnee.AddPoint(t, mouse.x * 0.0005f);
-			//dataRightAnkle.AddPoint(t, mouse.y * 0.0005f);
 
 			static float history = 10.0f;
 			ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
@@ -583,18 +565,6 @@ int main(int, char**)
 			thr_qasgd = thread(qASGD, asgd_struct);
 			asgd_start = false;
 		}
-
-		{   /// updating xs_callbacks pointers after readIMUs thread instantiate MtwCallbacks[i] 
-			unique_lock<mutex> lock(comm_mtx);
-			if (*imu_struct.param3A_) // readIMUs assigned mtwCallbacks ptrs
-			{
-				for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
-				{
-					asgd_struct.xs_callbacks[i] = imu_struct.xs_callbacks[i]; // aqui nao funcionou a passagem de endereco (continuou NULL)
-				}
-			}
-		}
-
 		if (logging_start) {
 			thr_logging = thread(Logging, logging_struct);
 			logging_start = false;

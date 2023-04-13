@@ -37,6 +37,8 @@ constexpr int IMU_DATA_SZ = 6;
 #define DTVCB_SZ 10
 #define DTVCF_SZ 6
 
+static XsDevice* mtw_devices_global[NUMBER_OF_IMUS];
+
 typedef struct shared_struct {
     float sampletime_;
     int     exectime_;
@@ -44,7 +46,7 @@ typedef struct shared_struct {
     std::mutex*  mtx_;
     std::mutex* mtx_vector_[NUMBER_OF_IMUS*2];
     std::condition_variable* cv_vector_[NUMBER_OF_IMUS*2];
-    MtwCallback* xs_callbacks[NUMBER_OF_IMUS];
+    XsDevice* mtw_devices[NUMBER_OF_IMUS];
     float *datavec_[DTVC_SZ];
     float *datavecA_[DTVCA_SZ];
     float *datavecB_[DTVCB_SZ];
