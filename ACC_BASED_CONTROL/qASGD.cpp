@@ -160,10 +160,12 @@ void qASGD(ThrdStruct &data_struct)
     }
 
     // Compute joints euler angles:
-    right_ankle_euler = quatDelta2Euler(qASGD[0], qASGD[1]); // IMU1 - IMU2
+    // Right Hand Rule:
+    right_ankle_euler = quatDelta2Euler(qASGD[1], qASGD[0]); // IMU2 - IMU1
     right_knee_euler  = quatDelta2Euler(qASGD[1], qASGD[2]); // IMU2 - IMU3
+    // Left  Hand Rule:
     left_ankle_euler  = quatDelta2Euler(qASGD[3], qASGD[4]); // IMU4 - IMU5
-    left_knee_euler   = quatDelta2Euler(qASGD[4], qASGD[5]); // IMU5 - IMU6
+    left_knee_euler   = quatDelta2Euler(qASGD[5], qASGD[4]); // IMU6 - IMU5
 
 
 
@@ -173,11 +175,12 @@ void qASGD(ThrdStruct &data_struct)
     if (elapsedTime < OFFSET_US) //
     {
         float incrmnt = (data_struct.sampletime_ * MILLION) / OFFSET_US;
-
-        qOffsets[0] += incrmnt * qDelta(qASGD[0], qASGD[1]);
+        // Right Hand Rule:
+        qOffsets[0] += incrmnt * qDelta(qASGD[1], qASGD[0]);
         qOffsets[1] += incrmnt * qDelta(qASGD[1], qASGD[2]);
+        // Left  Hand Rule:
         qOffsets[2] += incrmnt * qDelta(qASGD[3], qASGD[4]);
-        qOffsets[3] += incrmnt * qDelta(qASGD[4], qASGD[5]);
+        qOffsets[3] += incrmnt * qDelta(qASGD[5], qASGD[4]);
 
     }
     if (elapsedTime < (OFFSET_US + static_cast<long long>(7 * data_struct.sampletime_ * MILLION)) && elapsedTime >= OFFSET_US) 
@@ -188,10 +191,12 @@ void qASGD(ThrdStruct &data_struct)
         }
 
     } else {   // Compensate arbitrary IMU attitude:
-        right_ankle_euler = quatDelta2Euler(qASGD[0], qDelta(qOffsets[0], qASGD[1]));
+        // Right Hand Rule:
+        right_ankle_euler = quatDelta2Euler(qDelta(qASGD[1], qOffsets[0]), qASGD[0]);
         right_knee_euler  = quatDelta2Euler(qASGD[1], qDelta(qOffsets[1], qASGD[2]));
+        // Left  Hand Rule:
         left_ankle_euler  = quatDelta2Euler(qASGD[3], qDelta(qOffsets[2], qASGD[4]));
-        left_knee_euler   = quatDelta2Euler(qASGD[4], qDelta(qOffsets[3], qASGD[5]));
+        left_knee_euler   = quatDelta2Euler(qDelta(qASGD[5], qOffsets[3]), qASGD[4]);
     }
 
     // Relative Angular Velocity
