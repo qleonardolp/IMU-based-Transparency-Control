@@ -8,7 +8,7 @@ wearable robot ExoTau, designed by the Robotic Rehabilitation Laboratory (São C
 This solution has been developed on VS Express 2012. Follow the steps below to configure the VS solution in order to run the program:
 
 - Add the 'Win32/include' folder from Xsens SDK installation to "Additional Include Directories" in the solution (Configuration Properties > C/C++ > General);
-- Repeat the previous step for the path where [Eigen 3.3.7](http://eigen.tuxfamily.org/dox/GettingStarted.html) was extracted;
+- Repeat the previous step for the Eigen library (submodule here);
 - Add the 'Win32/lib' folder from Xsens SDK to "Additional Library Directories" (Configuration Properties > Linker > General);
 - Repeat the previous step adding '$(NIEXTCCOMPILERSUPP)\lib32\msvc' to "Additional Library Directories";
 - Copy the '.lib' files on Xsens SDK 'Win32/lib' to the **Debug** folder, or wherever the executable is after build the solution in VS. It is required to run the program.
