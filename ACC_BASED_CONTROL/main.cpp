@@ -1,688 +1,733 @@
-/*	Copyright (c) 2003-2016 Xsens Technologies B.V. or subsidiaries worldwide.
-All rights reserved.
+//|///////////////////////////\_____///\////_____ ___  ___ \//|
+//|Leonardo Felipe Lima Santos dos Santos/  | |  | . \/   \ \/|
+//|github/bitbucket qleonardolp        //\ 	| |   \ \   |_|  \|
+//|License: BSD (2022) ////\__________////\ \_'_/\_`_/__|   //|
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+#include <GLES2/gl2.h>
+#endif
+#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-1.	Redistributions of source code must retain the above copyright notice,
-this list of conditions and the following disclaimer.
+// [Win32] Our example includes a copy of glfw3.lib pre-compiled 
+// with VS2010 to maximize ease of testing and compatibility with old VS compilers.
+// To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, 
+// which we do using this pragma. Your own project should not be affected, as you are likely to 
+// link with a newer binary of GLFW that is adequate for your version of Visual Studio.
+//#if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
+//#pragma comment(lib, "legacy_stdio_definitions")
+//#endif
+// comentado pois baixei a glfw3.lib mais recente para VS2022!
 
-2.	Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
+#include "implot.h"
 
-3.	Neither the names of the copyright holders nor the names of their contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
-THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR
-TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-///////////////////////////////////////////////////////////////////////////
-// Adapted by Leonardo Felipe L. S. dos Santos, 2019-2023 (@qleonardolp) //
-///////////////////////////////////////////////////////////////////////////
-
-#include <WinSock2.h>
-
+#include "SharedStructs.h"
+#if CAN_ENABLE
+#include "XsensEpos.h"
+#endif
+#include "QpcLoopTimer.h" // ja inclui <windows.h>
+#include <processthreadsapi.h>
 #include <stdexcept>
 #include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <utility>
-#include <string>
-#include <list>
-#include <set>
-
-#include "AXIS.h"
-#include "EPOS_NETWORK.h"
-#include "generalheader.h"
-#include "Controller.h"
-#include "LowPassFilter2p.h"
-
-#include "findClosestUpdateRate.h"
-#include "mastercallback.h"
-#include "mtwcallback.h"
-
-#include <xsensdeviceapi.h> // The Xsens device API header 
-#include <xsens/xsmutex.h>
-#include "xstypes.h"
 #include <conio.h>
-#include <thread>
-#include <chrono>
 
-#define XSENS_RATE         120    // Use 120 Hz update rate for MTw, 150 Hz usually crashes!
-#define XSENS_FC           60     // IMU cutoff frequency
-#define XSENS_CH           25			// Use radio channel 25 for wireless master.
-#define CALIBRATION_PERIOD 3.0f  // Gyroscope Bias integration period
+void opmode01(short* opt);
+void opmode02(short* opt);
+void opmode03(short* opt);
+void opmode04(short* opt);
+void opmode05(short* opt);
+void opmode06(short* opt);
+void opmode07(short* opt);
+void opmode08(short* opt);
+void opmode09(short* opt);
+void readIMUs(ThrdStruct& data_struct);
+void readFTSensor(ThrdStruct& data_struct);
+void qASGD(ThrdStruct& data_struct);
+void Controle(ThrdStruct& data_struct);
+void Logging(ThrdStruct& data_struct);
+void updateGains(ThrdStruct& data_struct);
 
-void Habilita_Eixo(int ID);
+// DEBUGGING DEFINES:
+#define PRIORITY     0
+#define EXEC_TIME   25
 
-void Desabilita_Eixo(int ID);
+// Threads Sample Time:
+//#define IMU_SMPLTM  0.01333 // "@75 Hz", actually is defined by Xsens 'desiredUpdateRate'
+#define IMU_SMPLTM  0.020 //
+#define ASGD_SMPLTM IMU_SMPLTM //
+#define CTRL_SMPLTM 0.0010 //  @1000 Hz
+#define LOG_SMPLTM  IMU_SMPLTM //  "@200 Hz" 
+#define GSCN_SMPLTM 4.0000 //  @ leitura de ganhos do arquivo a cada 4s 
+#define FT_SMPLTM   0.0010 //  @1000 Hz, pode chegar a 7kHz ... 
+// Threads Priority:
+#define IMU_PRIORITY       -1 //
+#define ASGD_PRIORITY      -1 //
+#define CTRL_PRIORITY      -2 //
+#define LOG_PRIORITY        0 //
+#define DEFAULT_PRIORITY    0 // 
 
+// Global Vars
+bool imu_start(false);
+bool asgd_start(false);
+bool control_start(false);
+bool logging_start(false);
+bool ftsensor_start(false);
+bool gscan_start(false);
 
-/*! \brief Stream insertion operator overload for XsPortInfo */
-std::ostream& operator << (std::ostream& out, XsPortInfo const & p)
+int  execution_time = EXEC_TIME;
+
+// utility structure for realtime plot
+struct RollingBuffer {
+	float Span;
+	ImVector<ImVec2> Data;
+	RollingBuffer() {
+		Span = 10.0f;
+		Data.reserve(2000);
+	}
+	void AddPoint(float x, float y) {
+		float xmod = fmodf(x, Span);
+		if (!Data.empty() && xmod < Data.back().x)
+			Data.shrink(0);
+		Data.push_back(ImVec2(xmod, y));
+	}
+};
+
+static void glfw_error_callback(int error, const char* description)
 {
-  out << "Port: " << std::setw(2) << std::right << p.portNumber() << " (" << p.portName().toStdString() << ") @ "
-    << std::setw(7) << p.baudrate() << " Bd"
-    << ", " << "ID: " << p.deviceId().toString().toStdString()
-    ;
-  return out;
+	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-/*! \brief Stream insertion operator overload for XsDevice */
-std::ostream& operator << (std::ostream& out, XsDevice const & d)
+int main(int, char**)
 {
-  out << "ID: " << d.deviceId().toString().toStdString() << " (" << d.productCode().toStdString() << ")";
-  return out;
-}
+	using namespace std;
+#if PRIORITY
+	DWORD dwPriority, dwError;
+	if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
+		dwError = GetLastError();
+		printf("Error %lu! \n", dwError);
+	}
+	else {
+		dwPriority = GetPriorityClass(GetCurrentProcess());
+		printf("Process priority class: %lu \n", dwPriority);
+	}
+#endif
 
+#if ( CAN_ENABLE && false)
+	cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << endl;
+	IniciaRedeCan();
+#endif
 
+	mutex comm_mtx;
+	mutex imus_mtxs[NUMBER_OF_IMUS];
+	mutex asgd_param_mtx[NUMBER_OF_IMUS];
+	condition_variable cvs[NUMBER_OF_IMUS];
+	XsDevice* mtwDevices[NUMBER_OF_IMUS];
 
-int main(int argc, char** argv)
-{
-  QueryPerformanceFrequency(&TICKS_PER_SECOND);
-  ticksSampleTime = TICKS_PER_SECOND.QuadPart * SAMPLE_TIME;
+	float imu_data[DTVC_SZ] = { 0 };
+	float gains_data[DTVC_SZ] = { 0 };
+	float logging_data[DTVCA_SZ] = { 0 };
+	float states_data[DTVCB_SZ] = { 0 };
+	float ati_data[DTVCF_SZ] = { 0 };
 
-  //START DE TRANSMISS�O DA REDE CAN
-  epos.StartPDOS(1);
-  epos.StartPDOS(2);
-  epos.StartPDOS(3);
-  epos.StartPDOS(4);
-  epos.StartPDOS(5);
-  epos.StartPDOS(1);
-  epos.StartPDOS(2);
-  epos.StartPDOS(3);
-  epos.StartPDOS(4);
-  epos.StartPDOS(5);
+	float asgd_mi0 = ASGD_MI0;
+	float asgd_beta = ASGD_BETA;
 
-  std::cout << "INICIALIZANDO COMUNICACAO CANOpen COM AS EPOS" << std::endl;
+	static short mtw_callbacks_ready(false);
 
-  //Inicializando a comunica��o com os eixos
-  for (int i = 0; i < 10; i++)
-  {
-    //Aguarda tempo
-    endwait = clock() + 1 * CLOCKS_PER_SEC;
-    while (clock() < endwait)
-    {
-    }
+	static short imu_isready(false);
+	static short asgd_isready(false);
+	static short control_isready(false);
+	static short logging_isready(false);
+	static short ftsensor_isready(false);
+	static short gscan_isready(false);
 
-    //Sincroniza as epos
-    epos.sync();
+	static short imu_aborting(false);
+	static short asgd_aborting(false);
+	static short control_aborting(false);
+	static short logging_aborting(false);
+	static short ftsensor_aborting(false);
+	static short gscan_aborting(false);
 
-    eixo_out.ReadPDO01();
-    eixo_in.ReadPDO01();
+	short finished[10] = { 0 }; // finished flags
+	bool th_running = false; // TODO: flag para evitar que na GUI uma nova execucao seja iniciada enquanto ha um rodando...
 
-    printf(".");
-  }
+	ThrdStruct imu_struct, asgd_struct, ftsensor_struct;
+	ThrdStruct control_struct, logging_struct, gscan_struct;
 
-  std::cout << "Resetando Falhas " << std::endl;
+	// Function Structs definition:
+	{ // Apenas para colapsar e facilitar leitura do código
 
-  //EPOS 01
-  eixo_out.PDOsetControlWord_FaultReset(true);
-  eixo_out.WritePDO01();
+	// IMU Struct:
+		imu_struct.sampletime_ = IMU_SMPLTM;
+		imu_struct.param00_ = IMU_PRIORITY;
+		imu_struct.param0A_ = &imu_isready;
+		imu_struct.param1A_ = &imu_aborting;
+		imu_struct.param3A_ = &mtw_callbacks_ready;
+		imu_struct.param3F_ = finished + 0;
+		*(imu_struct.datavecB_) = states_data;
+		imu_struct.mtx_ = &comm_mtx;
 
-  //printf("\nResetando as falhas.");
+		// qASGD Struct:
+		asgd_struct.sampletime_ = ASGD_SMPLTM;
+		asgd_struct.param00_ = ASGD_PRIORITY;
+		asgd_struct.param0B_ = &asgd_isready;
+		asgd_struct.param1B_ = &asgd_aborting;
+		asgd_struct.param0A_ = &imu_isready;
+		asgd_struct.param1A_ = &imu_aborting;
+		asgd_struct.param3A_ = &mtw_callbacks_ready;
+		asgd_struct.param3F_ = finished + 1;
+		*(asgd_struct.datavecA_) = logging_data;// to logging
+		*(asgd_struct.datavecB_) = states_data; // to control
+		asgd_struct.mtx_ = &comm_mtx;
 
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+		asgd_struct.datavecF_[0] = &asgd_mi0;
+		asgd_struct.datavecF_[1] = &asgd_beta;
 
-  std::cout << "..";
+		for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+		{
+			imu_struct.mtx_vector_[i] = asgd_struct.mtx_vector_[i] = &imus_mtxs[i];
+			imu_struct.cv_vector_[i]  = asgd_struct.cv_vector_[i]  = &cvs[i];
+			imu_struct.mtw_devices[i] = asgd_struct.mtw_devices[i] = mtwDevices[i];
+			// param mutexes
+			asgd_struct.mtx_vector_[i + NUMBER_OF_IMUS] = &asgd_param_mtx[i];
+		}
 
-  //EPOS 01
-  eixo_out.PDOsetControlWord_FaultReset(false);
-  eixo_in.WritePDO01();
+		for (size_t i = 0; i < DTVC_SZ; i++)
+		{
+			imu_struct.datavec_[i] = asgd_struct.datavec_[i] = &imu_data[i];
+		}
 
-  std::cout << "..";
+		// Control Struct
+		control_struct.sampletime_ = CTRL_SMPLTM;
+		control_struct.param00_ = CTRL_PRIORITY;
+		control_struct.param0C_ = &control_isready;
+		control_struct.param1C_ = &control_aborting;
+		control_struct.param0A_ = &imu_isready;
+		control_struct.param1A_ = &imu_aborting;
+		control_struct.param0B_ = &asgd_isready;
+		control_struct.param0D_ = &logging_isready;
+		control_struct.param0E_ = &ftsensor_isready;
+		control_struct.param1E_ = &ftsensor_aborting;
+		control_struct.param0F_ = &gscan_isready;
+		control_struct.param3F_ = finished + 2;
+		*(control_struct.datavec_) = gains_data;
+		*(control_struct.datavecA_) = logging_data;
+		*(control_struct.datavecB_) = states_data;
+		*(control_struct.datavecF_) = ati_data;
+		control_struct.mtx_ = &comm_mtx;
 
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+		// Logging Struct
+		logging_struct.sampletime_ = LOG_SMPLTM;
+		logging_struct.param00_ = LOG_PRIORITY;
+		logging_struct.param0D_ = &logging_isready;
+		logging_struct.param1D_ = &logging_aborting;
+		logging_struct.param0A_ = &imu_isready;
+		logging_struct.param1A_ = &imu_aborting;
+		logging_struct.param0B_ = &asgd_isready;
+		logging_struct.param1B_ = &asgd_aborting;
+		logging_struct.param0C_ = &control_isready;
+		logging_struct.param1C_ = &control_aborting;
+		logging_struct.param0E_ = &ftsensor_isready;
+		logging_struct.param3F_ = finished + 3;
+		*(logging_struct.datavec_) = gains_data;
+#ifdef IMU_ATT_LOG
+		// TODO: use another vector, imu_data is only for readIMUs and qASGD			
+		*(logging_struct.datavec_) = imu_data; 
+#endif
+		*(logging_struct.datavecA_) = logging_data;
+		*(logging_struct.datavecB_) = states_data;
+		*(logging_struct.datavecF_) = ati_data;
+		logging_struct.mtx_ = &comm_mtx;
 
-  printf("..");
+		// F/T Sensor Struct
+		ftsensor_struct.sampletime_ = FT_SMPLTM;
+		ftsensor_struct.param00_ = DEFAULT_PRIORITY;
+		ftsensor_struct.param0E_ = &ftsensor_isready;
+		ftsensor_struct.param1E_ = &ftsensor_aborting;
+		ftsensor_struct.param0A_ = &imu_isready;
+		ftsensor_struct.param1A_ = &imu_aborting;
+		ftsensor_struct.param3F_ = finished + 4;
+		*(ftsensor_struct.datavecB_) = states_data;
+		*(ftsensor_struct.datavecF_) = ati_data;
+		ftsensor_struct.mtx_ = &comm_mtx;
 
-  //EPOS 02
-  eixo_in.PDOsetControlWord_FaultReset(true);
-  eixo_in.WritePDO01();
+		// updateGains Struct
+		gscan_struct.sampletime_ = GSCN_SMPLTM;
+		gscan_struct.param00_ = DEFAULT_PRIORITY;
+		gscan_struct.param0F_ = &gscan_isready;
+		gscan_struct.param1F_ = &gscan_aborting;
+		gscan_struct.param0D_ = &logging_isready;
+		gscan_struct.param0C_ = &control_isready;
+		gscan_struct.param3F_ = finished + 5;
+		*(gscan_struct.datavec_) = gains_data;
+		gscan_struct.mtx_ = &comm_mtx;
+	}
+	// Threads declaration
+	thread thr_imus;
+	thread thr_qasgd;
+	thread thr_controle;
+	thread thr_logging;
+	thread thr_ftsensor;
+	thread thr_gainscan;
 
-  std::cout << "..";
+	// Setup window
+	glfwSetErrorCallback(glfw_error_callback);
+	if (!glfwInit())
+		return 1;
 
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+	// Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+	// GL ES 2.0 + GLSL 100
+	const char* glsl_version = "#version 100";
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+#elif defined(__APPLE__)
+	// GL 3.2 + GLSL 150
+	const char* glsl_version = "#version 150";
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+#else
+	// GL 3.0 + GLSL 130
+	const char* glsl_version = "#version 130";
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+	//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+#endif
 
-  std::cout << "..";
+	// Create window with graphics context
+	GLFWwindow* window = glfwCreateWindow(WIND_WIDTH, WIND_HEIGHT, "Project Hylonome | D.ImGui[GLFW/OpenGL3]+ImPlot", NULL, NULL);
+	if (window == NULL) return 1;
+	glfwSetWindowPos(window, 0, 38);
+	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1); // Enable vsync
 
-  //EPOS 02
-  eixo_in.PDOsetControlWord_FaultReset(false);
-  eixo_in.WritePDO01();
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-  std::cout << "..";
+	ImPlot::CreateContext();
 
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
+	ImGui::LoadIniSettingsFromDisk("imgui.ini");
+	// Setup Dear ImGui style
+	ImGui::StyleColorsLight();
+	ImGui::GetStyle().FrameRounding = 3;
+	ImGui::GetStyle().FrameBorderSize = 1;
+	ImGui::GetStyle().AntiAliasedLinesUseTex = false;
+	ImGui::GetStyle().AntiAliasedFill = false;
+	ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
 
-  std::cout << "OK" << std::endl;
+	// Setup Platform/Renderer backends
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init(glsl_version);
 
-  // ---------------------------------------------  Xsens Awinda Station management  ---------------------------------------------- //
+	// Our state
+	bool show_demo_window = false;
+	bool show_another_window = false;
+	ImVec4 clear_color = ImVec4(0.6f, 0.6f, 0.6f, 1.00f);
 
+	bool show_imu_window = false;
+	bool show_ctrl_window = false;
 
-  /*
-
-  | MTw  | desiredUpdateRate (max) |
-  |------|------------------------|
-  |  1   |           150 Hz        |
-  |  2   |           120 Hz        |
-  |  4   |           100 Hz        |
-  |  6   |            75 Hz        |
-  |  12  |            50 Hz        |
-  |  18  |            40 Hz        |
-
-  */
-
-  const int desiredUpdateRate = XSENS_RATE;
-  const int desiredRadioChannel = XSENS_CH;
-
-  WirelessMasterCallback wirelessMasterCallback;			// Callback for wireless master
-  std::vector<MtwCallback*> mtwCallbacks;					// Callbacks for mtw devices
-
-  //std::cout << "Constructing XsControl..." << std::endl;
-  XsControl* control = XsControl::construct();
-  if (control == 0)
-  {
-    std::cout << "Failed to construct XsControl instance." << std::endl;
-  }
-
-  try
-  {
-    //std::cout << "Scanning ports..." << std::endl;
-    XsPortInfoArray detectedDevices = XsScanner::scanPorts();
-
-    //std::cout << "Finding wireless master..." << std::endl;
-    XsPortInfoArray::const_iterator wirelessMasterPort = detectedDevices.begin();
-    while (wirelessMasterPort != detectedDevices.end() && !wirelessMasterPort->deviceId().isWirelessMaster())
-    {
-      ++wirelessMasterPort;
-    }
-    if (wirelessMasterPort == detectedDevices.end())
-    {
-      throw std::runtime_error("No wireless masters found");
-    }
-    std::cout << "Wireless master found @ " << *wirelessMasterPort << std::endl;
-
-    std::cout << "Opening port..." << std::endl;
-    if (!control->openPort(wirelessMasterPort->portName().toStdString(), wirelessMasterPort->baudrate()))
-    {
-      std::ostringstream error;
-      error << "Failed to open port " << *wirelessMasterPort;
-      throw std::runtime_error(error.str());
-    }
-
-    //std::cout << "Getting XsDevice instance for wireless master..." << std::endl;
-    XsDevicePtr wirelessMasterDevice = control->device(wirelessMasterPort->deviceId());
-    if (wirelessMasterDevice == 0)
-    {
-      std::ostringstream error;
-      error << "Failed to construct XsDevice instance: " << *wirelessMasterPort;
-      throw std::runtime_error(error.str());
-    }
-
-    std::cout << "XsDevice instance created @ " << *wirelessMasterDevice << std::endl;
-
-    //std::cout << "Setting config mode..." << std::endl;
-    if (!wirelessMasterDevice->gotoConfig())
-    {
-      std::ostringstream error;
-      error << "Failed to goto config mode: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-
-    //std::cout << "Attaching callback handler..." << std::endl;
-    wirelessMasterDevice->addCallbackHandler(&wirelessMasterCallback);
-
-    std::cout << "Getting the list of the supported update rates..." << std::endl;
-    const XsIntArray supportedUpdateRates = wirelessMasterDevice->supportedUpdateRates();
-
-    std::cout << "Supported update rates: ";
-    for (XsIntArray::const_iterator itUpRate = supportedUpdateRates.begin(); itUpRate != supportedUpdateRates.end(); ++itUpRate)
-    {
-      std::cout << *itUpRate << " ";
-    }
-    std::cout << std::endl;
-
-    const int newUpdateRate = findClosestUpdateRate(supportedUpdateRates, desiredUpdateRate);
-
-    std::cout << "Setting update rate to " << newUpdateRate << " Hz..." << std::endl;
-    if (!wirelessMasterDevice->setUpdateRate(newUpdateRate))
-    {
-      std::ostringstream error;
-      error << "Failed to set update rate: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-
-    std::cout << "Disabling radio channel if previously enabled..." << std::endl;
-    if (wirelessMasterDevice->isRadioEnabled())
-    {
-      if (!wirelessMasterDevice->disableRadio())
-      {
-        std::ostringstream error;
-        error << "Failed to disable radio channel: " << *wirelessMasterDevice;
-        throw std::runtime_error(error.str());
-      }
-    }
-
-    std::cout << "Setting radio channel to " << desiredRadioChannel << " and enabling radio..." << std::endl;
-    if (!wirelessMasterDevice->enableRadio(desiredRadioChannel))
-    {
-      std::ostringstream error;
-      error << "Failed to set radio channel: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-
-    std::cout << "Waiting for MTW to wirelessly connect...\n" << std::endl;
-
-    bool quitOnMTw = false;
-    bool waitForConnections = true;
-
-    size_t connectedMTWCount = wirelessMasterCallback.getWirelessMTWs().size();
-    do
-    {
-      XsTime::msleep(100);
-
-      while (true)
-      {
-        size_t nextCount = wirelessMasterCallback.getWirelessMTWs().size();
-        if (nextCount != connectedMTWCount)
-        {
-          std::cout << "Number of connected MTWs: " << nextCount << ". Press 'y' to start measurement or 'q' to quit \n";
-          connectedMTWCount = nextCount;
-        }
-        else
-        {
-          break;
-        }
-      }
-      if (_kbhit())
-      {
-        char keypressed = _getch();
-        if ('y' == keypressed)
-          waitForConnections = false;
-        if ('q' == keypressed)
-        {
-          quitOnMTw = true;
-          waitForConnections = false;
-        }
-      }
-    } while (waitForConnections);
-
-    if (quitOnMTw)
-    {
-      wirelessMasterDevice->gotoConfig();
-      wirelessMasterDevice->disableRadio();
-      throw std::runtime_error("quit by user request");
-    }
-
-    char control_mode;
-    int log_time;
-
-    printf("Choose the control mode:\n[p] Position\n[s] Speed\n[k] CACuKF\n[a] CAC\n[u] CACu\n");
-    scanf("%c", &control_mode);
-	while (control_mode != 'p' && control_mode != 's' && control_mode != 'k' && control_mode != 'a' && control_mode != 'u')
+	// Main loop
+	while (!glfwWindowShouldClose(window))
 	{
-		printf("CHOOSE A PROPER CONTROL MODE: [p]  [s]  [k]  [a]  [u]\n");
-		scanf("%c", &control_mode);
+		// Poll and handle events (inputs, window resize, etc.)
+		// You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
+		// - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
+		// - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
+		// Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+		glfwPollEvents();
+
+		// Start the Dear ImGui frame
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+		if (show_demo_window)
+			ImGui::ShowDemoWindow(&show_demo_window);
+
+		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+		{
+			static float f = 0.0f;
+			static int counter = 0;
+			static short option = 0;
+
+			ImGui::Begin("Hello, ExoTau!");                          // Create a window with string name...
+
+			ImGui::Text(" //////////////////////////////////////////\\/////////\\/");
+			ImGui::Text(" // INTERFACE DE CONTROLE EXO-TAU  /       /\\     ////\\");
+			ImGui::Text(" // EESC-USP          [%.1f FPS]  / _____ ___  ___  //|", ImGui::GetIO().Framerate);
+			ImGui::Text(" // RehabLab | LegRo             /  | |  | . \\/   \\  /|");
+			ImGui::Text(" // *Copyright 2021-2026* \\//// //  | |   \\ \\   |_|  /|");
+			ImGui::Text(" //\\///////////////////////\\// //// \\_'_/\\_`_/__|   ///");
+			ImGui::Text(" ///\\///////////////////////\\ //////////////////\\/////\\");
+
+			ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+			ImGui::Checkbox("Another Window", &show_another_window);
+
+			//ImGui::SliderFloat("float", &f, -5.0f, 5.0f);           // Edit 1 float using a slider
+			//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+			if (ImGui::Button("Button")) counter++;                   // Buttons return true when clicked (most widgets return true when edited/activated)
+			ImGui::SameLine();
+			ImGui::Text("counter = %d", counter);
+
+			if (ImGui::Button("Controle com IMUs + F/T"))
+				opmode01(&option);
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Controle com IMUs"))
+				opmode02(&option);
+
+			if (ImGui::Button("Controle 'IMU3 bypass'"))
+				opmode03(&option);
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Controle sem IMUs (MF SEA)"))
+				opmode08(&option);
+
+			if (ImGui::Button("Leitura IMUs"))
+				opmode04(&option);
+
+			ImGui::SameLine();
+			
+			if (ImGui::Button("Leitura IMUs (Sem Log)"))
+				opmode09(&option);
+
+			if (ImGui::Button("Leitura F/T"))
+				opmode05(&option);
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Leitura Parametros"))
+				opmode06(&option);
+
+			if (ImGui::Button("Reset Falhas CAN"))
+			{
+				opmode07(&option);
+#if CAN_ENABLE
+				ResetRedeCan();
+				HabilitaEixo(2);
+				DesabilitaEixo(2);
+#endif
+			}
+
+			// Pass the operation mode to the threads:
+			imu_struct.param39_ = option;
+			asgd_struct.param39_ = option;
+			control_struct.param39_ = option;
+			logging_struct.param39_ = option;
+
+			// Fill structs exectime:
+			imu_struct.exectime_ = execution_time;
+			asgd_struct.exectime_ = execution_time;
+			gscan_struct.exectime_ = execution_time;
+			control_struct.exectime_ = execution_time;
+			logging_struct.exectime_ = execution_time;
+			ftsensor_struct.exectime_ = execution_time;
+
+			//ImGui::Text("Tempo de execução (s):");
+			//ImGui::SameLine();
+			if (ImGui::InputInt("segundos", &execution_time, 1, 20)) {
+				imu_struct.exectime_ = execution_time;
+				asgd_struct.exectime_ = execution_time;
+				gscan_struct.exectime_ = execution_time;
+				control_struct.exectime_ = execution_time;
+				logging_struct.exectime_ = execution_time;
+				ftsensor_struct.exectime_ = execution_time;
+			}
+
+			// Fill an array of contiguous float values to plot
+			// Tip: If your float aren't contiguous but part of a structure, you can pass a pointer to your first float
+			// and the sizeof() of your structure in the "stride" parameter.
+			static bool animate = true;
+			static float values[90] = {};
+			static int values_offset = 0;
+			static double refresh_time = 0.0;
+			if (!animate || refresh_time == 0.0)
+				refresh_time = ImGui::GetTime();
+			while (refresh_time < ImGui::GetTime()) // Create data at fixed 60 Hz rate for the demo
+			{
+				static float phase = 0.0f;
+				values[values_offset] = cosf(phase);
+				values_offset = (values_offset + 1) % IM_ARRAYSIZE(values);
+				phase += 0.05f * values_offset;
+				refresh_time += 1.0f / 60.0f;
+			}
+			ImGui::End();
+		}
+
+		// Escolher tipo de controle:
+		if (control_start || show_ctrl_window) {
+			show_ctrl_window = true;
+			ImGui::Begin("Controlador", &show_ctrl_window);
+			ImGui::Text(" Escolha uma controlador:");
+			static short option = -1;
+			if (ImGui::Button("Acc-based Transparency (PD)")) option = 1;
+			if (ImGui::Button("Acc-based Transparency Z_0")) option = 2;
+			if (ImGui::Button("Acc-based Transparency (LS)")) option = 3;
+			if (ImGui::Button("Int-based Transparency (F/T)")) option = 4;
+			if (ImGui::Button("Markovian Transparency (Mao)")) option = 5;
+			if (ImGui::Button("Malha Fechada SEA (MF SEA)"))   option = 8;
+			if (ImGui::Button("GyroscopeX 'IMU3 bypass'"))   option = 33;
+			// to logging the control option
+			control_struct.param01_ = option;
+			logging_struct.param10_ = option;
+			ftsensor_struct.param01_ = true; // F/T filtering on/off
+			ImGui::End();
+		}
+
+		// Janela de graficos (realtime) IMUs:
+		if (imu_start || show_imu_window)
+		{
+			show_imu_window = true;
+			ImGui::Begin("Joint Angle Estimator", &show_imu_window);
+			ImGui::BulletText("This example assumes 60 FPS. Higher FPS requires larger buffer size.");
+			static RollingBuffer   dataRightKnee, dataRightAnkle, dataLeftKnee, dataLeftAnkle;
+			static float t = 0;
+			t += ImGui::GetIO().DeltaTime;
+
+			static float history = 10.0f;
+			ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
+			dataRightKnee.Span = history;
+			dataRightAnkle.Span = history;
+			dataLeftKnee.Span = history;
+			dataLeftAnkle.Span = history;
+
+			static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
+
+			if (ImPlot::BeginPlot("Joint Positions", ImVec2(-1, 200))) {
+				
+				unique_lock<mutex> lock(comm_mtx);
+				dataRightAnkle.AddPoint(t, states_data[0]);
+				dataRightKnee.AddPoint(t, states_data[1]);
+				dataLeftAnkle.AddPoint(t, states_data[2]);
+				dataLeftKnee.AddPoint(t, states_data[3]);
+
+				// IMU Abort close this window:
+				show_imu_window = !(*imu_struct.param1A_);
+
+				ImPlot::SetupAxes(NULL, NULL, flags, flags);
+				ImPlot::SetupAxisLimits(ImAxis_X1, 0, history, ImGuiCond_Always);
+				ImPlot::SetupAxisLimits(ImAxis_Y1, -180, 180, ImGuiCond_Always);
+				ImPlot::PlotLine("Right Knee", &dataRightKnee.Data[0].x, &dataRightKnee.Data[0].y, dataRightKnee.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Right Ankle", &dataRightAnkle.Data[0].x, &dataRightAnkle.Data[0].y, dataRightAnkle.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Left Knee", &dataLeftKnee.Data[0].x, &dataLeftKnee.Data[0].y, dataLeftKnee.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::PlotLine("Left Ankle", &dataLeftAnkle.Data[0].x, &dataLeftAnkle.Data[0].y, dataLeftAnkle.Data.size(), 0, 2 * sizeof(float));
+				ImPlot::EndPlot();
+			}
+
+			static float asgd_mi0_update = ASGD_MI0;
+			static float asgd_beta_update = ASGD_BETA;
+			ImGui::SliderFloat("ASGD Mi0", &asgd_mi0_update, 0.1f, 5.0f, "%.3f");
+			ImGui::SliderFloat("ASGD Beta", &asgd_beta_update, 5.0f, 15.0f, "%.3f");
+
+			for (size_t i = 0; i < NUMBER_OF_IMUS; i++)
+			{
+				unique_lock<mutex> lock(asgd_param_mtx[i]);
+				*asgd_struct.datavecF_[0] = asgd_mi0_update;
+				*asgd_struct.datavecF_[1] = asgd_beta_update;
+			}
+
+			ImGui::End();
+		}
+
+		// 3. Show another simple window.
+		if (show_another_window)
+		{
+			// Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+			ImGui::Begin("Another Window", &show_another_window);
+			ImGui::Text("Hello from another window!");
+			if (ImGui::Button("Close Me"))
+				show_another_window = false;
+			ImGui::End();
+		}
+
+		// TODO: alguma thread esta rodando sem a outra que eh dependente rodar...
+		// Fire Threads:
+		if (imu_start) {
+			thr_imus = thread(readIMUs, imu_struct);
+			imu_start = false;
+		}
+		if (asgd_start) {
+			thr_qasgd = thread(qASGD, asgd_struct);
+			asgd_start = false;
+		}
+		if (logging_start) {
+			thr_logging = thread(Logging, logging_struct);
+			logging_start = false;
+		}
+		if (control_start) {
+			thr_controle = thread(Controle, control_struct);
+			control_start = false;
+		}
+		if (ftsensor_start) {
+			thr_ftsensor = thread(readFTSensor, ftsensor_struct);
+			ftsensor_start = false;
+		}
+		if (gscan_start) {
+			thr_gainscan = thread(updateGains, gscan_struct);
+			gscan_start = false;
+		}
+
+		// Join Threads:
+		{
+			unique_lock<mutex> lock(comm_mtx);
+			if (*imu_struct.param3F_) {
+				thr_imus.join();
+				*imu_struct.param3F_ = 0; // restart
+				cout << "-> readIMU jointed!" << endl;
+			}
+			if (*asgd_struct.param3F_) {
+				thr_qasgd.join();
+				*asgd_struct.param3F_ = 0;
+				cout << "-> qASGD jointed!" << endl;
+			}
+			if (*logging_struct.param3F_) {
+				thr_logging.join();
+				*logging_struct.param3F_ = 0;
+				cout << "-> Logging jointed!" << endl;
+			}
+			if (*control_struct.param3F_) {
+				thr_controle.join();
+				*control_struct.param3F_ = 0;
+				cout << "-> Control jointed!" << endl;
+			}
+			if (*ftsensor_struct.param3F_) {
+				thr_ftsensor.join();
+				*ftsensor_struct.param3F_ = 0;
+				cout << "-> FT Sensor jointed!" << endl;
+			}
+			if (*gscan_struct.param3F_) {
+				thr_gainscan.join();
+				*gscan_struct.param3F_ = 0;
+				cout << "-> GainScan jointed!" << endl;
+			}
+		}
+
+		// Rendering
+		ImGui::Render();
+		int display_w, display_h;
+		glfwGetFramebufferSize(window, &display_w, &display_h);
+		glViewport(0, 0, display_w, display_h);
+		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+		glClear(GL_COLOR_BUFFER_BIT);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+		glfwSwapBuffers(window);
 	}
 
-    printf("How long (sec) do you want to record this run? Zero (0) to do not record: ");
-    scanf("%d", &log_time);
+#if CAN_ENABLE
+	epos.StopPDOS(1);
+#endif
+	std::cout << " Successful exit." << endl;
+	// ImGui cleanup:
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImPlot::DestroyContext();
+	ImGui::DestroyContext();
 
-    std::cout << "Starting measurement..." << std::endl;
-    if (!wirelessMasterDevice->gotoMeasurement())
-    {
-      std::ostringstream error;
-      error << "Failed to goto measurement mode: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-
-    //std::cout << "Getting XsDevice instances for all MTWs..." << std::endl;
-    XsDeviceIdArray allDeviceIds = control->deviceIds();
-    XsDeviceIdArray mtwDeviceIds;
-    for (XsDeviceIdArray::const_iterator i = allDeviceIds.begin(); i != allDeviceIds.end(); ++i)
-    {
-      if (i->isMtw())
-      {
-        mtwDeviceIds.push_back(*i);
-      }
-    }
-    XsDevicePtrArray mtwDevices;
-    for (XsDeviceIdArray::const_iterator i = mtwDeviceIds.begin(); i != mtwDeviceIds.end(); ++i)
-    {
-      XsDevicePtr mtwDevice = control->device(*i);
-      if (mtwDevice != 0)
-      {
-        mtwDevices.push_back(mtwDevice);
-      }
-      else
-      {
-        throw std::runtime_error("Failed to create an MTW XsDevice instance");
-      }
-    }
-
-    //std::cout << "Attaching callback handlers to MTWs..." << std::endl;
-    mtwCallbacks.resize(mtwDevices.size());
-    for (int i = 0; i < (int)mtwDevices.size(); ++i)
-    {
-      mtwCallbacks[i] = new MtwCallback(i, mtwDevices[i]);
-      mtwDevices[i]->addCallbackHandler(mtwCallbacks[i]);
-    }
-
-    for (int i = 0; i < (int)mtwDevices.size(); ++i)
-    {
-      if (i == 0)
-      {
-        std::cout << "MTw Hum: " << mtwDevices[i]->deviceId().toString().toStdString();
-      }
-      if (i == 1)
-      {
-        std::cout << " MTw Exo: " << mtwDevices[i]->deviceId().toString().toStdString() << std::endl;
-      }
-    }
-
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    std::vector<XsVector> accData(mtwCallbacks.size());
-    std::vector<XsVector> gyroData(mtwCallbacks.size());
-
-    wirelessMasterCallback.mtw_event.clear();
-
-    // Gyroscopes Bias Calibration (Trapezoial Integration)
-    std::cout << "Calculating Gyroscope Bias, do not move the IMUs!";
-
-    float integration_time(0.000f);
-    float imus_ybias[2] = {0,0};
-    float gyro_y_last[2] = {0,0};
-    float deltaT = 0;
-    clock_t bias_startpoint = clock();
-    clock_t last_clk = clock();
-    while (integration_time <= CALIBRATION_PERIOD)
-    {
-      XsTime::msleep(4);
-
-      for (size_t i = 0; i < mtwCallbacks.size(); ++i)
-      {
-        if (mtwCallbacks[i]->dataAvailable())
-        {
-          XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
-
-          gyroData[i] = packet->calibratedGyroscopeData();
-
-          imus_ybias[i] += 0.5*(gyro_y_last[i] + (float)gyroData[i].value(2))*deltaT;
-          gyro_y_last[i] = (float)gyroData[i].value(2);
-          
-          mtwCallbacks[i]->deleteOldestPacket();
-        }
-      }
-      auto sys_clk = clock();
-      deltaT = (float) (sys_clk - last_clk)/CLOCKS_PER_SEC;
-      integration_time = (float) (sys_clk - bias_startpoint)/CLOCKS_PER_SEC;
-      last_clk = sys_clk;
-      // std::cout << "dt " << deltaT << " t_int " << integration_time << std::endl;
-    }
-    imus_ybias[0] /= CALIBRATION_PERIOD;
-    imus_ybias[1] /= CALIBRATION_PERIOD;
-    //debug
-    printf("Bias: %.6f, %.6f\n", imus_ybias[0], imus_ybias[1]);
-
-    //Sincroniza as epos
-    epos.sync();
-
-    endwait = clock() + 1 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
-
-    eixo_out.ReadPDO01();
-    eixo_in.ReadPDO01();
-
-    Habilita_Eixo(2);
-
-    // Loop MTw + Controle EPOS:
-    epos.sync();
-    eixo_out.ReadPDO01();
-    eixo_in.ReadPDO01();
-    accBasedControl xsens2Eposcan(&epos, &eixo_in, &eixo_out, control_mode, log_time);
-
-    std::cout << "Loop de Controle, pressione qualquer tecla para interromper!" << std::endl;
-
-    float delay;
-    int printer = 0;
-    int scan_file = 0;
-
-    std::chrono::system_clock::time_point mtw_data_stamp;
-    clock_t beginning = 0;
-    clock_t loop_duration;
-    float freq;
-
-    float mtw_hum = 0;
-    float mtw_exo = 0;
-    float mtw_hum_raw = 0;
-    float mtw_exo_raw = 0;
-    LowPassFilter2pFloat  mtwHumFiltered(XSENS_RATE, XSENS_FC);
-    LowPassFilter2pFloat  mtwExoFiltered(XSENS_RATE, XSENS_FC);
-    std::vector<float> gyros(mtwCallbacks.size());
-    std::thread controller_t;
-    std::condition_variable Cv;
-    std::mutex Mtx;
-
-    if(control_mode == 'k')
-      controller_t = std::thread(&accBasedControl::CACurrentKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 's')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControl, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-    else if (control_mode == 'p')
-      controller_t = std::thread(&accBasedControl::accBasedController, &xsens2Eposcan, std::ref(gyros), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'a')
-      controller_t = std::thread(&accBasedControl::CAdmittanceControlKF, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-    else if(control_mode == 'u')
-      controller_t = std::thread(&accBasedControl::CACurrent, &xsens2Eposcan, std::ref(mtw_hum), std::ref(Cv), std::ref(Mtx));
-
-	xsens2Eposcan.set_timestamp_begin(std::chrono::steady_clock::now());
-
-    while (!_kbhit())
-    {		
-      XsTime::msleep(4);
-
-      bool newDataAvailable = false;
-      mtw_data_stamp = std::chrono::steady_clock::now();
-
-      for (size_t i = 0; i < mtwCallbacks.size(); ++i)
-      {
-        if (mtwCallbacks[i]->dataAvailable())
-        {
-          newDataAvailable = true;
-          XsDataPacket const * packet = mtwCallbacks[i]->getOldestPacket();
-
-          accData[i] = packet->calibratedAcceleration();
-          gyroData[i] = packet->calibratedGyroscopeData();
-
-          mtwCallbacks[i]->deleteOldestPacket();
-        }
-      }
-
-      if (newDataAvailable)
-      {
-        std::unique_lock<std::mutex> Lck(Mtx);
-        mtw_hum_raw = -(float) (gyroData[0].value(2) - imus_ybias[0]);
-        mtw_hum = mtwHumFiltered.apply(mtw_hum_raw);
-        gyros[0] = mtw_hum;
-
-        
-        if (mtwCallbacks.size() == 2 && (control_mode == 'p' || control_mode == 's')){
-            mtw_exo_raw = (float) (gyroData[1].value(2) - imus_ybias[1]);
-            mtw_exo = mtwExoFiltered.apply(mtw_exo_raw);
-            gyros[1] = mtw_exo;
-        }
-
-        Cv.notify_one();
-        Cv.wait(Lck);
-
-		auto control_stamp = std::chrono::steady_clock::now();
-		delay = std::chrono::duration_cast<std::chrono::microseconds>(control_stamp - mtw_data_stamp).count();
-		delay = 1e-3*delay;
-
-        printer++;
-        scan_file++;
-
-        loop_duration = clock() - beginning;
-        beginning = clock();
-        freq = (float)CLOCKS_PER_SEC / loop_duration;
-      }
-
-      if (scan_file == (int)RATE * 6)  // every 6s reads the gains_values.txt 
-      {
-		  xsens2Eposcan.GainScan();
-		  scan_file = 0;
-      }
-
-      if (printer == (int)RATE / 4)   // printing the status @ 4Hz
-      {
-        system("cls");
-		    xsens2Eposcan.UpdateControlStatus();
-        std::cout << xsens2Eposcan.ctrl_word;
-        printf(" MTw Rate: %4.2f Hz\n delay %2.2f ms\n\n MasterCallback:", freq, delay);
-        // display MTW events, showing if one of the IMUs got disconnected:
-        std::cout << wirelessMasterCallback.mtw_event << std::endl; 
-        printer = 0;
-      }
-    }
-    (void)_getch();
-
-    xsens2Eposcan.StopCtrlThread();
-    Cv.notify_all();
-    controller_t.join();
-
-    //Zera o comando do motor
-    xsens2Eposcan.~accBasedControl();
-    //Desabilita o Eixo
-    Desabilita_Eixo(0);
-
-
-    std::cout << "Setting config mode..." << std::endl;
-    if (!wirelessMasterDevice->gotoConfig())
-    {
-      std::ostringstream error;
-      error << "Failed to goto config mode: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-
-    std::cout << "Disabling radio... " << std::endl;
-    if (!wirelessMasterDevice->disableRadio())
-    {
-      std::ostringstream error;
-      error << "Failed to disable radio: " << *wirelessMasterDevice;
-      throw std::runtime_error(error.str());
-    }
-  }
-  catch (std::exception const & ex)
-  {
-    std::cout << ex.what() << std::endl;
-    std::cout << "****ABORT****" << std::endl;
-  }
-  catch (...)
-  {
-    std::cout << "An unknown fatal error has occured. Aborting." << std::endl;
-    std::cout << "****ABORT****" << std::endl;
-  }
-
-  std::cout << "Closing XsControl..." << std::endl;
-  control->close();
-
-  std::cout << "Deleting mtw callbacks..." << std::endl;
-  for (std::vector<MtwCallback*>::iterator i = mtwCallbacks.begin(); i != mtwCallbacks.end(); ++i)
-  {
-    delete (*i);
-  }
-
-  //FINALIZA A COMUNICA��O COM AS EPOS
-  epos.StopPDOS(1);
-
-  endwait = clock() + 2 * CLOCKS_PER_SEC;
-  while (clock() < endwait) {}
-
-  std::cout << "Successful exit." << std::endl;
-  std::cout << "Press [ENTER] to continue." << std::endl;
-  std::cin.get();
-
-  return 0;
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	return 0;
 }
 
-
-
-/* EPOS FUNCTIONS */
-
-void Habilita_Eixo(int ID)
-{
-
-  if ((ID == 2) | (ID == 0))
-  {
-
-    eixo_in.PDOsetControlWord_SwitchOn(false);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    printf("\nENERGIZANDO O MOTOR 2 E HABILITANDO O CONTROLE");
-
-    endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(true);
-    eixo_in.WritePDO01();
-
-  }
-
+void opmode01(short* opt) {
+	*opt = OPMODE::FULL_SENSORS_CONTROL;
+	// tudo roda:
+	imu_start = asgd_start = true;
+	gscan_start = logging_start = true;
+	control_start = ftsensor_start = true;
 }
 
-
-void Desabilita_Eixo(int ID)
-{
-
-  if ((ID == 2) | (ID == 0))
-  {
-    printf("\nDESABILITANDO O MOTOR E CONTROLE\n\n");
-
-    eixo_in.PDOsetControlWord_SwitchOn(true);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-    endwait = clock() + 0.5 * CLOCKS_PER_SEC;
-    while (clock() < endwait) {}
-
-    eixo_in.PDOsetControlWord_SwitchOn(false);
-    eixo_in.PDOsetControlWord_EnableVoltage(true);
-    eixo_in.PDOsetControlWord_QuickStop(true);
-    eixo_in.PDOsetControlWord_EnableOperation(false);
-    eixo_in.WritePDO01();
-
-  }
-
+void opmode02(short* opt) {
+	*opt = OPMODE::IMUS_ONLY_CONTROL;
+	asgd_start = imu_start = true;
+	gscan_start = true;
+	logging_start = true;
+	control_start = true;
+	ftsensor_start = false;
 }
 
+void opmode03(short* opt) {
+	*opt = OPMODE::IMU_BYPASS_CONTROL;
+	asgd_start = imu_start = true;
+	gscan_start = true;
+	logging_start = true;
+	control_start = true;
+	ftsensor_start = false;
+}
+
+void opmode04(short* opt) {
+	*opt = OPMODE::IMUS_READ;
+	asgd_start = imu_start = true;
+	gscan_start = false;
+	logging_start = true;
+	control_start = false;
+	ftsensor_start = false;
+}
+
+void opmode05(short* opt) {
+	*opt = OPMODE::FT_READ;
+	asgd_start = imu_start = false;
+	gscan_start = false;
+	logging_start = true;
+	control_start = false;
+	ftsensor_start = true;
+}
+
+void opmode06(short* opt) {
+	*opt = OPMODE::PARAMS_READ;
+	asgd_start = imu_start = false;
+	gscan_start = true;
+	logging_start = true;
+	control_start = false;
+	ftsensor_start = false;
+}
+
+void opmode07(short* opt) {
+	*opt = OPMODE::RESET_CAN;
+	asgd_start = imu_start = false;
+	gscan_start = false;
+	logging_start = false;
+	control_start = false;
+	ftsensor_start = false;
+}
+
+void opmode08(short* opt) {
+	*opt = OPMODE::SEA_ONLY_CONTROL;
+	asgd_start = imu_start = false;
+	gscan_start = true;
+	logging_start = true;
+	control_start = true;
+	ftsensor_start = false;
+}
+
+void opmode09(short* opt) {
+	*opt = OPMODE::IMUS_READ_NOLOG;
+	asgd_start = imu_start = true;
+	gscan_start = false;
+	logging_start = false;
+	control_start = false;
+	ftsensor_start = false;
+}
+
+//////////////////////////////////////////\/////////\/
+// INTERFACE DE CONTROLE EXO-TAU  /       /\     ////\
+// EESC-USP                      / _____ ___  ___  //|
+// RehabLab                     /  | |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  | |   \ \   |_|  /|
+//\///////////////////////\// //// \_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\/////\

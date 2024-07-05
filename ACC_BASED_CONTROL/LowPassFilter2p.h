@@ -20,7 +20,11 @@
 
 #ifndef M_PI
   #define M_PI 3.141592653f
+  #define RADS2RPM (30/M_PI) // rad/s to rpm 
+  #define RPM2RADS (M_PI/30) // rpm to rad/s
 #endif
+
+#define LPF_CUTOFF 7
 
 
 /// @file   LowPassFilter2p.h
@@ -72,3 +76,11 @@ private:
 };
 
 typedef LowPassFilter2p<float>    LowPassFilter2pFloat;
+
+//////////////////////////////////////////\/////////\//
+// Leonardo Felipe Lima Santos dos Santos /\     ////\/
+// leonardo.felipe.santos@usp.br	_____ ___  ___  //|
+// github/bitbucket qleonardolp /	| |  | . \/   \  /|
+// *Copyright 2021-2026* \//// //  	| |   \ \   |_|  /|
+//\///////////////////////\// ////	\_'_/\_`_/__|   ///
+///\///////////////////////\ //////////////////\////\//

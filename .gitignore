@@ -10,6 +10,7 @@
 
 [Dd]ebug/
 [Rr]elease/
+ACC_BASED_CONTROL/R1/
 x64/
 build/
 [Bb]in/
@@ -18,6 +19,7 @@ build/
 # Enable "build/" folder in the NuGet Packages folder since NuGet packages use it for MSBuild targets
 packages/
 !packages/*/build/
+packages/
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -160,6 +162,8 @@ $RECYCLE.BIN/
 # My ignored, VS and Matlab temp files...
 .vs/
 *.slxc
+*.slx.original
 *.asv
 MATLAB/slprj/
 ACC_BASED_CONTROL/data/slprj/
+ACC_BASED_CONTROL/data

@@ -21,6 +21,8 @@ public:
 
 	XsDataPacket const * getOldestPacket() const;
 
+	XsDataPacket fetchOldestPacket();
+
 	void deleteOldestPacket();
 
 	int getMtwIndex() const;
