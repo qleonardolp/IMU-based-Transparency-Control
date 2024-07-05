@@ -7,3 +7,7 @@
 [submodule "implot"]
 	path = implot
 	url = git@github.com:epezent/implot.git
+[submodule "eigen"]
+	path = eigen
+	url = https://github.com/PX4/eigen.git
+	branch = master
